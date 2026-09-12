@@ -4,7 +4,7 @@
 
 ## Current Task
 
-追加タスク0-SH「セルフホスト配備の土台」の修正と自動検証は完了。Phase 1には未着手。
+追加タスク0-SH「セルフホスト配備の土台」の修正と自動検証は完了。Phase 1の認証・MFA方式を設計確定し、実装には未着手。
 
 ## Completed
 
@@ -20,6 +20,11 @@
 - Gunicornの制御ソケットを無効化し、読み取り専用ファイルシステムで起動可能に修正
 - Caddyで `/admin/` とその配下を404にする公開経路遮断
 - GitHub Actionsによる本番Composeの起動・疎通・永続化検証
+- Phase 1の認証・MFA基盤として `django-allauth[mfa]==65.19.3` を採用
+- WebAuthnパスキー、TOTP、一度だけ表示するリカバリーコードの役割と復旧順序を決定
+- パスキーログインを有効、セルフ登録・パスキー登録による新規アカウント作成を無効とする方針を決定
+- 管理者MFAゲート、MFA秘密の暗号化・鍵ローテーション、緊急リセット方針を決定
+- レート制限共有にPostgreSQL-backed `DatabaseCache`、実IP判定にCaddyが正規化する専用ヘッダーを採用
 
 ## In Progress
 
@@ -28,7 +33,7 @@
 ## Remaining
 
 - 実際の公開ドメイン決定後に、直接HTTPSの証明書取得を手動確認する
-- Phase 1は設計責任者から開始指示があるまで着手しない
+- Phase 1Aから1フェーズずつ実装し、各サブフェーズのテスト成功後に次へ進む
 
 ## Tests
 
@@ -76,3 +81,4 @@
 - `deploy/Caddyfile`: 管理画面の公開経路遮断修正
 - `.github/workflows/ci.yml`: 本番サービス、疎通、ポート、永続化の検証追加
 - `PLAN.md`、`STATUS.md`: 追加タスク0-SHの実績反映
+- `PROJECT_SPEC.md`、`PLAN.md`: Phase 1のパスキー対応と実装順序を具体化
