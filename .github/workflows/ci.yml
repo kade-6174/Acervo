@@ -104,13 +104,16 @@ jobs:
           import urllib.request
 
           base_url = "http://proxy:8080"
+          headers = {"Host": "acervo.example.org"}
 
           for path in ("/health/", "/static/css/acervo.css"):
-              with urllib.request.urlopen(f"{base_url}{path}", timeout=10) as response:
+              request = urllib.request.Request(f"{base_url}{path}", headers=headers)
+              with urllib.request.urlopen(request, timeout=10) as response:
                   assert response.status == 200, (path, response.status)
 
           try:
-              urllib.request.urlopen(f"{base_url}/admin/", timeout=10)
+              request = urllib.request.Request(f"{base_url}/admin/", headers=headers)
+              urllib.request.urlopen(request, timeout=10)
           except urllib.error.HTTPError as error:
               assert error.code == 404, error.code
           else:
