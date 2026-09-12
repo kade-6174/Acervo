@@ -11,6 +11,7 @@ RUN groupadd --gid 10001 acervo \
     && useradd --uid 10001 --gid acervo --create-home --shell /usr/sbin/nologin acervo
 
 COPY pyproject.toml README.md ./
+COPY accounts ./accounts
 COPY config ./config
 COPY core ./core
 COPY manage.py ./manage.py
