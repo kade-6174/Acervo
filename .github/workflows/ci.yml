@@ -83,13 +83,56 @@ jobs:
       - name: 本番イメージをビルド
         run: docker compose -f compose.production.yaml build web
 
-      - name: DBとアプリを起動
-        run: docker compose -f compose.production.yaml up --detach --wait db web
+      - name: 本番サービスを起動
+        run: docker compose -f compose.production.yaml up --detach --wait db web proxy
+
+      - name: ヘルス状態を確認
+        run: |
+          test "$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose -f compose.production.yaml ps -q db)")" = "healthy"
+          test "$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose -f compose.production.yaml ps -q web)")" = "healthy"
+          test "$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose -f compose.production.yaml ps -q proxy)")" = "healthy"
 
       - name: 非root実行と本番設定を確認
         run: |
           test "$(docker compose -f compose.production.yaml exec -T web id -u)" = "10001"
           docker compose -f compose.production.yaml exec -T web python manage.py check --deploy
+
+      - name: Caddy経由のHTTP応答を確認
+        run: |
+          docker compose -f compose.production.yaml exec -T web python - <<'PY'
+          import urllib.error
+          import urllib.request
+
+          base_url = "http://proxy:8080"
+
+          for path in ("/health/", "/static/css/acervo.css"):
+              with urllib.request.urlopen(f"{base_url}{path}", timeout=10) as response:
+                  assert response.status == 200, (path, response.status)
+
+          try:
+              urllib.request.urlopen(f"{base_url}/admin/", timeout=10)
+          except urllib.error.HTTPError as error:
+              assert error.code == 404, error.code
+          else:
+              raise AssertionError("/admin/が404を返しませんでした。")
+          PY
+
+      - name: アプリとDBのポート非公開を確認
+        run: |
+          test -z "$(docker compose -f compose.production.yaml port web 8000 2>/dev/null)"
+          test -z "$(docker compose -f compose.production.yaml port db 5432 2>/dev/null)"
+
+      - name: DBデータの永続化を確認
+        run: |
+          docker compose -f compose.production.yaml exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE TABLE ci_persistence_check (value text NOT NULL); INSERT INTO ci_persistence_check VALUES ('\''retained'\'');"'
+          docker compose -f compose.production.yaml up --detach --force-recreate --wait db
+          test "$(docker compose -f compose.production.yaml exec -T db sh -c 'psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT value FROM ci_persistence_check;"')" = "retained"
+
+      - name: 写真ボリュームの永続化を確認
+        run: |
+          docker compose -f compose.production.yaml exec -T web sh -c 'printf %s retained > /app/media/ci-persistence-check.txt'
+          docker compose -f compose.production.yaml up --detach --force-recreate --no-deps --wait web
+          test "$(docker compose -f compose.production.yaml exec -T web cat /app/media/ci-persistence-check.txt)" = "retained"
 
       - name: コンテナログを表示
         if: always()

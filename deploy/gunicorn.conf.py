@@ -7,3 +7,4 @@ accesslog = "-"
 errorlog = "-"
 capture_output = True
 forwarded_allow_ips = "*"
+control_socket_disable = True
