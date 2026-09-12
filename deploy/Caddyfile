@@ -6,7 +6,7 @@
 (acervo_routes) {
 	encode zstd gzip
 
-	@django_admin path /admin /admin/*
+	@django_admin path /admin /admin/ /admin/*
 	respond @django_admin 404
 
 	handle_path /static/* {
@@ -27,7 +27,7 @@
 :8080 {
 	encode zstd gzip
 
-	@django_admin path /admin /admin/*
+	@django_admin path /admin /admin/ /admin/*
 	respond @django_admin 404
 
 	handle_path /static/* {
