@@ -4,9 +4,9 @@
 
 ## 現在地
 
-**Phase 0 — プロジェクト基盤: ローカル確認完了・CI確認待ち**
+**Phase 0 — プロジェクト基盤: 完了**
 
-Python 3.13、Django 5.2 LTS、PostgreSQL 18を前提とする開発基盤を実装した。ローカルでは設定確認・lint・format・2件のテストが成功している。DockerがこのPCに未導入のため、PostgreSQLへの実接続はGitHub Actionsで確認する。
+Python 3.13、Django 5.2 LTS、PostgreSQL 18を前提とする開発基盤を実装した。ローカルの設定確認・lint・format・2件のテストに加え、GitHub ActionsでPostgreSQLへの接続、マイグレーション、同じテストが成功した。
 
 ## 今回完了したこと
 
@@ -45,7 +45,8 @@ Python 3.13、Django 5.2 LTS、PostgreSQL 18を前提とする開発基盤を実
 - `ruff format --check .`: 成功（21ファイル）
 - `python manage.py check --settings=config.settings.test`: 成功
 - `python manage.py test --settings=config.settings.test`: 成功（2件）
-- PostgreSQL 18への実接続: GitHub Actionsで確認待ち
+- PostgreSQL 18への実接続・マイグレーション: GitHub Actionsで成功
+- GitHub Actions `品質確認`（run 34680963472）: 成功
 
 ## 未解決事項
 
@@ -56,4 +57,4 @@ Python 3.13、Django 5.2 LTS、PostgreSQL 18を前提とする開発基盤を実
 
 ## 次に行うこと
 
-GitHub ActionsでPostgreSQL 18への接続を含む全確認が成功したらPhase 0を完了とし、Phase 1のCustom User Model設計・実装へ進む。
+Phase 1として、Custom User Model、回生からの在籍判定、初回パスワード変更、権限の土台を設計・実装する。MFAの具体的な依存関係は、実装前に保守状況と対応バージョンを確認する。
