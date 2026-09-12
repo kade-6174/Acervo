@@ -48,11 +48,11 @@
 
 ### Phase 1A — Userモデルと在籍判定
 
-- `accounts` アプリとCustom User Modelを最初のマイグレーションとして作る。
-- username、role、cohort_number、is_active、must_change_passwordを実装する。
-- 2026年度の3年生を31回生とする基準から、学校年度ごとの在校生・卒業生を算出する。
-- 未入学相当の未来回生や不正値を登録時に拒否する。
-- `AUTH_USER_MODEL` とDjango管理コマンド・テスト用ユーザー作成をCustom Userへ統一する。
+- [x] `accounts` アプリとCustom User Modelを最初のマイグレーションとして作る。
+- [x] username、role、cohort_number、is_active、must_change_passwordを実装する。
+- [x] 2026年度の3年生を31回生とする基準から、学校年度ごとの在校生・卒業生を算出する。
+- [x] 未入学相当の未来回生や不正値を登録時に拒否する。
+- [x] `AUTH_USER_MODEL` とDjango管理コマンド・テスト用ユーザー作成をCustom Userへ統一する。
 
 **必須テスト:** username一意性、role値、年度境界（3月31日／4月1日）、1～3年生、卒業生、未来回生、不正値。
 

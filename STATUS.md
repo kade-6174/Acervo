@@ -1,10 +1,10 @@
 # Project Status
 
-最終更新: 2026-09-12
+最終更新: 2026-09-13
 
 ## Current Task
 
-追加タスク0-SH「セルフホスト配備の土台」の修正と自動検証は完了。Phase 1の認証・MFA方式を設計確定し、実装には未着手。
+Phase 1A「Userモデルと在籍判定」は実装・検証完了。Phase 1B以降には未着手。
 
 ## Completed
 
@@ -25,6 +25,12 @@
 - パスキーログインを有効、セルフ登録・パスキー登録による新規アカウント作成を無効とする方針を決定
 - 管理者MFAゲート、MFA秘密の暗号化・鍵ローテーション、緊急リセット方針を決定
 - レート制限共有にPostgreSQL-backed `DatabaseCache`、実IP判定にCaddyが正規化する専用ヘッダーを採用
+- `accounts` アプリと `AbstractUser` ベースのCustom User Model
+- username、member/admin role、正の回生、初回パスワード変更フラグ、Django標準の有効状態
+- `AUTH_USER_MODEL = "accounts.User"` とaccounts初回マイグレーション
+- 4月1日を境界とする学校年度と、2026年度31回生を基準にした学年・在籍状態の純粋な算出処理
+- role・回生のモデル検証とDB制約、未入学相当の未来回生の新規作成拒否
+- 通常ユーザー・superuserをCustom Userとして作成するUser manager
 
 ## In Progress
 
@@ -33,21 +39,24 @@
 ## Remaining
 
 - 実際の公開ドメイン決定後に、直接HTTPSの証明書取得を手動確認する
-- Phase 1Aから1フェーズずつ実装し、各サブフェーズのテスト成功後に次へ進む
+- Phase 1Bは設計責任者から開始指示があるまで着手しない
 
 ## Tests
 
 ### ローカル
 
 - `ruff check .`: 成功
-- `ruff format --check .`: 成功（22ファイル）
+- `ruff format --check .`: 成功（31ファイル）
 - `python manage.py check --settings=config.settings.test`: 成功
 - `python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（差分なし）
-- `python manage.py test --settings=config.settings.test`: 成功（2件）
+- `python manage.py test --settings=config.settings.test`: 成功（SQLite、15件）
 - 本番相当設定での `python manage.py check --deploy`: 成功
 
 ### GitHub Actions
 
+- Phase 1A実装成功: run 34705401207
+- PostgreSQL 18でaccounts初回マイグレーションと全15テスト: 成功
+- Phase 1A追加後の0-SH本番コンテナ検証: 成功
 - 実装内容の全項目成功: run 34683368629
 - 通常テストジョブ: 成功
 - 本番ComposeとCloudflare追加Composeの設定検証: 成功
@@ -73,6 +82,7 @@
 
 - 追加タスク0-SHの自動検証に未解決の問題はない。
 - 実ドメインでの証明書取得は、公開ドメインと本番ホスト決定後の手動確認事項として残る。
+- 既存開発DBへDjango標準Userのauthマイグレーションを適用済みの場合、Custom Userへの後付け切替は安全に継続できない。対象は開発用PostgreSQL DBと開発用Composeの `postgres_data` ボリューム（通常 `acervo_postgres_data`）。今回は接続、削除、初期化を行っていない。再作成が必要な環境では、保存データの有無を確認し、設計責任者または運用者の承認を得て別作業で行う。
 
 ## Recent Changes
 
@@ -82,3 +92,8 @@
 - `.github/workflows/ci.yml`: 本番サービス、疎通、ポート、永続化の検証追加
 - `PLAN.md`、`STATUS.md`: 追加タスク0-SHの実績反映
 - `PROJECT_SPEC.md`、`PLAN.md`: Phase 1のパスキー対応と実装順序を具体化
+- `accounts/models.py`、`accounts/enrollment.py`: Custom Userと在籍判定
+- `accounts/migrations/0001_initial.py`: Userモデルの初回マイグレーション
+- `accounts/tests/`: User制約、manager、年度境界、学年・在籍判定のテスト
+- `config/settings/base.py`: `accounts` と `AUTH_USER_MODEL` の設定
+- `Dockerfile`、`pyproject.toml`: accountsパッケージを本番イメージへ追加
