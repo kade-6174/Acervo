@@ -1,0 +1,8 @@
+:root {
+  --acervo-surface: #f4f7f2;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--acervo-surface);
+}

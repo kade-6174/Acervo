@@ -18,8 +18,8 @@ MVPでは「スマートフォンで未使用QRを読む → 標本を登録す�
 
 | 領域 | 方針 |
 |---|---|
-| Web基盤 | Djangoを使用する。開始時にLTS版を確認して採用する。 |
-| DB | PostgreSQL。開発専用SQLiteから本番へ依存しない。 |
+| Web基盤 | Python 3.13 + Django 5.2 LTS。5.2系のセキュリティ修正版を追従する。 |
+| DB | PostgreSQL 18。開発専用SQLiteから本番へ依存しない。 |
 | UI | Django Templates、HTMX、Bootstrap、必要最小限のJavaScript。 |
 | PWA | Manifest、Service Worker、ホーム画面追加、QRカメラ読取をMVPに含める。 |
 | QR読取 | ブラウザカメラを利用する。URL形式のQRを扱う。 |

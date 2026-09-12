@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acervo"
+version = "0.1.0"
+description = "標本・収蔵品・アーカイブを管理するオープンソースコレクション管理システム"
+readme = "README.md"
+requires-python = ">=3.13,<3.15"
+dependencies = [
+    "Django==5.2.17",
+    "django-environ==0.14.0",
+    "psycopg[binary]==3.3.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff==0.16.7",
+]
+
+[tool.setuptools.packages.find]
+include = ["config*", "core*"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "DJ"]
+
+[tool.ruff.lint.per-file-ignores]
+"config/settings/*.py" = ["F403", "F405"]
+"*/migrations/*.py" = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

@@ -1,0 +1,65 @@
+name: 品質確認
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: acervo_test
+          POSTGRES_USER: acervo
+          POSTGRES_PASSWORD: acervo-ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U acervo -d acervo_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.test
+      DJANGO_SECRET_KEY: ci-only-secret-key
+      DJANGO_ALLOWED_HOSTS: testserver
+      ACERVO_TEST_DATABASE: postgresql
+      POSTGRES_DB: acervo_test
+      POSTGRES_USER: acervo
+      POSTGRES_PASSWORD: acervo-ci-password
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: 5432
+
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: 依存関係をインストール
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+
+      - name: コード品質を確認
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Django設定を確認
+        run: python manage.py check --settings=config.settings.test
+
+      - name: PostgreSQLへ接続してマイグレーション
+        run: python manage.py migrate --noinput --settings=config.settings.test
+
+      - name: テストを実行
+        run: python manage.py test --settings=config.settings.test

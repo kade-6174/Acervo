@@ -42,6 +42,36 @@
 - Web App Manifest + Service Worker
 - Cloudflare Tunnel 経由のHTTPS公開
 
+## 開発環境
+
+必要なものはPython 3.13、PostgreSQL 18、Gitです。Dockerを利用できる環境では、同梱の`compose.yaml`で開発用PostgreSQLを起動できます。
+
+### Windowsでの準備
+
+```powershell
+Copy-Item .env.example .env
+py -3.13 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+docker compose up -d db
+python manage.py migrate
+python manage.py runserver
+```
+
+Dockerを使わない場合は、PostgreSQLを別途起動し、`.env`の接続情報を合わせてください。起動後は `http://127.0.0.1:8000/`、DBを含む稼働確認は `http://127.0.0.1:8000/health/` で確認できます。
+
+### 品質確認
+
+```powershell
+ruff check .
+ruff format --check .
+python manage.py check --settings=config.settings.test
+python manage.py test --settings=config.settings.test
+```
+
+通常の開発設定はPostgreSQLを使用します。ローカルの自動テストだけは高速に確認できるSQLiteインメモリ設定を使い、GitHub ActionsではPostgreSQL 18へ実際に接続して同じテストを実行します。
+
 ## ライセンス
 
 ライセンスは未決定です。将来の公開方針を定めた時点で追加します。
