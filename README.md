@@ -1,50 +1,81 @@
 # Acervo
 
-標本・収蔵品・アーカイブを管理するための、オープンソースのコレクション管理システムです。
+標本・収蔵品・アーカイブを自分たちのサーバーで管理するための、セルフホスト可能なオープンソースWebアプリケーションです。
 
-学校の部活動、研究室、小規模博物館、個人コレクションなどで、標本や資料の登録・検索・保管・履歴管理を継続できることを目指します。生物標本を最初の主な対象としますが、鉱物、化石、文化資料などにも広げられる設計にします。
+学校の部活動、研究室、小規模博物館、個人コレクション等で、標本や資料の登録・検索・保管・履歴管理を継続できることを目指します。生物標本を最初の対象としますが、組織名や標本番号の接頭辞は設定で変更できます。
 
-> **開発準備中** — 現在は要件と設計を確定する段階です。実装状況は [STATUS.md](STATUS.md) を参照してください。
+> **開発中** — Phase 0の開発基盤まで完了しています。次はセルフホスト配備の土台と認証・権限を実装します。正確な現在地は [STATUS.md](STATUS.md) を参照してください。
 
-## 目指すこと
+## 主な機能（MVP）
 
-- スマートフォンからQRコードを読み取り、標本を素早く登録できる
-- 標本番号、分類情報、採集・入手情報、保管場所、写真、履歴を一か所で管理できる
-- 卒業後も記録を閲覧でき、現役部員への権限移行を安全に行える
-- 少人数の団体でも、自分たちで長期運用・引き継ぎできる
-- 個人情報を最小限にし、標本情報を安全に守る
-
-## MVPの主な機能
-
-- 標本の登録、検索、詳細表示、編集、写真追加、履歴追加
-- 一意な標本番号の自動採番（例: `KDF-000123`）
+- スマートフォンでQRを読み取り、標本と写真を登録
+- 一意な標本番号の自動採番
 - 未使用・使用済み・無効を区別するQRラベル
-- 和名・学名・分類情報のローカル管理と外部候補検索
-- 保管場所、状態、貸出・返却・売却などの履歴管理
+- 標本の検索、編集、保管場所、状態、貸出・返却等の履歴
+- 和名・学名・分類情報のローカル管理と任意の外部候補検索
 - 標本ラベル・QRラベルのPDF出力
-- 部員・管理者の権限管理、管理者MFA、監査ログ
+- 部員・卒業生・管理者の権限、管理者MFA、監査ログ
 - スマートフォンのホーム画面へ追加できるPWA
+- バックアップ・復元を含むセルフホスト運用
+
+## 本番構成
+
+正式な本番構成は、1台のLinuxホスト上でDocker Composeを使います。
+
+```text
+ブラウザ ──HTTPS── Caddy ── Django/Gunicorn ── PostgreSQL
+                              │
+                              └── 保護された写真ボリューム
+```
+
+- Caddyだけを外部公開し、アプリとDBは内部ネットワークに置きます。
+- PostgreSQLと写真は永続ボリュームへ保存します。
+- 直接HTTPSを標準とし、Cloudflare Tunnelはポート開放できない場合の任意構成です。
+- Cloudflare、S3、外部CDNがなくても主要機能を利用できます。
+- DBと写真を毎日バックアップし、サーバーとは別の保存先へ複製します。
+
+`compose.yaml` は開発専用、`compose.production.yaml` は本番専用です。本番では次の手順で準備します。
+
+```bash
+cp .env.production.example .env.production
+chmod 600 .env.production
+# .env.productionのドメイン、許可ホスト、CSRFオリジン、秘密値を変更する
+docker compose -f compose.production.yaml config --quiet
+docker compose -f compose.production.yaml build
+docker compose -f compose.production.yaml up -d
+docker compose -f compose.production.yaml ps
+```
+
+`DJANGO_SECRET_KEY` と `POSTGRES_PASSWORD` には、インスタンスごとに生成した長いランダム値を設定してください。直接HTTPSでは、設定したドメインのA/AAAAレコードをサーバーへ向け、外部から80/443番へ到達できる必要があります。Caddyが証明書を取得・更新します。
+
+本番ではCaddyだけがホストへポートを公開します。GunicornとPostgreSQLにはホスト側の公開ポートがありません。`/admin/` はCaddyで拒否し、`/static/` だけをCaddyから配信します。アップロード写真は静的ディレクトリに置かず、今後実装するDjangoの認証付き経路から返します。
+
+### Cloudflare Tunnelを使う場合（任意）
+
+Tunnelは本体から分離した追加Composeとして提供します。Cloudflare側でリモート管理Tunnelを作り、公開ホスト名のオリジンを `http://proxy:8080` に設定します。
+
+```bash
+cp .env.cloudflare.example .env.cloudflare
+chmod 600 .env.cloudflare
+# .env.cloudflareへTunnel tokenを設定する
+docker compose \
+  -f compose.production.yaml \
+  -f compose.cloudflare.yaml \
+  up -d
+```
+
+Tunnel tokenは秘密情報です。リポジトリやログへ記録しないでください。Tunnelを使わない通常構成では、`.env.cloudflare`も追加Composeも不要です。
 
 ## 設計文書
 
 - [PROJECT_SPEC.md](PROJECT_SPEC.md) — プロダクト要件と設計上の決定
-- [PLAN.md](PLAN.md) — 実装フェーズと完了条件
-- [AGENTS.md](AGENTS.md) — 開発時に守るルール
-- [STATUS.md](STATUS.md) — 現在の進捗と次に行うこと
-
-## 想定技術構成
-
-実装開始時点で最新の互換性・保守状況を確認したうえで、原則として次を採用します。
-
-- Django / Python
-- PostgreSQL
-- Django Templates + HTMX + Bootstrap（ReactはMVPでは採用しない）
-- Web App Manifest + Service Worker
-- Cloudflare Tunnel 経由のHTTPS公開
+- [PLAN.md](PLAN.md) — Codexが実装する順序、テスト、完了条件
+- [AGENTS.md](AGENTS.md) — Codexが守る恒久的な作業ルール
+- [STATUS.md](STATUS.md) — 実装状況、テスト結果、問題点
 
 ## 開発環境
 
-必要なものはPython 3.13、PostgreSQL 18、Gitです。Dockerを利用できる環境では、同梱の`compose.yaml`で開発用PostgreSQLを起動できます。
+必要なものはPython 3.13、PostgreSQL 18、Gitです。Dockerを利用できる環境では、同梱の開発用 `compose.yaml` でPostgreSQLを起動できます。
 
 ### Windowsでの準備
 
@@ -59,7 +90,7 @@ python manage.py migrate
 python manage.py runserver
 ```
 
-Dockerを使わない場合は、PostgreSQLを別途起動し、`.env`の接続情報を合わせてください。起動後は `http://127.0.0.1:8000/`、DBを含む稼働確認は `http://127.0.0.1:8000/health/` で確認できます。
+起動後は `http://127.0.0.1:8000/`、DBを含む稼働確認は `http://127.0.0.1:8000/health/` で確認できます。
 
 ### 品質確認
 
@@ -70,8 +101,8 @@ python manage.py check --settings=config.settings.test
 python manage.py test --settings=config.settings.test
 ```
 
-通常の開発設定はPostgreSQLを使用します。ローカルの自動テストだけは高速に確認できるSQLiteインメモリ設定を使い、GitHub ActionsではPostgreSQL 18へ実際に接続して同じテストを実行します。
+通常の開発設定はPostgreSQLを使用します。ローカルの高速テストはSQLiteインメモリ設定を使いますが、DB制約・トランザクション・競合を含む重要テストはPostgreSQL上でも実行します。
 
 ## ライセンス
 
-ライセンスは未決定です。将来の公開方針を定めた時点で追加します。
+ライセンスは未決定です。公開方針を定めた時点で追加します。

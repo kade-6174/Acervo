@@ -1,60 +1,59 @@
-# Acervo 開発状況
+# Project Status
 
 最終更新: 2026-09-12
 
-## 現在地
+## Current Task
 
-**Phase 0 — プロジェクト基盤: 完了**
+追加タスク 0-SH「セルフホスト配備の土台」の実装と検証。
 
-Python 3.13、Django 5.2 LTS、PostgreSQL 18を前提とする開発基盤を実装した。ローカルの設定確認・lint・format・2件のテストに加え、GitHub ActionsでPostgreSQLへの接続、マイグレーション、同じテストが成功した。
+## Completed
 
-## 今回完了したこと
+- Phase 0のDjango開発基盤
+- 開発用と本番用のCompose構成の分離
+- Python 3.13、Gunicorn、非rootユーザーを用いたアプリイメージ定義
+- Caddyを唯一の公開入口とし、PostgreSQLを内部ネットワークだけに配置
+- PostgreSQL、写真、静的ファイル、Caddyデータの永続ボリューム定義
+- Bootstrap 5.3.8とHTMX 2.0.10のローカル配信
+- 本番必須環境変数の検証とDjangoの本番セキュリティ設定
+- 直接HTTPS用Caddy構成と、任意のCloudflare Tunnel追加構成
+- 本番コンテナ検証を行うGitHub Actionsジョブ
+- 本番相当設定での `check --deploy`
 
-- `README.md` を日本語のプロダクト概要として整備
-- `PROJECT_SPEC.md` に機能、権限、QR、セキュリティ、運用の決定を記録
-- `PLAN.md` にPhase 0〜10と完了条件を記録
-- `AGENTS.md` に実装・テスト・Git運用の恒久ルールを記録
-- ライセンスは未決定として維持
-- 環境別Django設定、基本URL、ホーム画面、DBヘルスチェックを追加
-- PostgreSQL 18の開発用Compose設定とGitHub Actionsを追加
-- Python依存関係、Ruff設定、環境変数テンプレートを追加
+## In Progress
 
-## 変更ファイル
+- Dockerを利用した本番イメージとCompose構成の実動作確認
 
-- `README.md`
-- `PROJECT_SPEC.md`
-- `PLAN.md`
-- `AGENTS.md`
-- `STATUS.md`
-- `.env.example`
-- `.gitattributes`
-- `.github/workflows/ci.yml`
-- `.gitignore`
-- `.python-version`
-- `compose.yaml`
-- `pyproject.toml`
-- `manage.py`
-- `config/`
-- `core/`
-- `static/`
-- `templates/`
+## Remaining
 
-## テスト・確認
+- イメージビルドと `docker compose config` の実行
+- コンテナ内の非root実行、DB待機後のマイグレーション、ヘルスチェックの確認
+- 再起動後のDB・写真永続化と、DBポート非公開の実動作確認
+- 実際の公開ドメインでのHTTPS証明書取得
+- 追加タスク0-SH完了後にPhase 1へ着手
+
+## Tests
 
 - `ruff check .`: 成功
-- `ruff format --check .`: 成功（21ファイル）
+- `ruff format --check .`: 成功（22ファイル）
 - `python manage.py check --settings=config.settings.test`: 成功
+- `python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（差分なし）
 - `python manage.py test --settings=config.settings.test`: 成功（2件）
-- PostgreSQL 18への実接続・マイグレーション: GitHub Actionsで成功
-- GitHub Actions `品質確認`（run 34680963472）: 成功
+- 本番相当設定での `python manage.py check --deploy`: 成功
+- 本番相当設定での `collectstatic`: 成功（135ファイル）
+- Docker関連の確認: 未実行（このPCにDockerまたはPodmanが見つからないため）
 
-## 未解決事項
+## Problems
 
-- ライセンスの選定（将来のOSS公開方針に合わせて決定）
-- 本番ドメイン、Cloudflare Tunnel、バックアップ先
-- 分類データの取り込み対象と各データソースの再利用条件
-- BootstrapとHTMXの本番向け自前配信方法（Phase 10までにCDN依存を解消）
+- このPCにDocker実行環境がないため、追加タスク0-SHのコンテナ確認項目は未完了。
+- GitHub Actionsには本番コンテナ検証を追加したが、ユーザーの明示指示がないためGitHubへpushしておらず、未実行。
+- 実ドメイン、公開方式、バックアップ保存先、MFAライブラリ、OSSライセンスは今後の設計・導入判断として残っている。
 
-## 次に行うこと
+## Recent Changes
 
-Phase 1として、Custom User Model、回生からの在籍判定、初回パスワード変更、権限の土台を設計・実装する。MFAの具体的な依存関係は、実装前に保守状況と対応バージョンを確認する。
+- `Dockerfile`、`compose.production.yaml`、`compose.cloudflare.yaml`
+- `deploy/Caddyfile`、`deploy/entrypoint.sh`、`deploy/gunicorn.conf.py`
+- `.env.production.example`、`.env.cloudflare.example`、`.dockerignore`
+- `config/settings/base.py`、`config/settings/production.py`
+- `static/vendor/`、`templates/base.html`
+- `.github/workflows/ci.yml`、`pyproject.toml`
+- `README.md`、`PLAN.md`、`STATUS.md`

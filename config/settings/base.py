@@ -78,9 +78,11 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "ja"
-TIME_ZONE = "Asia/Tokyo"
+TIME_ZONE = env("DJANGO_TIME_ZONE", default="Asia/Tokyo")
 USE_I18N = True
 USE_TZ = True
+
+ACERVO_PUBLIC_BASE_URL = env("ACERVO_PUBLIC_BASE_URL", default="http://localhost:8000")
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"

@@ -63,3 +63,38 @@ jobs:
 
       - name: テストを実行
         run: python manage.py test --settings=config.settings.test
+
+  production-container:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v6
+
+      - name: 検証用の本番設定を準備
+        run: |
+          cp .env.production.example .env.production
+          cp .env.cloudflare.example .env.cloudflare
+
+      - name: Compose設定を検証
+        run: |
+          docker compose -f compose.production.yaml config --quiet
+          docker compose -f compose.production.yaml -f compose.cloudflare.yaml config --quiet
+
+      - name: 本番イメージをビルド
+        run: docker compose -f compose.production.yaml build web
+
+      - name: DBとアプリを起動
+        run: docker compose -f compose.production.yaml up --detach --wait db web
+
+      - name: 非root実行と本番設定を確認
+        run: |
+          test "$(docker compose -f compose.production.yaml exec -T web id -u)" = "10001"
+          docker compose -f compose.production.yaml exec -T web python manage.py check --deploy
+
+      - name: コンテナログを表示
+        if: always()
+        run: docker compose -f compose.production.yaml logs --no-color
+
+      - name: 検証用コンテナを削除
+        if: always()
+        run: docker compose -f compose.production.yaml down --volumes

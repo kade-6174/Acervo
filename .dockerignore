@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+.ruff_cache
+*.egg-info
+__pycache__
+*.py[cod]
+.env
+.env.*
+!.env.example
+!.env.production.example
+!.env.cloudflare.example
+db.sqlite3
+media
+staticfiles
