@@ -1,9 +1,10 @@
 """MFA URLルーティングおよびアクセス制御のテスト。
 
-- 最小限のTOTP/Recovery Codes用URLのみを公開
+- TOTP / Recovery Codes の管理、および再認証に必要な最小限のURLのみを公開
 - 匿名ユーザーのログイン誘導
 - InitialPasswordChangeMiddlewareによる未変更ユーザーの遮断
 - WebAuthn・mfa_authenticate・未公開URLの非露出
+- 直近認証タイムアウト時（stale session）の再認証誘導とNoReverseMatch防止
 - GETリクエストでの状態変更防止
 - Cache-Control / Pragma ヘッダーの実測
 """
@@ -41,14 +42,16 @@ class MFAURLRoutingTests(TestCase):
         )
 
     def setUp(self):
-        self.exposed_url_names = [
+        self.exposed_mfa_url_names = [
             "mfa_index",
+            "mfa_reauthenticate",
             "mfa_activate_totp",
             "mfa_deactivate_totp",
             "mfa_view_recovery_codes",
             "mfa_generate_recovery_codes",
             "mfa_download_recovery_codes",
         ]
+        self.all_exposed_url_names = ["account_reauthenticate"] + self.exposed_mfa_url_names
 
     def _login_with_recent_auth(self, user):
         """直近認証済みセッション（did_recently_authenticate=True）を持つクライアント状態を作る。"""
@@ -57,10 +60,21 @@ class MFAURLRoutingTests(TestCase):
         session[AUTHENTICATION_METHODS_SESSION_KEY] = [{"method": "password", "at": time.time()}]
         session.save()
 
+    def _login_with_stale_auth(self, user, age_seconds=600):
+        """タイムアウト済みセッション（did_recently_authenticate=False）を持つクライアント状態を作る。"""
+        self.client.force_login(user)
+        session = self.client.session
+        session[AUTHENTICATION_METHODS_SESSION_KEY] = [
+            {"method": "password", "at": time.time() - age_seconds}
+        ]
+        session.save()
+
     def test_required_url_names_reverse_successfully(self):
-        """必要なallauth MFA URL nameが期待通りのパスに解決されること。"""
+        """必要なallauth MFAおよび再認証URL nameが期待通りのパスに解決されること。"""
         expected_mappings = {
+            "account_reauthenticate": "/accounts/reauthenticate/",
             "mfa_index": "/accounts/mfa/",
+            "mfa_reauthenticate": "/accounts/mfa/reauthenticate/",
             "mfa_activate_totp": "/accounts/mfa/totp/activate/",
             "mfa_deactivate_totp": "/accounts/mfa/totp/deactivate/",
             "mfa_view_recovery_codes": "/accounts/mfa/recovery-codes/",
@@ -72,10 +86,9 @@ class MFAURLRoutingTests(TestCase):
                 self.assertEqual(reverse(name), expected_path)
 
     def test_unexposed_url_names_raise_no_reverse_match(self):
-        """WebAuthnや未公開のallauth URL nameは解決できないこと。"""
+        """WebAuthnやログイン時認証（mfa_authenticate）など未公開URL nameは解決できないこと。"""
         unexposed_names = [
             "mfa_authenticate",
-            "mfa_reauthenticate",
             "mfa_trust",
             "mfa_list_webauthn",
             "mfa_add_webauthn",
@@ -95,7 +108,6 @@ class MFAURLRoutingTests(TestCase):
         self._login_with_recent_auth(self.normal_user)
         unexposed_paths = [
             "/accounts/mfa/authenticate/",
-            "/accounts/mfa/reauthenticate/",
             "/accounts/mfa/trust/",
             "/accounts/mfa/webauthn/",
             "/accounts/mfa/webauthn/add/",
@@ -109,7 +121,7 @@ class MFAURLRoutingTests(TestCase):
     def test_anonymous_user_redirected_to_login(self):
         """匿名ユーザーがMFA URLへアクセスした場合、ログイン画面へリダイレクトされること。"""
         login_url = reverse("account_login")
-        for name in self.exposed_url_names:
+        for name in self.all_exposed_url_names:
             target_url = reverse(name)
             with self.subTest(name=name):
                 response = self.client.get(target_url)
@@ -118,12 +130,12 @@ class MFAURLRoutingTests(TestCase):
                 self.assertIn(f"next={target_url}", unquote(response.headers["Location"]))
 
     def test_must_change_password_user_redirected_to_password_change(self):
-        """must_change_password=TrueのユーザーはMFA URLへアクセスできず、
+        """must_change_password=TrueのユーザーはMFA/再認証URLへアクセスできず、
         password_changeへ送られること。
         """
         self._login_with_recent_auth(self.must_change_user)
         change_password_url = reverse("account_change_password")
-        for name in self.exposed_url_names:
+        for name in self.all_exposed_url_names:
             target_url = reverse(name)
             with self.subTest(name=name):
                 response = self.client.get(target_url)
@@ -131,12 +143,21 @@ class MFAURLRoutingTests(TestCase):
                 self.assertEqual(response.headers["Location"], change_password_url)
 
     def test_authenticated_user_can_access_mfa_urls(self):
-        """通常認証済みユーザーが公開MFA URLにアクセス可能なこと。"""
+        """通常認証済みユーザーが公開URLにアクセス可能なこと。"""
         self._login_with_recent_auth(self.normal_user)
+
+        # account_reauthenticate: 200 OK
+        resp = self.client.get(reverse("account_reauthenticate"))
+        self.assertEqual(resp.status_code, 200)
 
         # mfa_index: 200 OK
         resp = self.client.get(reverse("mfa_index"))
         self.assertEqual(resp.status_code, 200)
+
+        # mfa_reauthenticate: MFA未登録時は利用不可のため、account_reauthenticateへリダイレクト
+        resp = self.client.get(reverse("mfa_reauthenticate"))
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.headers["Location"], reverse("account_reauthenticate"))
 
         # mfa_activate_totp: TOTP未登録時は200 OK
         resp = self.client.get(reverse("mfa_activate_totp"))
@@ -171,6 +192,10 @@ class MFAURLRoutingTests(TestCase):
         resp = self.client.get(reverse("mfa_deactivate_totp"))
         self.assertEqual(resp.status_code, 200)
 
+        # TOTP設定済みの場合、mfa_reauthenticate は 200 OK
+        resp_reauth = self.client.get(reverse("mfa_reauthenticate"))
+        self.assertEqual(resp_reauth.status_code, 200)
+
         # RecoveryCodes Authenticator を作成
         from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
 
@@ -199,12 +224,38 @@ class MFAURLRoutingTests(TestCase):
         self.assertEqual(resp_view.status_code, 200)
         self.assertFalse(resp_view.context["can_view_codes"])
 
+    def test_stale_session_redirects_to_reauthenticate_without_no_reverse_match(self):
+        """直近認証タイムアウト（stale session）の状態で保護操作をPOSTした際、
+        NoReverseMatchにならず正常にaccount_reauthenticateへリダイレクトされること。
+        """
+        # 1. パスワードのみのユーザー（TOTP未登録）でRecoveryCodes再生成をPOST
+        self._login_with_stale_auth(self.normal_user, age_seconds=600)
+        resp_password_only = self.client.post(reverse("mfa_generate_recovery_codes"))
+        self.assertEqual(resp_password_only.status_code, 302)
+        self.assertTrue(
+            resp_password_only.headers["Location"].startswith(reverse("account_reauthenticate"))
+        )
+
+        # 2. TOTP有効済みユーザーでTOTP無効化をPOST
+        from allauth.mfa.totp.internal.auth import TOTP
+
+        TOTP.activate(self.normal_user, "JBSWY3DPEHPK3PXP")
+
+        # セッションを再度stale状態にする
+        self._login_with_stale_auth(self.normal_user, age_seconds=600)
+        resp_totp_user = self.client.post(reverse("mfa_deactivate_totp"))
+        # allauthはget_reauthentication_methodsで候補を列挙し、先頭（パスワード再認証）へ誘導
+        self.assertEqual(resp_totp_user.status_code, 302)
+        self.assertTrue(
+            resp_totp_user.headers["Location"].startswith(reverse("account_reauthenticate"))
+        )
+
     def test_no_state_change_on_get(self):
         """GETリクエストによって状態変更（Authenticatorの生成・削除等）が発生しないこと。"""
         self._login_with_recent_auth(self.normal_user)
         initial_count = Authenticator.objects.filter(user=self.normal_user).count()
 
-        for name in self.exposed_url_names:
+        for name in self.all_exposed_url_names:
             self.client.get(reverse(name))
 
         current_count = Authenticator.objects.filter(user=self.normal_user).count()
@@ -231,3 +282,15 @@ class MFAURLRoutingTests(TestCase):
         resp_gen = self.client.get(reverse("mfa_generate_recovery_codes"))
         self.assertEqual(resp_gen.status_code, 200)
         self.assertIsNone(resp_gen.headers.get("Cache-Control"))
+
+        # 4. mfa_view_recovery_codes (初回表示時: Recovery Codesが表示される最重要画面)
+        from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
+
+        RecoveryCodes.activate(self.normal_user)
+        resp_rc_view = self.client.get(reverse("mfa_view_recovery_codes"))
+        self.assertEqual(resp_rc_view.status_code, 200)
+        self.assertTrue(resp_rc_view.context["can_view_codes"])
+        # allauth 65.19.3標準のViewRecoveryCodesViewにもCache-Control/never_cacheが付与されていない
+        self.assertIsNone(resp_rc_view.headers.get("Cache-Control"))
+        self.assertIsNone(resp_rc_view.headers.get("Pragma"))
+        self.assertIsNone(resp_rc_view.headers.get("Expires"))

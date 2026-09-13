@@ -7,5 +7,6 @@ urlpatterns = [
     path("inactive/", views.account_inactive, name="account_inactive"),
     path("signup/", views.signup, name="account_signup"),
     path("password/change/", views.password_change, name="account_change_password"),
+    path("reauthenticate/", views.reauthenticate, name="account_reauthenticate"),
     path("mfa/", include("accounts.mfa_urls")),
 ]

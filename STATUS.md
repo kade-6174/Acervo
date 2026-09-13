@@ -8,15 +8,16 @@ Phase 1C Step 3A「TOTP / Recovery Codes の最小URLルーティングとアク
 
 ## Completed
 
-- `accounts/mfa_urls.py` を新設し、TOTP・リカバリーコード設定管理に必要な最小限のview（`mfa_index`, `mfa_activate_totp`, `mfa_deactivate_totp`, `mfa_view_recovery_codes`, `mfa_generate_recovery_codes`, `mfa_download_recovery_codes`）を明示的にマッピング
-- `accounts/urls.py` に `path("mfa/", include("accounts.mfa_urls"))` を追加
-- WebAuthn関連URL（`mfa_list_webauthn` 等）および `mfa_authenticate`, `mfa_reauthenticate` の完全非露出（404およびNoReverseMatch）をテストで担保
-- `InitialPasswordChangeMiddleware` がMFA関連全URLを確実に遮断し `account_change_password` へ302リダイレクトすることを検証
-- 匿名ユーザーが各MFA URLへのアクセスで `account_login?next=...` へリダイレクトされることを検証
+- `accounts/mfa_urls.py` を新設し、TOTP・リカバリーコード設定管理に必要な最小限のview（`mfa_index`, `mfa_reauthenticate`, `mfa_activate_totp`, `mfa_deactivate_totp`, `mfa_view_recovery_codes`, `mfa_generate_recovery_codes`, `mfa_download_recovery_codes`）を明示的にマッピング
+- `accounts/urls.py` に `path("reauthenticate/", views.reauthenticate, name="account_reauthenticate")` および `path("mfa/", include("accounts.mfa_urls"))` を追加
+- `REAUTHENTICATION_TIMEOUT` 超過の古いセッション（stale session）で保護操作（無効化・再生成）をPOSTした際に、`account_reauthenticate` および `mfa_reauthenticate` が存在しないことで発生する `NoReverseMatch` 例外を特定し、補正ルーティングにより安全にパスワード再認証へ302リダイレクトされることを実証
+- ログイン時MFAチャレンジURL（`mfa_authenticate`）およびWebAuthn関連URL（`mfa_list_webauthn` 等）の完全非露出（404およびNoReverseMatch）をテストで維持
+- `InitialPasswordChangeMiddleware` がMFA・再認証関連全URLを確実に遮断し `account_change_password` へ302リダイレクトすることを検証
+- 匿名ユーザーが各URLへのアクセスで `account_login?next=...` へリダイレクトされることを検証
 - 通常認証済みユーザーによるMFA各画面への到達性、およびGETのみでの状態変更防止を検証
 - `MFA_RECOVERY_CODES_SHOW_ONCE = True` により、初回ダウンロード成功後に2回目のダウンロードが 403 PermissionDenied となり、一覧画面のコードがマスキングされる防御仕様を実証
-- Cache-Controlヘッダーの実測（`DownloadRecoveryCodesView` は `never_cache` が付与されているが、`ActivateTOTPView` には `never_cache` が付与されていないことを確認）
-- MFA URLルーティング・アクセス制御テスト（`accounts/tests/test_mfa_urls.py`）の追加（全83テスト成功）
+- Cache-Controlヘッダーの実測（`DownloadRecoveryCodesView` は `never_cache` 付与済み、`ActivateTOTPView` および `ViewRecoveryCodesView` には `never_cache` が付与されていない現状を確認）
+- MFA URLルーティング・アクセス制御・stale session再認証テスト（`accounts/tests/test_mfa_urls.py`）の追加（全84テスト成功）
 - `accounts/adapters.py` に `AcervoMFAAdapter(DefaultMFAAdapter)` を実装し、`encrypt()` / `decrypt()` をオーバーライド
 - `config/settings/base.py` に `MFA_ADAPTER = "accounts.adapters.AcervoMFAAdapter"` を設定
 - `MultiFernet` による先頭鍵暗号化・全登録鍵復号・旧鍵ローテーション互換性・不正暗号文の安全な拒否
@@ -84,7 +85,7 @@ Phase 1C Step 3A「TOTP / Recovery Codes の最小URLルーティングとアク
 - `ruff format --check .`: 成功（49ファイル）
 - `python manage.py check --settings=config.settings.test`: 成功
 - `python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（差分なし）
-- `python manage.py test --settings=config.settings.test`: 成功（SQLite、83件全成功）
+- `python manage.py test --settings=config.settings.test`: 成功（SQLite、84件全成功）
 - 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
 
 ### GitHub Actions

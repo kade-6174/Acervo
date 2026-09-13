@@ -12,6 +12,7 @@ from django.urls import path
 
 urlpatterns = [
     path("", base_views.index, name="mfa_index"),
+    path("reauthenticate/", base_views.reauthenticate, name="mfa_reauthenticate"),
     path("totp/activate/", totp_views.activate_totp, name="mfa_activate_totp"),
     path("totp/deactivate/", totp_views.deactivate_totp, name="mfa_deactivate_totp"),
     path(
