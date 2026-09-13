@@ -4,10 +4,14 @@
 
 ## Current Task
 
-Phase 1C Sub-step 3D（TOTPとRecovery Codeによる一般利用者のログイン時MFA）の実装とローカル検証を完了。WebAuthn、パスキー、管理者MFAゲートには未着手。
+Phase 1C Sub-step 4A（WebAuthnの固定RP ID／公開Origin基盤）の実装とローカル検証を完了。WebAuthn画面公開、パスキー登録・認証、管理者MFAゲートには未着手。
 
 ## Completed
 
+- Sub-step 4Aとして、`ACERVO_PUBLIC_BASE_URL`を唯一の情報源にして小文字のhostnameをWebAuthn RP IDへ固定し、RP表示名を`Acervo`へ固定。リクエストの`Host`、`X-Forwarded-Host`、`X-Forwarded-For`はRP IDの決定に使わない
+- 本番起動時に公開URLのHTTPS、DNS hostname、認証情報・query・fragment・subpath不在、IP／localhost拒否、`DJANGO_ALLOWED_HOSTS`完全一致、`DJANGO_CSRF_TRUSTED_ORIGINS`完全Origin一致をfail-fastで検証。allauth／python-fido2標準のOrigin検証は緩和していない
+- `MFA_PASSKEY_SIGNUP_ENABLED=False`を明示し、`MFA_SUPPORTED_TYPES=["recovery_codes", "totp"]`、`MFA_PASSKEY_LOGIN_ENABLED=False`、WebAuthn URL非公開、Trust browser無効を維持
+- `accounts/tests/test_deployment_config.py`へ、RP IDのport除外・header偽装非依存・表示名、開発用localhost、本番公開Origin設定の失敗経路を追加。既存TOTP／Recovery Codes／ログイン時MFAの回帰テストも実行
 - Sub-step 3Dレビュー指摘対応として、MFAログインステージの制限到達時に利用者へ一般的な日本語メッセージと `rate_limited` エラーコードを返す表示契約を追加。allauth標準の制限消費・解除・照合は変更していない
 - `accounts/tests/test_mfa_authenticate.py` を補強し、同一専用IPでX-Forwarded-Forだけを変えてもMFA制限を回避できないこと、入力コードとRecovery Codeがレスポンス・セッション・DBへ残らないこと、正しいMFA成功後にallauth標準の失敗回数解除が働くことを検証
 - `mfa_authenticate` だけを明示的allowlistへ追加し、django-allauth標準のログインステージでTOTPまたは未使用Recovery Codeを検証してからログインを確立する縦断フローを実装
@@ -100,7 +104,7 @@ Phase 1C Sub-step 3D（TOTPとRecovery Codeによる一般利用者のログイ�
 
 - 実際の公開ドメイン決定後に、直接HTTPSの証明書取得を手動確認する
 - Phase 1C全体の受入前に、実運用HTTPSブラウザでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告を確認する（未実施）。
-- Phase 1C Step 4（WebAuthn／パスキーの登録・ログイン・オリジン検証）。このStepでのみ `webauthn` とパスキーログイン設定を再有効化する
+- Phase 1C Sub-step 4B（パスキー登録・一覧・名称変更・削除・再認証）、4C（パスワードレスログインとログイン時第二要素）、4D（本番相当・実ブラウザ検証と最終レビュー）
 
 ## Tests
 
@@ -115,9 +119,9 @@ Phase 1C Sub-step 3D（TOTPとRecovery Codeによる一般利用者のログイ�
 - `python manage.py test accounts.tests.test_mfa_recovery_codes --settings=config.settings.test`: 成功（6件全成功）
 - `python manage.py test accounts.tests.test_mfa_authenticate --settings=config.settings.test`: 成功（12件全成功）
 - `python manage.py test accounts.tests --settings=config.settings.test`: 成功（112件全成功）
-- `python manage.py test --settings=config.settings.test`: 成功（SQLite、115件全成功）
+- `python manage.py test --settings=config.settings.test`: 成功（SQLite、119件全成功）
 - 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
-- ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。Sub-step 3D HEADのGitHub Actionsで本番コンテナ検証を実行し、全項目成功
+- ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。Sub-step 4A HEADのGitHub Actionsで本番コンテナ検証を実行する
 
 ### GitHub Actions
 

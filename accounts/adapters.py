@@ -5,7 +5,7 @@ from django.core.exceptions import SuspiciousOperation
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
-from .security import get_mfa_multi_fernet
+from .security import get_mfa_multi_fernet, get_public_origin_and_rp_id
 
 
 class AcervoAccountAdapter(DefaultAccountAdapter):
@@ -29,6 +29,16 @@ class AcervoMFAAdapter(DefaultMFAAdapter):
         **DefaultMFAAdapter.error_messages,
         "incorrect_code": _("認証コードを確認できませんでした。"),
     }
+
+    def get_public_key_credential_rp_entity(self):
+        """固定の公開OriginからRPを決め、リクエストヘッダーを参照しない。"""
+        from django.conf import settings
+
+        _, rp_id = get_public_origin_and_rp_id(
+            settings.ACERVO_PUBLIC_BASE_URL,
+            allow_localhost_http=True,
+        )
+        return {"id": rp_id, "name": "Acervo"}
 
     def get_multi_fernet(self):
         return get_mfa_multi_fernet()

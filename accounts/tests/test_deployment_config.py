@@ -1,9 +1,12 @@
 from pathlib import Path
 
 from allauth.account import app_settings
+from allauth.core import context
 from django.conf import settings
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import NoReverseMatch, reverse
+
+from accounts.adapters import AcervoMFAAdapter
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -21,6 +24,7 @@ class Phase1ConfigurationTests(SimpleTestCase):
             ["recovery_codes", "totp"],
         )
         self.assertFalse(settings.MFA_PASSKEY_LOGIN_ENABLED)
+        self.assertFalse(settings.MFA_PASSKEY_SIGNUP_ENABLED)
         self.assertEqual(settings.MFA_RECOVERY_CODE_COUNT, 10)
         self.assertTrue(settings.MFA_RECOVERY_CODES_SHOW_ONCE)
         self.assertFalse(settings.MFA_TRUST_ENABLED)
@@ -134,6 +138,35 @@ class MFAKeyValidationTests(SimpleTestCase):
         self.assertNotIn(self.INVALID_KEY, str(ctx.exception))
 
 
+class WebAuthnRPConfigurationTests(SimpleTestCase):
+    def setUp(self):
+        self.adapter = AcervoMFAAdapter()
+        self.request_factory = RequestFactory()
+
+    @override_settings(ACERVO_PUBLIC_BASE_URL="https://PASSKEY.Example.ORG:8443/")
+    def test_rp_id_comes_from_public_url_hostname_not_request_headers(self):
+        direct_request = self.request_factory.get("/", HTTP_HOST="attacker.example.org")
+        forwarded_request = self.request_factory.get(
+            "/",
+            HTTP_HOST="other.example.org",
+            HTTP_X_FORWARDED_HOST="attacker.example.org",
+            HTTP_X_FORWARDED_FOR="203.0.113.99",
+        )
+
+        for request in (direct_request, forwarded_request):
+            with self.subTest(request=request.META):
+                with context.request_context(request):
+                    entity = self.adapter.get_public_key_credential_rp_entity()
+                self.assertEqual(entity, {"id": "passkey.example.org", "name": "Acervo"})
+
+    @override_settings(ACERVO_PUBLIC_BASE_URL="http://localhost:8000")
+    def test_localhost_http_is_only_allowed_for_local_development(self):
+        self.assertEqual(
+            self.adapter.get_public_key_credential_rp_entity(),
+            {"id": "localhost", "name": "Acervo"},
+        )
+
+
 class ProductionMFASettingsTests(SimpleTestCase):
     VALID_KEY = "0YFsuKhANUHwqSsmdjDwiT5GUQXzE7d1c5bUpFPJgy4="
 
@@ -152,6 +185,7 @@ class ProductionMFASettingsTests(SimpleTestCase):
                 "POSTGRES_PASSWORD": "dummy-password",
                 "DJANGO_CSRF_TRUSTED_ORIGINS": "https://acervo.example.org",
                 "ACERVO_PUBLIC_BASE_URL": "https://acervo.example.org",
+                "ACERVO_MFA_FERNET_KEYS": self.VALID_KEY,
             }
         )
         if extra_env:
@@ -220,5 +254,47 @@ class ProductionMFASettingsTests(SimpleTestCase):
         self.assertIn("SUCCESS_CAUGHT", result.stdout)
 
     def test_production_succeeds_with_valid_fernet_key(self):
-        result = self._run_production_setup({"ACERVO_MFA_FERNET_KEYS": self.VALID_KEY})
+        result = self._run_production_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_production_validates_public_origin_and_rp_id_boundary(self):
+        invalid_cases = {
+            "http://acervo.example.org": "httpsの公開URL",
+            "https:///": "形式が不正",
+            "https://user:password@acervo.example.org": "形式が不正",
+            "https://acervo.example.org?query=value": "形式が不正",
+            "https://acervo.example.org#fragment": "形式が不正",
+            "https://acervo.example.org/subpath": "形式が不正",
+            "https://192.0.2.10": "IPアドレス",
+            "https://localhost": "localhost",
+        }
+        for public_url, message in invalid_cases.items():
+            with self.subTest(public_url=public_url):
+                result = self._run_production_setup({"ACERVO_PUBLIC_BASE_URL": public_url})
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(message, result.stderr)
+
+        allowed_hosts_mismatch = self._run_production_setup(
+            {"DJANGO_ALLOWED_HOSTS": "other.example.org"}
+        )
+        self.assertNotEqual(allowed_hosts_mismatch.returncode, 0)
+        self.assertIn("DJANGO_ALLOWED_HOSTS", allowed_hosts_mismatch.stderr)
+
+        wildcard_only = self._run_production_setup({"DJANGO_ALLOWED_HOSTS": ".example.org"})
+        self.assertNotEqual(wildcard_only.returncode, 0)
+        self.assertIn("DJANGO_ALLOWED_HOSTS", wildcard_only.stderr)
+
+        csrf_mismatch = self._run_production_setup(
+            {"DJANGO_CSRF_TRUSTED_ORIGINS": "https://other.example.org"}
+        )
+        self.assertNotEqual(csrf_mismatch.returncode, 0)
+        self.assertIn("DJANGO_CSRF_TRUSTED_ORIGINS", csrf_mismatch.stderr)
+
+    def test_production_accepts_ported_public_origin_when_exactly_registered(self):
+        result = self._run_production_setup(
+            {
+                "ACERVO_PUBLIC_BASE_URL": "https://acervo.example.org:8443",
+                "DJANGO_CSRF_TRUSTED_ORIGINS": "https://acervo.example.org:8443",
+            }
+        )
         self.assertEqual(result.returncode, 0, result.stderr)

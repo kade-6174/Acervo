@@ -79,7 +79,11 @@
   - [x] Sub-step 3B: TOTP登録・無効化の日本語UI・テンプレート・キャッシュ制御・機能テスト。
   - [x] Sub-step 3C: リカバリーコード表示・ダウンロード・再生成の日本語UI・機能テスト。
   - [x] Sub-step 3D: ログイン時のMFA認証画面（TOTP / リカバリーコード入力）および総合検証。
-- [ ] Step 4: WebAuthn（パスキー）の登録・ログイン・オリジン検証。安全でない本番オリジンの拒否。完了時に `MFA_SUPPORTED_TYPES` の `webauthn` と `MFA_PASSKEY_LOGIN_ENABLED` を再有効化する。
+- [ ] Step 4: WebAuthn（パスキー）の登録・ログイン・オリジン検証。安全でない本番オリジンの拒否。
+  - [x] Sub-step 4A: 固定公開OriginからのRP ID決定、本番設定のfail-fast検証、WebAuthn機能ゲート維持。
+  - [ ] Sub-step 4B: パスキー登録・一覧・名称変更・削除・再認証。
+  - [ ] Sub-step 4C: パスワードレスログインとログイン時第二要素。ここで `MFA_SUPPORTED_TYPES` の `webauthn` と `MFA_PASSKEY_LOGIN_ENABLED` を再有効化する。
+  - [ ] Sub-step 4D: 本番相当・実ブラウザ検証と最終レビュー。
 - [ ] Step 5: 全利用者へのMFA設定画面提供と管理者MFA必須化（検証済みパスキーまたはTOTP必須、セッション内MFA確認）。
 - [ ] Step 6: 別管理者によるMFAリセットと、最後の管理者向けサーバー管理コマンド。リセット後の再登録強制。
 - [ ] Step 7: 本番Compose・CI検証（production validation）。

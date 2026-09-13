@@ -91,6 +91,7 @@ MFA_ADAPTER = "accounts.adapters.AcervoMFAAdapter"
 # Step 4でWebAuthnとパスキーログインを再有効化するまでの機能ゲート。
 MFA_SUPPORTED_TYPES = ["recovery_codes", "totp"]
 MFA_PASSKEY_LOGIN_ENABLED = False
+MFA_PASSKEY_SIGNUP_ENABLED = False
 MFA_FORMS = {
     "authenticate": "accounts.forms.AcervoAuthenticateForm",
 }

@@ -1,10 +1,8 @@
 """本番用設定。秘密値が不足している場合は起動させない。"""
 
-from urllib.parse import urlsplit
-
 from django.core.exceptions import ImproperlyConfigured
 
-from accounts.security import validate_mfa_fernet_keys
+from accounts.security import validate_mfa_fernet_keys, validate_production_public_origin
 
 from .base import *  # noqa: F403
 
@@ -24,9 +22,11 @@ CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])  # no
 if not CSRF_TRUSTED_ORIGINS:
     raise ImproperlyConfigured("DJANGO_CSRF_TRUSTED_ORIGINSの設定が必要です。")
 
-public_url = urlsplit(ACERVO_PUBLIC_BASE_URL)  # noqa: F405
-if public_url.scheme != "https" or not public_url.hostname:
-    raise ImproperlyConfigured("ACERVO_PUBLIC_BASE_URLにはhttpsの公開URLが必要です。")
+validate_production_public_origin(  # noqa: F405
+    ACERVO_PUBLIC_BASE_URL,
+    ALLOWED_HOSTS,
+    CSRF_TRUSTED_ORIGINS,
+)
 
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
