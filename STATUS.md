@@ -131,6 +131,8 @@ Phase 1C Sub-step 4B（WebAuthn登録・管理・パスワードログイン後�
 
 ### GitHub Actions
 
+- Phase 1C Sub-step 4B（HEAD: `63e8a86bec1a553621dbf72277c6ccf31c6049b5`）: run 34771093567（`test`、`production-container` 全成功）。PostgreSQL 18上の全119テスト、Ruff、Django check、migration差分なし、本番Compose／Cloudflare追加Compose、Caddy adapt・validate、本番イメージ、全サービスhealthy、UID 10001、`check --deploy`、Caddy経由確認、IP境界、ポート非公開、DB・写真永続化を確認
+
 - Phase 1C Sub-step 4A（HEAD: `dac1fd15c9e65ee8c393775cd4bf3b9a33c8b12c`）: run 34770046419（全ジョブ成功）
 - `test` job: PostgreSQL 18.6上で全119テスト、Ruff lint・format、Django system check、migration差分なしを確認
 - `production-container` job: 本番ComposeとCloudflare追加Compose、Caddy adapt・validate、本番イメージ、全サービスhealthy、非root・`check --deploy`、Caddy経由のMFA認証URL安全リダイレクト、共有cache table、クライアントIP境界、ポート非公開、DB・写真永続化を確認
