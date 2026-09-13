@@ -28,6 +28,12 @@ class UserModelTests(TestCase):
                 role="owner",
             )
 
+    def test_database_rejects_invalid_role_without_model_validation(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            User(username="database-invalid-role", cohort_number=31, role="owner").save(
+                force_insert=True
+            )
+
     def test_non_positive_cohort_number_is_rejected(self):
         for cohort_number in (0, -1):
             with self.subTest(cohort_number=cohort_number), self.assertRaises(ValidationError):
@@ -35,6 +41,15 @@ class UserModelTests(TestCase):
                     username=f"invalid-cohort-{cohort_number}",
                     cohort_number=cohort_number,
                 )
+
+    def test_database_rejects_non_positive_cohort_number_without_model_validation(self):
+        for cohort_number in (0, -1):
+            with self.subTest(cohort_number=cohort_number):
+                with self.assertRaises(IntegrityError), transaction.atomic():
+                    User(
+                        username=f"database-invalid-cohort-{cohort_number}",
+                        cohort_number=cohort_number,
+                    ).save(force_insert=True)
 
     @patch("accounts.models.timezone.localdate")
     def test_future_cohort_is_rejected_on_creation(self, localdate):
@@ -62,6 +77,35 @@ class UserModelTests(TestCase):
         self.assertFalse(user.is_staff)
         self.assertFalse(user.is_superuser)
         self.assertTrue(user.check_password("test-password-123"))
+
+    async def test_async_manager_creates_regular_user(self):
+        user = await User.objects.acreate_user(
+            username="async-regular-user",
+            password="test-password-123",
+            cohort_number=31,
+        )
+
+        self.assertFalse(user.is_staff)
+        self.assertFalse(user.is_superuser)
+        self.assertTrue(user.check_password("test-password-123"))
+
+    async def test_async_manager_rejects_invalid_role(self):
+        with self.assertRaises(ValidationError):
+            await User.objects.acreate_user(
+                username="async-invalid-role",
+                cohort_number=31,
+                role="owner",
+            )
+
+    @patch("accounts.models.timezone.localdate")
+    async def test_async_manager_rejects_future_cohort(self, localdate):
+        localdate.return_value = date(2026, 4, 1)
+
+        with self.assertRaisesMessage(ValidationError, "未入学相当"):
+            await User.objects.acreate_user(
+                username="async-future-user",
+                cohort_number=34,
+            )
 
     def test_manager_creates_superuser(self):
         user = User.objects.create_superuser(

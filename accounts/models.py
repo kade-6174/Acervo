@@ -1,5 +1,6 @@
 from datetime import date
 
+from asgiref.sync import sync_to_async
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import UserManager as DjangoUserManager
 from django.core.validators import MinValueValidator
@@ -18,7 +19,7 @@ class UserManager(DjangoUserManager):
 
     async def _acreate_user(self, username, email, password, **extra_fields):
         user = self._create_user_object(username, email, password, **extra_fields)
-        user.full_clean()
+        await sync_to_async(user.full_clean, thread_sensitive=True)()
         await user.asave(using=self._db)
         return user
 
