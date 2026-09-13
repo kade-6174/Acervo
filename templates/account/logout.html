@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}ログアウト — Acervo{% endblock %}
+
+{% block content %}
+  <section class="container py-5">
+    <h1 class="h2">ログアウト</h1>
+    <p>ログアウトしますか？</p>
+    <form method="post" action="{% url 'account_logout' %}">
+      {% csrf_token %}
+      <button class="btn btn-primary" type="submit">ログアウト</button>
+    </form>
+  </section>
+{% endblock %}

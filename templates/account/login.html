@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}ログイン — Acervo{% endblock %}
+
+{% block content %}
+  <section class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-md-7 col-lg-5">
+        <h1 class="h2 mb-4">ログイン</h1>
+        <form method="post" action="{% url 'account_login' %}" novalidate>
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+          {% endif %}
+          {% for field in form %}
+            <div class="mb-3">
+              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}<div class="text-danger mt-1">{{ field.errors }}</div>{% endif %}
+            </div>
+          {% endfor %}
+          {% if redirect_field_value %}
+            <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+          {% endif %}
+          <button class="btn btn-primary w-100" type="submit">ログイン</button>
+        </form>
+      </div>
+    </div>
+  </section>
+{% endblock %}

@@ -74,11 +74,17 @@ jobs:
         run: |
           cp .env.production.example .env.production
           cp .env.cloudflare.example .env.cloudflare
+          sed -i 's/acervo\.example\.org/acervo.localhost/g' .env.production
 
       - name: Compose設定を検証
         run: |
           docker compose -f compose.production.yaml config --quiet
           docker compose -f compose.production.yaml -f compose.cloudflare.yaml config --quiet
+
+      - name: Caddy設定を変換・検証
+        run: |
+          docker compose -f compose.production.yaml run --rm --no-deps --entrypoint caddy proxy adapt --config /etc/caddy/Caddyfile --validate
+          docker compose -f compose.production.yaml run --rm --no-deps --entrypoint caddy proxy validate --config /etc/caddy/Caddyfile
 
       - name: 本番イメージをビルド
         run: docker compose -f compose.production.yaml build web
@@ -96,6 +102,7 @@ jobs:
         run: |
           test "$(docker compose -f compose.production.yaml exec -T web id -u)" = "10001"
           docker compose -f compose.production.yaml exec -T web python manage.py check --deploy
+          docker compose -f compose.production.yaml exec -T web python manage.py shell -c "from django.conf import settings; cache = settings.CACHES['default']; assert cache['BACKEND'] == 'django.core.cache.backends.db.DatabaseCache'; assert cache['LOCATION'] == 'acervo_rate_limit_cache'"
 
       - name: Caddy経由のHTTP応答を確認
         run: |
@@ -104,9 +111,9 @@ jobs:
           import urllib.request
 
           base_url = "http://proxy:8080"
-          headers = {"Host": "acervo.example.org"}
+          headers = {"Host": "acervo.localhost"}
 
-          for path in ("/health/", "/static/css/acervo.css"):
+          for path in ("/health/", "/static/css/acervo.css", "/accounts/login/"):
               request = urllib.request.Request(f"{base_url}{path}", headers=headers)
               with urllib.request.urlopen(request, timeout=10) as response:
                   assert response.status == 200, (path, response.status)
@@ -118,6 +125,98 @@ jobs:
               assert error.code == 404, error.code
           else:
               raise AssertionError("/admin/が404を返しませんでした。")
+          PY
+
+      - name: レート制限cache tableを確認
+        run: |
+          test "$(docker compose -f compose.production.yaml exec -T db sh -c 'psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT to_regclass('"'"'public.acervo_rate_limit_cache'"'"');"')" = "acervo_rate_limit_cache"
+
+      - name: 直接HTTPSとTunnelのクライアントIP境界を確認
+        run: |
+          docker compose -f compose.production.yaml exec -T web python manage.py shell <<'PY'
+          import http.cookiejar
+          import re
+          import ssl
+          import urllib.parse
+          import urllib.request
+
+          from django.db import connection
+
+
+          def login_attempt(url, headers, *, https=False):
+              cookie_jar = http.cookiejar.CookieJar()
+              handlers = [urllib.request.HTTPCookieProcessor(cookie_jar)]
+              if https:
+                  handlers.append(
+                      urllib.request.HTTPSHandler(
+                          context=ssl._create_unverified_context()
+                      )
+                  )
+              opener = urllib.request.build_opener(*handlers)
+              with opener.open(urllib.request.Request(url, headers=headers), timeout=10) as response:
+                  body = response.read().decode()
+              csrf_token = re.search(
+                  r'name="csrfmiddlewaretoken" value="([^"]+)"', body
+              ).group(1)
+              data = urllib.parse.urlencode(
+                  {
+                      "csrfmiddlewaretoken": csrf_token,
+                      "login": "missing-user",
+                      "password": "wrong-password",
+                  }
+              ).encode()
+              post_headers = {
+                  **headers,
+                  "Content-Type": "application/x-www-form-urlencoded",
+                  "Origin": "https://acervo.localhost",
+              }
+              request = urllib.request.Request(url, data=data, headers=post_headers)
+              with opener.open(request, timeout=10) as response:
+                  assert response.status == 200, response.status
+
+
+          def login_ip_keys():
+              with connection.cursor() as cursor:
+                  cursor.execute(
+                      "SELECT cache_key FROM acervo_rate_limit_cache "
+                      "WHERE cache_key LIKE %s",
+                      ["%:allauth:rl:login:ip:%"],
+                  )
+                  return [row[0] for row in cursor.fetchall()]
+
+
+          def clear_cache_table():
+              with connection.cursor() as cursor:
+                  cursor.execute("DELETE FROM acervo_rate_limit_cache")
+
+
+          spoofed_headers = {
+              "Host": "acervo.localhost",
+              "X-Acervo-Client-IP": "203.0.113.90",
+              "X-Forwarded-For": "203.0.113.91",
+              "CF-Connecting-IP": "203.0.113.92",
+          }
+
+          clear_cache_table()
+          login_attempt(
+              "https://proxy/accounts/login/",
+              spoofed_headers,
+              https=True,
+          )
+          direct_keys = login_ip_keys()
+          assert len(direct_keys) == 1, direct_keys
+          assert all("203.0.113." not in key for key in direct_keys), direct_keys
+
+          clear_cache_table()
+          tunnel_headers = {
+              **spoofed_headers,
+              "CF-Connecting-IP": "198.51.100.40",
+          }
+          login_attempt("http://proxy:8080/accounts/login/", tunnel_headers)
+          tunnel_keys = login_ip_keys()
+          assert len(tunnel_keys) == 1, tunnel_keys
+          assert tunnel_keys[0].endswith(":198.51.100.40"), tunnel_keys
+          assert all("203.0.113." not in key for key in tunnel_keys), tunnel_keys
           PY
 
       - name: アプリとDBのポート非公開を確認
