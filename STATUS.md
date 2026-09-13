@@ -99,7 +99,7 @@ Gemini移行期間（`927256e..eb02cce`）の独立監査と必要最小限の�
 - `python manage.py test accounts.tests.test_mfa_totp --settings=config.settings.test`: 成功（12件全成功）
 - `python manage.py test --settings=config.settings.test`: 成功（SQLite、97件全成功）
 - 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
-- ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。同一HEADのGitHub Actionsで本番コンテナ検証済み
+- ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。監査対象HEAD `eb02cce` のGitHub Actionsで本番コンテナ検証済み。監査補正コミットは未pushのためCI未実行
 
 ### GitHub Actions
 
