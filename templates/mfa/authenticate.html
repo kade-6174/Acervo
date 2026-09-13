@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}二要素認証 — Acervo{% endblock %}
+
+{% block content %}
+  <section class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-md-7 col-lg-6">
+        <h1 class="h2 mb-3">二要素認証</h1>
+        <p class="text-muted">
+          認証アプリに表示された6桁のコードを入力してください。
+        </p>
+        <p class="text-muted">
+          認証アプリを利用できない場合は、未使用のリカバリーコードを同じ欄に入力できます。リカバリーコードは使用後に無効になります。
+        </p>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+          {% endif %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.code.id_for_label }}">{{ form.code.label }}</label>
+            {{ form.code }}
+            {% if form.code.errors %}
+              <div class="invalid-feedback d-block">{{ form.code.errors }}</div>
+            {% endif %}
+          </div>
+          <button class="btn btn-primary" type="submit">確認してログイン</button>
+        </form>
+
+        <form method="post" action="{% url 'account_logout' %}" class="mt-3">
+          {% csrf_token %}
+          <button class="btn btn-outline-secondary" type="submit">ログインを中止する</button>
+        </form>
+      </div>
+    </div>
+  </section>
+{% endblock %}

@@ -74,12 +74,12 @@
 
 - [x] Step 1: `allauth.mfa` の有効化、`cryptography` 依存追加、allauth標準MFA設定（ブラウザ信頼無効化、リカバリーコード10個・一度限り表示、WebAuthn安全オリジン等）、`ACERVO_MFA_FERNET_KEYS` の本番バリデーション。
 - [x] Step 2: `allauth.mfa` のMFA adapterを拡張し、TOTP秘密とリカバリーコードを `cryptography.fernet.MultiFernet` で暗号化する。`ACERVO_MFA_FERNET_KEYS` の全鍵で復号し、新規保存は先頭鍵を使う。
-- [ ] Step 3: TOTP登録・認証、リカバリーコード（10個の一度限り表示・再生成による旧コード無効化）のUIとルーティング。
+- [x] Step 3: TOTP登録・認証、リカバリーコード（10個の一度限り表示・再生成による旧コード無効化）のUIとルーティング。
   - [x] Sub-step 3A: TOTP / Recovery Codesに必要な最小URLルーティング（accounts.mfa_urls）の明示的公開、初回パスワード変更ゲート・アクセス制御・WebAuthn非露出の検証。
   - [x] Sub-step 3B: TOTP登録・無効化の日本語UI・テンプレート・キャッシュ制御・機能テスト。
   - [x] Sub-step 3C: リカバリーコード表示・ダウンロード・再生成の日本語UI・機能テスト。
-  - [ ] Sub-step 3D: ログイン時のMFA認証画面（TOTP / リカバリーコード入力）および総合検証。
-- [ ] Step 4: WebAuthn（パスキー）の登録・ログイン・オリジン検証。安全でない本番オリジンの拒否。
+  - [x] Sub-step 3D: ログイン時のMFA認証画面（TOTP / リカバリーコード入力）および総合検証。
+- [ ] Step 4: WebAuthn（パスキー）の登録・ログイン・オリジン検証。安全でない本番オリジンの拒否。完了時に `MFA_SUPPORTED_TYPES` の `webauthn` と `MFA_PASSKEY_LOGIN_ENABLED` を再有効化する。
 - [ ] Step 5: 全利用者へのMFA設定画面提供と管理者MFA必須化（検証済みパスキーまたはTOTP必須、セッション内MFA確認）。
 - [ ] Step 6: 別管理者によるMFAリセットと、最後の管理者向けサーバー管理コマンド。リセット後の再登録強制。
 - [ ] Step 7: 本番Compose・CI検証（production validation）。

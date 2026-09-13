@@ -3,7 +3,7 @@
 - TOTP / Recovery Codes の管理、および再認証に必要な最小限のURLのみを公開
 - 匿名ユーザーのログイン誘導
 - InitialPasswordChangeMiddlewareによる未変更ユーザーの遮断
-- WebAuthn・mfa_authenticate・未公開URLの非露出
+- WebAuthn・未公開URLの非露出とログイン時MFA認証URLの公開
 - 直近認証タイムアウト時（stale session）の再認証誘導とNoReverseMatch防止
 - GETリクエストでの状態変更防止
 - Cache-Control / Pragma ヘッダーの実測
@@ -75,6 +75,7 @@ class MFAURLRoutingTests(TestCase):
             "account_reauthenticate": "/accounts/reauthenticate/",
             "mfa_index": "/accounts/mfa/",
             "mfa_reauthenticate": "/accounts/mfa/reauthenticate/",
+            "mfa_authenticate": "/accounts/mfa/authenticate/",
             "mfa_activate_totp": "/accounts/mfa/totp/activate/",
             "mfa_deactivate_totp": "/accounts/mfa/totp/deactivate/",
             "mfa_view_recovery_codes": "/accounts/mfa/recovery-codes/",
@@ -86,9 +87,8 @@ class MFAURLRoutingTests(TestCase):
                 self.assertEqual(reverse(name), expected_path)
 
     def test_unexposed_url_names_raise_no_reverse_match(self):
-        """WebAuthnやログイン時認証（mfa_authenticate）など未公開URL nameは解決できないこと。"""
+        """WebAuthnや信頼済みブラウザなど未公開URL nameは解決できないこと。"""
         unexposed_names = [
-            "mfa_authenticate",
             "mfa_trust",
             "mfa_list_webauthn",
             "mfa_add_webauthn",
@@ -107,7 +107,6 @@ class MFAURLRoutingTests(TestCase):
         """未公開のパスへ直接アクセスした場合は404を返すこと。"""
         self._login_with_recent_auth(self.normal_user)
         unexposed_paths = [
-            "/accounts/mfa/authenticate/",
             "/accounts/mfa/trust/",
             "/accounts/mfa/webauthn/",
             "/accounts/mfa/webauthn/add/",

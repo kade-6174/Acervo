@@ -1,4 +1,13 @@
 from allauth.account.forms import ChangePasswordForm, LoginForm
+from allauth.mfa.base.forms import AuthenticateForm
+from django import forms
+
+
+class OneTimeCodeInput(forms.TextInput):
+    """入力済みの認証コードをエラー応答へ再表示しない入力欄。"""
+
+    def format_value(self, value):
+        return None
 
 
 class AcervoLoginForm(LoginForm):
@@ -25,3 +34,19 @@ class AcervoChangePasswordForm(ChangePasswordForm):
         if self.user.must_change_password:
             self.user.must_change_password = False
             self.user.save(update_fields=["must_change_password"])
+
+
+class AcervoAuthenticateForm(AuthenticateForm):
+    """allauth標準の照合をそのまま使うMFA認証画面用フォーム。"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["code"].label = "認証コード"
+        self.fields["code"].widget = OneTimeCodeInput(
+            attrs={
+                "class": "form-control",
+                "autocomplete": "one-time-code",
+                "inputmode": "numeric",
+                "autofocus": True,
+            }
+        )

@@ -4,10 +4,14 @@
 
 ## Current Task
 
-Phase 1C Sub-step 3C（Recovery Codesの一回限り表示・直接ダウンロード・再生成）の実装とローカル検証を完了。Sub-step 3D、ログイン時MFA、WebAuthn、パスキー、管理者MFAゲートには未着手。
+Phase 1C Sub-step 3D（TOTPとRecovery Codeによる一般利用者のログイン時MFA）の実装とローカル検証を完了。WebAuthn、パスキー、管理者MFAゲートには未着手。
 
 ## Completed
 
+- `mfa_authenticate` だけを明示的allowlistへ追加し、django-allauth標準のログインステージでTOTPまたは未使用Recovery Codeを検証してからログインを確立する縦断フローを実装
+- 日本語の認証画面、CSRF付きPOST中止、一般的な不正コードメッセージ、入力済み認証コードをエラー応答へ再表示しない入力欄を追加。照合・使用済み更新・レート制限・ログインステージはallauth標準実装を維持
+- Step 4までの一時的機能ゲートとして `MFA_SUPPORTED_TYPES` から `webauthn` を除外し、`MFA_PASSKEY_LOGIN_ENABLED=False` を設定。`mfa_trust` と全WebAuthn URLは引き続きNoReverseMatch/404
+- `accounts/tests/test_mfa_authenticate.py` でMFA未登録・Recovery Codesのみの通常ログイン、TOTP/Recovery Code成功・失敗・一回性、safe/external next、キャンセル、CSRF、never_cache、専用クライアントIP境界、無効ユーザー、初回パスワード変更順序、認証記録をHTTP統合テストで確認
 - Sub-step 3Cレビュー指摘対応として、Clipboard APIの機能検出・例外処理、日本語 `aria-live` 通知、Blob保存の開始・失敗通知、一時リンク削除・Object URL破棄、再生成フォームの通常二重送信防止を追加
 - Recovery Codesだけを持つ利用者の再生成POSTがallauth標準フォームで拒否され、Authenticator、暗号化seed、used mask、閲覧済み時刻が不変で、レスポンスへ平文コードを返さない回帰テストを追加
 - 監査補正コミット `66c63fc` と `7dcb3ca` を変更・squashせず `origin/main` へpushし、GitHub Actions run 34754182073 の `test` と `production-container` が全成功したことを確認
@@ -93,20 +97,21 @@ Phase 1C Sub-step 3C（Recovery Codesの一回限り表示・直接ダウンロ�
 ## Remaining
 
 - 実際の公開ドメイン決定後に、直接HTTPSの証明書取得を手動確認する
-- Phase 1C Sub-step 3D（ログイン時MFA認証画面および総合検証）
+- Phase 1C Step 4（WebAuthn／パスキーの登録・ログイン・オリジン検証）。このStepでのみ `webauthn` とパスキーログイン設定を再有効化する
 
 ## Tests
 
 ### ローカル
 
 - `ruff check .`: 成功
-- `ruff format --check .`: 成功（52ファイル）
+- `ruff format --check .`: 成功（53ファイル）
 - `python manage.py check --settings=config.settings.test`: 成功
 - `python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（差分なし）
 - `python manage.py test accounts.tests.test_mfa_urls --settings=config.settings.test`: 成功（11件全成功）
 - `python manage.py test accounts.tests.test_mfa_totp --settings=config.settings.test`: 成功（12件全成功）
 - `python manage.py test accounts.tests.test_mfa_recovery_codes --settings=config.settings.test`: 成功（6件全成功）
-- `python manage.py test --settings=config.settings.test`: 成功（SQLite、103件全成功）
+- `python manage.py test accounts.tests.test_mfa_authenticate --settings=config.settings.test`: 成功（11件全成功）
+- `python manage.py test --settings=config.settings.test`: 成功（SQLite、114件全成功）
 - 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
 - ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。Sub-step 3C HEADのGitHub Actionsで本番コンテナ検証を実行し、全項目成功
 
@@ -175,7 +180,7 @@ Phase 1C Sub-step 3C（Recovery Codesの一回限り表示・直接ダウンロ�
 - Phase 1Bと追加タスク0-SHの自動検証に未解決の問題はない。
 - 実ドメインでの証明書取得は、公開ドメインと本番ホスト決定後の手動確認事項として残る。
 - 既存開発DBへDjango標準Userのauthマイグレーションを適用済みの場合、Custom Userへの後付け切替は安全に継続できない。対象は開発用PostgreSQL DBと開発用Composeの `postgres_data` ボリューム（通常 `acervo_postgres_data`）。今回は接続、削除、初期化を行っていない。再作成が必要な環境では、保存データの有無を確認し、設計責任者または運用者の承認を得て別作業で行う。
-- `mfa_authenticate` はSub-step 3Dまで意図的に非公開である。この中間状態ではTOTP設定後の次回パスワードログイン時にMFAチャレンジを完了できないため、Phase 1C全体の完成版として本番提供しない。
+- TOTPとRecovery Codeによる一般利用者MFAは完成したが、WebAuthn／パスキー、管理者MFAゲート、MFAリセット、監査ログは未実装であり、Phase 1C全体および本番準備の完了を意味しない。
 
 ## Change history
 

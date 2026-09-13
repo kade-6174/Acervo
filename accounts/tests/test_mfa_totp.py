@@ -7,7 +7,7 @@
 - POSTによる無効化とmfa_indexへのリダイレクト
 - stale sessionでの再認証誘導
 - must_change_password=Trueでの遮断
-- WebAuthn・mfa_authenticateの非露出維持
+- WebAuthnの非露出維持
 - 秘密値の非ログ出力
 """
 
@@ -382,9 +382,9 @@ class TOTPUserInterfaceTests(TestCase):
                 self.assertEqual(resp.status_code, 302)
                 self.assertEqual(resp.headers["Location"], reverse("account_change_password"))
 
-    def test_webauthn_and_mfa_authenticate_remain_unexposed(self):
-        """WebAuthn関連URLおよびmfa_authenticateは引き続き非公開であること。"""
-        for name in ("mfa_authenticate", "mfa_list_webauthn", "mfa_add_webauthn"):
+    def test_webauthn_urls_remain_unexposed(self):
+        """WebAuthn関連URLは引き続き非公開であること。"""
+        for name in ("mfa_list_webauthn", "mfa_add_webauthn"):
             with self.subTest(name=name):
                 with self.assertRaises(NoReverseMatch):
                     reverse(name)

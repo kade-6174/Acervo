@@ -147,6 +147,22 @@ jobs:
               assert error.code == 404, error.code
           else:
               raise AssertionError("/admin/が404を返しませんでした。")
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, request, fp, code, msg, headers, newurl):
+                  return None
+
+          opener = urllib.request.build_opener(NoRedirect)
+          request = urllib.request.Request(
+              f"{base_url}/accounts/mfa/authenticate/", headers=headers
+          )
+          try:
+              opener.open(request, timeout=10)
+          except urllib.error.HTTPError as error:
+              assert error.code == 302, error.code
+              assert error.headers["Location"] == "/accounts/login/", error.headers
+          else:
+              raise AssertionError("ログインステージなしのMFA認証URLがログインへ戻りませんでした。")
           PY
 
       - name: レート制限cache tableを確認
