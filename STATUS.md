@@ -121,10 +121,13 @@ Phase 1C Sub-step 4A（WebAuthnの固定RP ID／公開Origin基盤）の実装�
 - `python manage.py test accounts.tests --settings=config.settings.test`: 成功（112件全成功）
 - `python manage.py test --settings=config.settings.test`: 成功（SQLite、119件全成功）
 - 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
-- ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。Sub-step 4A HEADのGitHub Actionsで本番コンテナ検証を実行する
+- ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。Sub-step 4A HEADのGitHub Actionsで本番コンテナ検証を実行し、全項目成功
 
 ### GitHub Actions
 
+- Phase 1C Sub-step 4A（HEAD: `dac1fd15c9e65ee8c393775cd4bf3b9a33c8b12c`）: run 34770046419（全ジョブ成功）
+- `test` job: PostgreSQL 18.6上で全119テスト、Ruff lint・format、Django system check、migration差分なしを確認
+- `production-container` job: 本番ComposeとCloudflare追加Compose、Caddy adapt・validate、本番イメージ、全サービスhealthy、非root・`check --deploy`、Caddy経由のMFA認証URL安全リダイレクト、共有cache table、クライアントIP境界、ポート非公開、DB・写真永続化を確認
 - Phase 1C Sub-step 3D（HEAD: `0a48c1faf51f343826d8b89c45bc91af51a86cdc`）: run 34768590542（全ジョブ成功）
 - `test` job: PostgreSQL 18.6上で全114テスト、Ruff lint・format、Django system check、migration差分なしを確認
 - `production-container` job: 本番ComposeとCloudflare追加Compose、Caddy adapt・validate、本番イメージ、全サービスhealthy、非root・`check --deploy`、Caddy経由でログインステージなしの `/accounts/mfa/authenticate/` が `/accounts/login/` へ302、共有cache table、クライアントIP境界、ポート非公開、DB・写真永続化を確認
