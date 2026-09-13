@@ -113,10 +113,13 @@ Phase 1C Sub-step 3D（TOTPとRecovery Codeによる一般利用者のログイ�
 - `python manage.py test accounts.tests.test_mfa_authenticate --settings=config.settings.test`: 成功（11件全成功）
 - `python manage.py test --settings=config.settings.test`: 成功（SQLite、114件全成功）
 - 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
-- ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。Sub-step 3C HEADのGitHub Actionsで本番コンテナ検証を実行し、全項目成功
+- ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。Sub-step 3D HEADのGitHub Actionsで本番コンテナ検証を実行し、全項目成功
 
 ### GitHub Actions
 
+- Phase 1C Sub-step 3D（HEAD: `0a48c1faf51f343826d8b89c45bc91af51a86cdc`）: run 34768590542（全ジョブ成功）
+- `test` job: PostgreSQL 18.6上で全114テスト、Ruff lint・format、Django system check、migration差分なしを確認
+- `production-container` job: 本番ComposeとCloudflare追加Compose、Caddy adapt・validate、本番イメージ、全サービスhealthy、非root・`check --deploy`、Caddy経由でログインステージなしの `/accounts/mfa/authenticate/` が `/accounts/login/` へ302、共有cache table、クライアントIP境界、ポート非公開、DB・写真永続化を確認
 - Phase 1C Sub-step 3Cレビュー指摘修正（HEAD: `a65931e047f960b82e354edb5e5a081dc9d5c45d`）: run 34767393446（全ジョブ成功）
 - `test` job: PostgreSQL 18.6上で全103テスト、Ruff lint・format、Django system check、migration差分なしを確認
 - `production-container` job: 本番ComposeとCloudflare追加Compose、Caddy設定、本番イメージ、全サービスhealthy、非root・`check --deploy`、Caddy応答、共有cache table、クライアントIP境界、ポート非公開、DB・写真永続化を確認
