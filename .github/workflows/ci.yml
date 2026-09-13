@@ -75,6 +75,28 @@ jobs:
           cp .env.production.example .env.production
           cp .env.cloudflare.example .env.cloudflare
           sed -i 's/acervo\.example\.org/acervo.localhost/g' .env.production
+          python3 - <<'PY'
+          import base64
+          import secrets
+
+          try:
+              from cryptography.fernet import Fernet
+              key = Fernet.generate_key().decode("ascii")
+          except ImportError:
+              key = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("ascii")
+
+          with open(".env.production", "r", encoding="utf-8") as f:
+              content = f.read()
+
+          content = content.replace(
+              "replace-with-comma-separated-fernet-keys-generated-for-this-instance",
+              key,
+          )
+
+          with open(".env.production", "w", encoding="utf-8") as f:
+              f.write(content)
+          PY
+
 
       - name: Compose設定を検証
         run: |
