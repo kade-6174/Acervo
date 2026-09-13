@@ -1,6 +1,6 @@
 # Project Status
 
-最終更新: 2026-09-13
+最終更新: 2026-09-14
 
 ## Current Task
 
@@ -112,6 +112,9 @@ Phase 1C Sub-step 3C（Recovery Codesの一回限り表示・直接ダウンロ�
 
 ### GitHub Actions
 
+- Phase 1C Sub-step 3Cレビュー指摘修正（HEAD: `a65931e047f960b82e354edb5e5a081dc9d5c45d`）: run 34767393446（全ジョブ成功）
+- `test` job: PostgreSQL 18.6上で全103テスト、Ruff lint・format、Django system check、migration差分なしを確認
+- `production-container` job: 本番ComposeとCloudflare追加Compose、Caddy設定、本番イメージ、全サービスhealthy、非root・`check --deploy`、Caddy応答、共有cache table、クライアントIP境界、ポート非公開、DB・写真永続化を確認
 - Phase 1C Sub-step 3C最終検証（HEAD: `7a22e1db24bd43bbf8ec614b3e71def7497890f2`）: run 34754570798（全ジョブ成功）
 - `test` job: PostgreSQL 18.6上で全102テスト、Ruff lint・format、Django system check、migration差分なしを確認
 - `production-container` job: 本番ComposeとCloudflare追加Compose、Caddy設定、本番イメージ、全サービスhealthy、非root・`check --deploy`、Caddy応答、共有cache table、クライアントIP境界、ポート非公開、DB・写真永続化を確認
