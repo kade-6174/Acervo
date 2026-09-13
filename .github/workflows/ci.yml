@@ -134,27 +134,42 @@ jobs:
       - name: 直接HTTPSとTunnelのクライアントIP境界を確認
         run: |
           docker compose -f compose.production.yaml exec -T web python manage.py shell <<'PY'
-          import http.cookiejar
+          import http.client
           import re
+          import socket
           import ssl
           import urllib.parse
-          import urllib.request
 
           from django.db import connection
 
 
-          def login_attempt(url, headers, *, https=False):
-              cookie_jar = http.cookiejar.CookieJar()
-              handlers = [urllib.request.HTTPCookieProcessor(cookie_jar)]
-              if https:
-                  handlers.append(
-                      urllib.request.HTTPSHandler(
-                          context=ssl._create_unverified_context()
-                      )
+          class DirectHttpsConnection(http.client.HTTPSConnection):
+              def __init__(self):
+                  super().__init__(
+                      "acervo.localhost",
+                      timeout=10,
+                      context=ssl._create_unverified_context(),
                   )
-              opener = urllib.request.build_opener(*handlers)
-              with opener.open(urllib.request.Request(url, headers=headers), timeout=10) as response:
-                  body = response.read().decode()
+
+              def connect(self):
+                  socket_connection = socket.create_connection(("proxy", 443), self.timeout)
+                  self.sock = self._context.wrap_socket(
+                      socket_connection,
+                      server_hostname="acervo.localhost",
+                  )
+
+
+          def login_attempt(connection, headers):
+              path = "/accounts/login/"
+              connection.request("GET", path, headers=headers)
+              response = connection.getresponse()
+              assert response.status == 200, response.status
+              body = response.read().decode()
+              cookies = "; ".join(
+                  value.split(";", 1)[0]
+                  for name, value in response.getheaders()
+                  if name.lower() == "set-cookie"
+              )
               csrf_token = re.search(
                   r'name="csrfmiddlewaretoken" value="([^"]+)"', body
               ).group(1)
@@ -167,12 +182,15 @@ jobs:
               ).encode()
               post_headers = {
                   **headers,
+                  "Cookie": cookies,
                   "Content-Type": "application/x-www-form-urlencoded",
                   "Origin": "https://acervo.localhost",
               }
-              request = urllib.request.Request(url, data=data, headers=post_headers)
-              with opener.open(request, timeout=10) as response:
-                  assert response.status == 200, response.status
+              connection.request("POST", path, body=data, headers=post_headers)
+              response = connection.getresponse()
+              assert response.status == 200, response.status
+              response.read()
+              connection.close()
 
 
           def login_ip_keys():
@@ -198,11 +216,7 @@ jobs:
           }
 
           clear_cache_table()
-          login_attempt(
-              "https://proxy/accounts/login/",
-              spoofed_headers,
-              https=True,
-          )
+          login_attempt(DirectHttpsConnection(), spoofed_headers)
           direct_keys = login_ip_keys()
           assert len(direct_keys) == 1, direct_keys
           assert all("203.0.113." not in key for key in direct_keys), direct_keys
@@ -212,7 +226,7 @@ jobs:
               **spoofed_headers,
               "CF-Connecting-IP": "198.51.100.40",
           }
-          login_attempt("http://proxy:8080/accounts/login/", tunnel_headers)
+          login_attempt(http.client.HTTPConnection("proxy", 8080, timeout=10), tunnel_headers)
           tunnel_keys = login_ip_keys()
           assert len(tunnel_keys) == 1, tunnel_keys
           assert tunnel_keys[0].endswith(":198.51.100.40"), tunnel_keys
