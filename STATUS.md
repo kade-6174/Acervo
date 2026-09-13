@@ -106,10 +106,13 @@ Phase 1C Sub-step 3C（Recovery Codesの一回限り表示・直接ダウンロ�
 - `python manage.py test accounts.tests.test_mfa_recovery_codes --settings=config.settings.test`: 成功（5件全成功）
 - `python manage.py test --settings=config.settings.test`: 成功（SQLite、102件全成功）
 - 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
-- ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。Sub-step 3Cのpush後、GitHub Actionsで本番コンテナ検証を実行する
+- ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。Sub-step 3C HEADのGitHub Actionsで本番コンテナ検証を実行し、全項目成功
 
 ### GitHub Actions
 
+- Phase 1C Sub-step 3C最終検証（HEAD: `7a22e1db24bd43bbf8ec614b3e71def7497890f2`）: run 34754570798（全ジョブ成功）
+- `test` job: PostgreSQL 18.6上で全102テスト、Ruff lint・format、Django system check、migration差分なしを確認
+- `production-container` job: 本番ComposeとCloudflare追加Compose、Caddy設定、本番イメージ、全サービスhealthy、非root・`check --deploy`、Caddy応答、共有cache table、クライアントIP境界、ポート非公開、DB・写真永続化を確認
 - Gemini移行期間最終検証（HEAD: `eb02cce5642318388c3298379dd813177211c286`）: run 34752369353（全ジョブ成功）
 - `test` job: 成功。PostgreSQL 18.6上で全93テスト、Ruff lint・format、Django system check、migration差分なしを確認
 - `production-container` job: 成功。本番Compose・Cloudflare追加Compose、Caddy設定、本番イメージ、全サービスhealthy、非root・`check --deploy`、Caddy応答、共有cache table、クライアントIP境界、ポート非公開、DB・写真永続化を確認
