@@ -9,11 +9,12 @@ from allauth.mfa.base import views as base_views
 from allauth.mfa.recovery_codes import views as recovery_views
 from allauth.mfa.totp import views as totp_views
 from django.urls import path
+from django.views.decorators.cache import never_cache
 
 urlpatterns = [
     path("", base_views.index, name="mfa_index"),
     path("reauthenticate/", base_views.reauthenticate, name="mfa_reauthenticate"),
-    path("totp/activate/", totp_views.activate_totp, name="mfa_activate_totp"),
+    path("totp/activate/", never_cache(totp_views.activate_totp), name="mfa_activate_totp"),
     path("totp/deactivate/", totp_views.deactivate_totp, name="mfa_deactivate_totp"),
     path(
         "recovery-codes/",

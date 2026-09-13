@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}二要素認証 — Acervo{% endblock %}
+
+{% block content %}
+  <section class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-md-9 col-lg-8">
+        <h1 class="h2 mb-4">二要素認証設定</h1>
+        <p class="text-muted mb-4">
+          ログイン時のセキュリティを強化するため、二要素認証（MFA）を設定できます。
+        </p>
+
+        <!-- 認証アプリ (TOTP) -->
+        <div class="card shadow-sm mb-4">
+          <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <h2 class="h5 card-title mb-1">認証アプリ (TOTP)</h2>
+                <p class="text-muted small mb-0">
+                  Google Authenticator や 1Password などの認証アプリに表示されるワンタイムコードで認証します。
+                </p>
+              </div>
+              <div>
+                {% if authenticators.totp %}
+                  <span class="badge bg-success">設定済み</span>
+                {% else %}
+                  <span class="badge bg-secondary">未設定</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <hr class="my-3">
+
+            <div class="d-flex justify-content-end">
+              {% if authenticators.totp %}
+                <a href="{% url 'mfa_deactivate_totp' %}" class="btn btn-outline-danger btn-sm">無効化する</a>
+              {% else %}
+                <a href="{% url 'mfa_activate_totp' %}" class="btn btn-primary btn-sm">設定する</a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- リカバリーコード -->
+        <div class="card shadow-sm mb-4">
+          <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <h2 class="h5 card-title mb-1">リカバリーコード</h2>
+                <p class="text-muted small mb-0">
+                  認証端末を紛失した際に、緊急ログイン用として使用できる使い捨てコードです。
+                </p>
+              </div>
+              <div>
+                {% if authenticators.recovery_codes %}
+                  <span class="badge bg-success">発行済み</span>
+                {% else %}
+                  <span class="badge bg-secondary">未設定</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <hr class="my-3">
+
+            <div class="d-flex justify-content-end gap-2">
+              {% if authenticators.recovery_codes %}
+                {% if not MFA_RECOVERY_CODES_SHOW_ONCE %}
+                  <a href="{% url 'mfa_view_recovery_codes' %}" class="btn btn-outline-secondary btn-sm">確認する</a>
+                {% endif %}
+                <a href="{% url 'mfa_generate_recovery_codes' %}" class="btn btn-outline-warning btn-sm">再生成する</a>
+              {% else %}
+                <a href="{% url 'mfa_generate_recovery_codes' %}" class="btn btn-outline-secondary btn-sm">生成する</a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- パスキー / セキュリティキー (WebAuthn: Phase 1C Step 4にて提供予定) -->
+        <div class="card shadow-sm text-muted bg-light">
+          <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <h2 class="h5 card-title mb-1 text-secondary">パスキー / セキュリティキー</h2>
+                <p class="small mb-0">
+                  Touch ID、Face ID、Windows Hello、YubiKeyなどの生体認証や物理キーで認証します。
+                </p>
+              </div>
+              <div>
+                <span class="badge bg-secondary">準備中</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+{% endblock %}

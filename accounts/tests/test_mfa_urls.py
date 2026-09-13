@@ -270,13 +270,15 @@ class MFAURLRoutingTests(TestCase):
         self.assertEqual(resp_index.status_code, 200)
         self.assertIsNone(resp_index.headers.get("Cache-Control"))
 
-        # 2. mfa_activate_totp (TOTP secretが表示される画面)
+        # 2. mfa_activate_totp (TOTP secretが表示される画面: never_cache適用済み)
         resp_totp = self.client.get(reverse("mfa_activate_totp"))
         self.assertEqual(resp_totp.status_code, 200)
-        # allauth 65.19.3標準のActivateTOTPViewにはCache-Control/never_cacheが付与されていない
-        self.assertIsNone(resp_totp.headers.get("Cache-Control"))
-        self.assertIsNone(resp_totp.headers.get("Pragma"))
-        self.assertIsNone(resp_totp.headers.get("Expires"))
+        totp_cache_control = resp_totp.headers.get("Cache-Control")
+        self.assertIsNotNone(totp_cache_control)
+        self.assertIn("max-age=0", totp_cache_control)
+        self.assertIn("no-cache", totp_cache_control)
+        self.assertIn("no-store", totp_cache_control)
+        self.assertIn("must-revalidate", totp_cache_control)
 
         # 3. mfa_generate_recovery_codes
         resp_gen = self.client.get(reverse("mfa_generate_recovery_codes"))

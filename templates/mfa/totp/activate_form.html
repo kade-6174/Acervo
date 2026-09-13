@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}認証アプリを設定 — Acervo{% endblock %}
+
+{% block content %}
+  <section class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-md-8 col-lg-6">
+        <div class="d-flex align-items-center mb-4">
+          <a href="{% url 'mfa_index' %}" class="btn btn-outline-secondary btn-sm me-3">← 戻る</a>
+          <h1 class="h2 mb-0">認証アプリを設定</h1>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+          <div class="card-body p-4">
+            <h2 class="h5 card-title mb-3">設定の手順</h2>
+            <ol class="text-muted small ps-3 mb-4">
+              <li class="mb-2">スマートフォン等の認証アプリ（Google Authenticator、1Password等）を開きます。</li>
+              <li class="mb-2">以下のQRコードを認証アプリでスキャンします（読み取れない場合は手動入力用キーを使用してください）。</li>
+              <li class="mb-2">認証アプリに表示される6桁の確認コードを画面下部に入力し、登録ボタンを押します。</li>
+              <li>登録完了後、端末紛失時に備えた緊急用の<strong>リカバリーコード</strong>が自動発行されます。</li>
+            </ol>
+
+            <div class="text-center mb-4">
+              <div class="d-inline-block p-3 border rounded bg-light">
+                <img src="{{ totp_svg_data_uri }}" alt="TOTP QRコード" class="img-fluid" style="max-width: 220px; height: auto;">
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label small fw-semibold text-muted" for="totp-secret-display">手動入力用キー</label>
+              <div class="input-group">
+                <input type="text" id="totp-secret-display" class="form-control font-monospace text-center" value="{{ form.secret }}" readonly aria-label="手動入力用シークレットキー">
+                <button class="btn btn-outline-secondary" type="button" id="copy-secret-btn">コピー</button>
+              </div>
+              <div id="copy-feedback" class="form-text text-success d-none">キーをクリップボードにコピーしました。</div>
+            </div>
+
+            <hr class="my-4">
+
+            <form method="post" action="{% url 'mfa_activate_totp' %}" novalidate>
+              {% csrf_token %}
+              {% if form.non_field_errors %}
+                <div class="alert alert-danger py-2 small" role="alert">
+                  {{ form.non_field_errors }}
+                </div>
+              {% endif %}
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold" for="{{ form.code.id_for_label }}">確認コード（6桁）</label>
+                <input type="text"
+                       name="{{ form.code.html_name }}"
+                       id="{{ form.code.id_for_label }}"
+                       class="form-control form-control-lg text-center font-monospace fs-4 {% if form.code.errors %}is-invalid{% endif %}"
+                       placeholder="000000"
+                       maxlength="6"
+                       inputmode="numeric"
+                       autocomplete="one-time-code"
+                       required>
+                {% if form.code.errors %}
+                  <div class="invalid-feedback text-center">
+                    {{ form.code.errors|striptags }}
+                  </div>
+                {% else %}
+                  <div class="form-text text-center">認証アプリに表示されている現在の6桁の数字を入力してください。</div>
+                {% endif %}
+              </div>
+
+              <div class="d-grid gap-2 mt-4">
+                <button class="btn btn-primary btn-lg" type="submit">認証アプリを登録</button>
+                <a href="{% url 'mfa_index' %}" class="btn btn-link text-secondary text-decoration-none">キャンセル</a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function() {
+      var copyBtn = document.getElementById('copy-secret-btn');
+      var secretInput = document.getElementById('totp-secret-display');
+      var feedback = document.getElementById('copy-feedback');
+      if (copyBtn && secretInput && navigator.clipboard) {
+        copyBtn.addEventListener('click', function() {
+          navigator.clipboard.writeText(secretInput.value).then(function() {
+            if (feedback) {
+              feedback.classList.remove('d-none');
+              setTimeout(function() {
+                feedback.classList.add('d-none');
+              }, 3000);
+            }
+          });
+        });
+      }
+    })();
+  </script>
+{% endblock %}
