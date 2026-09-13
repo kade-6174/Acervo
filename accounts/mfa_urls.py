@@ -18,7 +18,7 @@ urlpatterns = [
     path("totp/deactivate/", totp_views.deactivate_totp, name="mfa_deactivate_totp"),
     path(
         "recovery-codes/",
-        recovery_views.view_recovery_codes,
+        never_cache(recovery_views.view_recovery_codes),
         name="mfa_view_recovery_codes",
     ),
     path(

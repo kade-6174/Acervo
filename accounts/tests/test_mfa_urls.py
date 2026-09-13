@@ -285,14 +285,38 @@ class MFAURLRoutingTests(TestCase):
         self.assertEqual(resp_gen.status_code, 200)
         self.assertIsNone(resp_gen.headers.get("Cache-Control"))
 
-        # 4. mfa_view_recovery_codes (初回表示時: Recovery Codesが表示される最重要画面)
+        # 4. mfa_view_recovery_codes
+        # (初回表示時: Recovery Codesが表示される最重要画面: never_cache適用済み)
         from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
 
         RecoveryCodes.activate(self.normal_user)
         resp_rc_view = self.client.get(reverse("mfa_view_recovery_codes"))
         self.assertEqual(resp_rc_view.status_code, 200)
         self.assertTrue(resp_rc_view.context["can_view_codes"])
-        # allauth 65.19.3標準のViewRecoveryCodesViewにもCache-Control/never_cacheが付与されていない
-        self.assertIsNone(resp_rc_view.headers.get("Cache-Control"))
-        self.assertIsNone(resp_rc_view.headers.get("Pragma"))
-        self.assertIsNone(resp_rc_view.headers.get("Expires"))
+        rc_cache_control = resp_rc_view.headers.get("Cache-Control")
+        self.assertIsNotNone(rc_cache_control)
+        self.assertIn("max-age=0", rc_cache_control)
+        self.assertIn("no-cache", rc_cache_control)
+        self.assertIn("no-store", rc_cache_control)
+        self.assertIn("must-revalidate", rc_cache_control)
+
+        # 5. mfa_download_recovery_codes (allauth標準でnever_cache適用済み)
+        # SHOW_ONCE=True のため未閲覧の別ユーザーでダウンロードを実行
+        dl_user = User.objects.create_user(
+            username="cache_dl_user",
+            email="cache_dl@example.com",
+            password="SecurePassword123!",
+            must_change_password=False,
+            role=User.Role.MEMBER,
+            cohort_number=31,
+        )
+        self._login_with_recent_auth(dl_user)
+        RecoveryCodes.activate(dl_user)
+        resp_rc_download = self.client.get(reverse("mfa_download_recovery_codes"))
+        self.assertEqual(resp_rc_download.status_code, 200)
+        dl_cache_control = resp_rc_download.headers.get("Cache-Control")
+        self.assertIsNotNone(dl_cache_control)
+        self.assertIn("max-age=0", dl_cache_control)
+        self.assertIn("no-cache", dl_cache_control)
+        self.assertIn("no-store", dl_cache_control)
+        self.assertIn("must-revalidate", dl_cache_control)
