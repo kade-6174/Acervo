@@ -77,12 +77,27 @@ class AcervoMFAAdapterTests(TestCase):
             "not-valid-fernet-token",
             "gAAAAABinvalid...",
             "plain-text-secret",
+            "全角日本語暗号文",
+            12345,
+            None,
         ]
         for token in invalid_ciphertexts:
             with self.subTest(token=token):
                 with self.assertRaises(SuspiciousOperation) as ctx:
                     self.adapter.decrypt(token)
-                self.assertNotIn(token, str(ctx.exception))
+                self.assertNotIn(str(token), str(ctx.exception))
+
+    def test_decrypt_does_not_suppress_unexpected_configuration_errors(self):
+        from unittest.mock import patch
+
+        from django.core.exceptions import ImproperlyConfigured
+
+        with patch.object(
+            self.adapter, "get_multi_fernet", side_effect=ImproperlyConfigured("設定不備")
+        ):
+            with self.assertRaises(ImproperlyConfigured) as ctx:
+                self.adapter.decrypt("valid-looking-token")
+            self.assertEqual(str(ctx.exception), "設定不備")
 
     def test_totp_secret_is_encrypted_in_database(self):
         plain_secret = "JBSWY3DPEHPK3PXP"

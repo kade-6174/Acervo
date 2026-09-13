@@ -27,9 +27,13 @@ class AcervoMFAAdapter(DefaultMFAAdapter):
 
     def decrypt(self, encrypted_text: str) -> str:
         """暗号化された機密情報を登録済みFernet鍵群で復号して返す。"""
+        if not isinstance(encrypted_text, str):
+            raise SuspiciousOperation("MFA秘密情報の復号に失敗しました。")
+
         multi_fernet = self.get_multi_fernet()
         try:
-            decrypted_bytes = multi_fernet.decrypt(encrypted_text.encode("ascii"))
+            token_bytes = encrypted_text.encode("ascii")
+            decrypted_bytes = multi_fernet.decrypt(token_bytes)
             return decrypted_bytes.decode("utf-8")
-        except (InvalidToken, ValueError, Exception):
+        except (InvalidToken, UnicodeError):
             raise SuspiciousOperation("MFA秘密情報の復号に失敗しました。") from None
