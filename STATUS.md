@@ -4,7 +4,7 @@
 
 ## Current Task
 
-Phase 1A「Userモデルと在籍判定」は実装・検証完了。Phase 1B以降には未着手。
+Phase 1A「Userモデルと在籍判定」の追加修正と再検証まで完了。Phase 1B以降には未着手。
 
 ## Completed
 
@@ -31,6 +31,8 @@ Phase 1A「Userモデルと在籍判定」は実装・検証完了。Phase 1B以
 - 4月1日を境界とする学校年度と、2026年度31回生を基準にした学年・在籍状態の純粋な算出処理
 - role・回生のモデル検証とDB制約、未入学相当の未来回生の新規作成拒否
 - 通常ユーザー・superuserをCustom Userとして作成するUser manager
+- 非同期User managerで、同期版と同じ `full_clean()` をthread-sensitiveな同期処理として保存前に安全に実行
+- managerと `full_clean()` を経由しない直接保存に対するrole・正の回生のDB制約テスト
 
 ## In Progress
 
@@ -49,18 +51,20 @@ Phase 1A「Userモデルと在籍判定」は実装・検証完了。Phase 1B以
 - `ruff format --check .`: 成功（31ファイル）
 - `python manage.py check --settings=config.settings.test`: 成功
 - `python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（差分なし）
-- `python manage.py test --settings=config.settings.test`: 成功（SQLite、15件）
+- `python manage.py test --settings=config.settings.test`: 成功（SQLite、20件）
 - 本番相当設定での `python manage.py check --deploy`: 成功
 
 ### GitHub Actions
 
-- Phase 1A実装成功: run 34705401207
-- PostgreSQL 18でaccounts初回マイグレーションと全15テスト: 成功
-- Phase 1A追加後の0-SH本番コンテナ検証: 成功
-- 実装内容の全項目成功: run 34683368629
-- 通常テストジョブ: 成功
+- Phase 1A追加修正の最終検証: run 34741189245（全ジョブ成功）
+- PostgreSQL 18でaccounts初回マイグレーションと全20テスト: 成功
+- Ruff lint、Ruff format check、Django system check: 成功
 - 本番ComposeとCloudflare追加Composeの設定検証: 成功
 - 本番Webイメージのビルド: 成功
+- Phase 1A追加修正後の0-SH本番コンテナ検証: 成功
+- Phase 1A初回実装成功: run 34705401207
+- 実装内容の全項目成功: run 34683368629
+- 通常テストジョブ: 成功
 - `db`、`web`、`proxy` のhealthy確認: 成功
 - Web実行UID `10001`: 成功
 - コンテナ内 `manage.py check --deploy`: 成功
@@ -94,6 +98,7 @@ Phase 1A「Userモデルと在籍判定」は実装・検証完了。Phase 1B以
 - `PROJECT_SPEC.md`、`PLAN.md`: Phase 1のパスキー対応と実装順序を具体化
 - `accounts/models.py`、`accounts/enrollment.py`: Custom Userと在籍判定
 - `accounts/migrations/0001_initial.py`: Userモデルの初回マイグレーション
-- `accounts/tests/`: User制約、manager、年度境界、学年・在籍判定のテスト
+- `accounts/models.py`: 非同期User managerの保存前検証を非同期コンテキストで安全に実行
+- `accounts/tests/`: 非同期manager、DB制約、年度境界、学年・在籍判定のテスト
 - `config/settings/base.py`: `accounts` と `AUTH_USER_MODEL` の設定
 - `Dockerfile`、`pyproject.toml`: accountsパッケージを本番イメージへ追加
