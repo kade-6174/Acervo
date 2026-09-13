@@ -8,6 +8,8 @@ Phase 1C Sub-step 3D（TOTPとRecovery Codeによる一般利用者のログイ�
 
 ## Completed
 
+- Sub-step 3Dレビュー指摘対応として、MFAログインステージの制限到達時に利用者へ一般的な日本語メッセージと `rate_limited` エラーコードを返す表示契約を追加。allauth標準の制限消費・解除・照合は変更していない
+- `accounts/tests/test_mfa_authenticate.py` を補強し、同一専用IPでX-Forwarded-Forだけを変えてもMFA制限を回避できないこと、入力コードとRecovery Codeがレスポンス・セッション・DBへ残らないこと、正しいMFA成功後にallauth標準の失敗回数解除が働くことを検証
 - `mfa_authenticate` だけを明示的allowlistへ追加し、django-allauth標準のログインステージでTOTPまたは未使用Recovery Codeを検証してからログインを確立する縦断フローを実装
 - 日本語の認証画面、CSRF付きPOST中止、一般的な不正コードメッセージ、入力済み認証コードをエラー応答へ再表示しない入力欄を追加。照合・使用済み更新・レート制限・ログインステージはallauth標準実装を維持
 - Step 4までの一時的機能ゲートとして `MFA_SUPPORTED_TYPES` から `webauthn` を除外し、`MFA_PASSKEY_LOGIN_ENABLED=False` を設定。`mfa_trust` と全WebAuthn URLは引き続きNoReverseMatch/404
@@ -97,6 +99,7 @@ Phase 1C Sub-step 3D（TOTPとRecovery Codeによる一般利用者のログイ�
 ## Remaining
 
 - 実際の公開ドメイン決定後に、直接HTTPSの証明書取得を手動確認する
+- Phase 1C全体の受入前に、実運用HTTPSブラウザでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告を確認する（未実施）。
 - Phase 1C Step 4（WebAuthn／パスキーの登録・ログイン・オリジン検証）。このStepでのみ `webauthn` とパスキーログイン設定を再有効化する
 
 ## Tests
@@ -110,8 +113,9 @@ Phase 1C Sub-step 3D（TOTPとRecovery Codeによる一般利用者のログイ�
 - `python manage.py test accounts.tests.test_mfa_urls --settings=config.settings.test`: 成功（11件全成功）
 - `python manage.py test accounts.tests.test_mfa_totp --settings=config.settings.test`: 成功（12件全成功）
 - `python manage.py test accounts.tests.test_mfa_recovery_codes --settings=config.settings.test`: 成功（6件全成功）
-- `python manage.py test accounts.tests.test_mfa_authenticate --settings=config.settings.test`: 成功（11件全成功）
-- `python manage.py test --settings=config.settings.test`: 成功（SQLite、114件全成功）
+- `python manage.py test accounts.tests.test_mfa_authenticate --settings=config.settings.test`: 成功（12件全成功）
+- `python manage.py test accounts.tests --settings=config.settings.test`: 成功（112件全成功）
+- `python manage.py test --settings=config.settings.test`: 成功（SQLite、115件全成功）
 - 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
 - ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。Sub-step 3D HEADのGitHub Actionsで本番コンテナ検証を実行し、全項目成功
 

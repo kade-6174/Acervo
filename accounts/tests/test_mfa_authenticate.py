@@ -251,9 +251,11 @@ class MFAAuthenticateTests(TestCase):
         )
 
     @override_settings(ACCOUNT_RATE_LIMITS={"login_failed": "1/m/ip"})
-    def test_mfa_rate_limit_uses_dedicated_client_ip_not_forwarded_for(self):
+    def test_mfa_rate_limit_uses_dedicated_client_ip_and_hides_submitted_code(self):
+        """MFA制限は専用IPだけで判定し、秘密の入力値を再表示しないこと。"""
         self._start_login(self.totp_user)
         invalid = self._invalid_totp(self.totp_secret)
+        unused_codes_before = self.recovery_codes.get_unused_codes()
         first = self.client.post(
             reverse("mfa_authenticate"),
             {"code": invalid},
@@ -261,6 +263,11 @@ class MFAAuthenticateTests(TestCase):
             HTTP_X_FORWARDED_FOR="203.0.113.1",
         )
         self.assertEqual(first.status_code, 200)
+        first_error = first.context["form"].errors.as_data()["code"][0]
+        self.assertEqual(first_error.code, "incorrect_code")
+        self.assertNotContains(first, invalid)
+        self.assertNotIn(invalid, repr(dict(self.client.session)))
+
         second = self.client.post(
             reverse("mfa_authenticate"),
             {"code": invalid},
@@ -268,7 +275,19 @@ class MFAAuthenticateTests(TestCase):
             HTTP_X_FORWARDED_FOR="203.0.113.2",
         )
         self.assertEqual(second.status_code, 200)
-        self.assertNotContains(second, "認証コードを確認できませんでした。")
+        limited_error = second.context["form"].errors.as_data()["code"][0]
+        self.assertEqual(limited_error.code, "rate_limited")
+        self.assertContains(
+            second,
+            "試行回数が多すぎます。しばらく待ってからもう一度お試しください。",
+        )
+        self.assertNotContains(second, invalid)
+        self.assertNotIn(invalid, repr(dict(self.client.session)))
+        self.assertNotIn(SESSION_KEY, self.client.session)
+        self.recovery_codes.instance.refresh_from_db()
+        self.assertEqual(
+            RecoveryCodes(self.recovery_codes.instance).get_unused_codes(), unused_codes_before
+        )
 
         separate = Client()
         self._start_login(self.totp_user, client=separate)
@@ -278,3 +297,38 @@ class MFAAuthenticateTests(TestCase):
             HTTP_X_FORWARDED_FOR="203.0.113.3",
         )
         self.assertEqual(no_dedicated_header.status_code, 403)
+
+    @override_settings(ACCOUNT_RATE_LIMITS={"login_failed": "2/m/ip"})
+    def test_successful_mfa_clears_failed_attempt_rate_limit(self):
+        """allauth標準のclear_rl()により、成功後は失敗回数が解除されること。"""
+        client_ip = "198.51.100.30"
+        invalid = self._invalid_totp(self.totp_secret)
+        self._start_login(self.totp_user)
+        first_failure = self.client.post(
+            reverse("mfa_authenticate"),
+            {"code": invalid},
+            HTTP_X_ACERVO_CLIENT_IP=client_ip,
+        )
+        self.assertEqual(
+            first_failure.context["form"].errors.as_data()["code"][0].code, "incorrect_code"
+        )
+
+        success = self.client.post(
+            reverse("mfa_authenticate"),
+            {"code": self._valid_totp(self.totp_secret)},
+            HTTP_X_ACERVO_CLIENT_IP=client_ip,
+        )
+        self.assertRedirects(success, reverse("core:home"), fetch_redirect_response=False)
+        self.assertEqual(int(self.client.session[SESSION_KEY]), self.totp_user.pk)
+
+        self.client.post(reverse("account_logout"), **CLIENT_IP_HEADER)
+        self._start_login(self.totp_user)
+        later_failure = self.client.post(
+            reverse("mfa_authenticate"),
+            {"code": invalid},
+            HTTP_X_ACERVO_CLIENT_IP=client_ip,
+        )
+        self.assertEqual(later_failure.status_code, 200)
+        later_error = later_failure.context["form"].errors.as_data()["code"][0]
+        self.assertEqual(later_error.code, "incorrect_code")
+        self.assertNotIn(SESSION_KEY, self.client.session)

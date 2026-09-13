@@ -1,6 +1,8 @@
+from allauth.account.adapter import get_adapter as get_account_adapter
 from allauth.account.forms import ChangePasswordForm, LoginForm
 from allauth.mfa.base.forms import AuthenticateForm
 from django import forms
+from django.core.exceptions import ValidationError
 
 
 class OneTimeCodeInput(forms.TextInput):
@@ -50,3 +52,12 @@ class AcervoAuthenticateForm(AuthenticateForm):
                 "autofocus": True,
             }
         )
+
+    def clean_code(self):
+        """allauth標準の制限到達エラーを画面共通のコードへ正規化する。"""
+        try:
+            return super().clean_code()
+        except ValidationError as error:
+            if error.code == "too_many_login_attempts":
+                raise get_account_adapter().validation_error("rate_limited") from None
+            raise

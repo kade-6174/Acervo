@@ -9,6 +9,14 @@ from .security import get_mfa_multi_fernet
 
 
 class AcervoAccountAdapter(DefaultAccountAdapter):
+    error_messages = {
+        **DefaultAccountAdapter.error_messages,
+        "rate_limited": _("試行回数が多すぎます。しばらく待ってからもう一度お試しください。"),
+        "too_many_login_attempts": _(
+            "試行回数が多すぎます。しばらく待ってからもう一度お試しください。"
+        ),
+    }
+
     def is_open_for_signup(self, request):
         return False
 
