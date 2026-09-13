@@ -15,13 +15,15 @@ import time
 
 from allauth.mfa.adapter import get_adapter
 from allauth.mfa.models import Authenticator
+from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
 from allauth.mfa.totp.internal.auth import (
     TOTP,
     format_hotp_value,
     hotp_value,
     yield_hotp_counters_from_time,
 )
-from django.test import TestCase
+from django.core.cache import cache
+from django.test import Client, TestCase, override_settings
 from django.urls import NoReverseMatch, reverse
 
 from accounts.models import User
@@ -50,10 +52,11 @@ class TOTPUserInterfaceTests(TestCase):
             cohort_number=31,
         )
 
-    def _login_with_recent_auth(self, user):
+    def _login_with_recent_auth(self, user, client=None):
         """直近認証済みセッションを作成。"""
-        self.client.force_login(user)
-        session = self.client.session
+        client = client or self.client
+        client.force_login(user)
+        session = client.session
         session[AUTHENTICATION_METHODS_SESSION_KEY] = [{"method": "password", "at": time.time()}]
         session.save()
 
@@ -66,12 +69,26 @@ class TOTPUserInterfaceTests(TestCase):
         ]
         session.save()
 
+    @staticmethod
+    def _invalid_totp_code(secret):
+        """現在の許容時間窓では必ず不正となる6桁コードを返す。"""
+        valid_codes = {
+            format_hotp_value(hotp_value(secret, counter))
+            for counter in yield_hotp_counters_from_time()
+        }
+        return next(
+            f"{candidate:06d}"
+            for candidate in range(1_000_000)
+            if f"{candidate:06d}" not in valid_codes
+        )
+
     def test_activate_totp_get_renders_japanese_ui_qr_and_never_cache(self):
         """TOTP登録画面（GET）が日本語UI、QRコード、手動入力用キー、never_cacheヘッダーで描画されること。"""
         self._login_with_recent_auth(self.user)
         response = self.client.get(reverse("mfa_activate_totp"), **CLIENT_IP_HEADER)
 
         self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "mfa/totp/activate_form.html")
 
         # 日本語UIの検証
         self.assertContains(response, "認証アプリを設定")
@@ -79,6 +96,7 @@ class TOTPUserInterfaceTests(TestCase):
         self.assertContains(response, "確認コード（6桁）")
         self.assertContains(response, "認証アプリを登録")
         self.assertContains(response, "リカバリーコード")
+        self.assertContains(response, 'name="csrfmiddlewaretoken"')
 
         # QRコード（data URI）がimgタグに含まれること
         self.assertContains(response, "data:image/svg+xml;base64,")
@@ -103,9 +121,12 @@ class TOTPUserInterfaceTests(TestCase):
         get_resp = self.client.get(reverse("mfa_activate_totp"), **CLIENT_IP_HEADER)
         self.assertEqual(get_resp.status_code, 200)
 
+        secret = get_resp.context["form"].secret
+        invalid_code = self._invalid_totp_code(secret)
+
         post_resp = self.client.post(
             reverse("mfa_activate_totp"),
-            {"code": "000000"},
+            {"code": invalid_code},
             **CLIENT_IP_HEADER,
         )
         self.assertEqual(post_resp.status_code, 200)
@@ -159,12 +180,122 @@ class TOTPUserInterfaceTests(TestCase):
         self.assertEqual(decrypted_secret, plain_secret)
 
         # リカバリーコード Authenticatorも自動生成されていること
+        recovery_authenticator = Authenticator.objects.get(
+            user=self.user,
+            type=Authenticator.Type.RECOVERY_CODES,
+        )
+        self.assertEqual(set(recovery_authenticator.data), {"seed", "used_mask"})
+        self.assertNotIn("codes", recovery_authenticator.data)
+        self.assertNotIn("migrated_codes", recovery_authenticator.data)
+        self.assertNotEqual(adapter.decrypt(recovery_authenticator.data["seed"]), "")
+
+    def test_totp_state_changes_require_csrf_token(self):
+        """TOTP登録・無効化のPOSTがCSRF tokenなしでは拒否され、状態を変えないこと。"""
+        csrf_client = Client(enforce_csrf_checks=True)
+        self._login_with_recent_auth(self.user, client=csrf_client)
+
+        activate_url = reverse("mfa_activate_totp")
+        get_response = csrf_client.get(activate_url, **CLIENT_IP_HEADER)
+        self.assertEqual(get_response.status_code, 200)
+        activate_response = csrf_client.post(
+            activate_url,
+            {"code": "000000"},
+            **CLIENT_IP_HEADER,
+        )
+        self.assertEqual(activate_response.status_code, 403)
+        self.assertFalse(
+            Authenticator.objects.filter(
+                user=self.user,
+                type=Authenticator.Type.TOTP,
+            ).exists()
+        )
+
+        TOTP.activate(self.user, "JBSWY3DPEHPK3PXP")
+        deactivate_response = csrf_client.post(
+            reverse("mfa_deactivate_totp"),
+            **CLIENT_IP_HEADER,
+        )
+        self.assertEqual(deactivate_response.status_code, 403)
         self.assertTrue(
             Authenticator.objects.filter(
                 user=self.user,
-                type=Authenticator.Type.RECOVERY_CODES,
+                type=Authenticator.Type.TOTP,
             ).exists()
         )
+
+    @override_settings(ACCOUNT_RATE_LIMITS={"login_failed": "1/m/ip"})
+    def test_totp_rate_limit_uses_only_acervo_client_ip_header(self):
+        """TOTP確認のIP判定は専用ヘッダーだけを使い、X-Forwarded-Forを信用しないこと。"""
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self._login_with_recent_auth(self.user)
+        activate_url = reverse("mfa_activate_totp")
+        get_response = self.client.get(activate_url)
+        self.assertEqual(get_response.status_code, 200)
+        invalid_code = self._invalid_totp_code(get_response.context["form"].secret)
+
+        no_header_response = self.client.post(activate_url, {"code": invalid_code})
+        self.assertEqual(no_header_response.status_code, 403)
+
+        xff_only_response = self.client.post(
+            activate_url,
+            {"code": invalid_code},
+            HTTP_X_FORWARDED_FOR="203.0.113.1",
+        )
+        self.assertEqual(xff_only_response.status_code, 403)
+
+        first_response = self.client.post(
+            activate_url,
+            {"code": invalid_code},
+            HTTP_X_ACERVO_CLIENT_IP="198.51.100.10",
+            HTTP_X_FORWARDED_FOR="203.0.113.1",
+        )
+        self.assertEqual(first_response.status_code, 200)
+        first_error = first_response.context["form"].errors.as_data()["code"][0]
+        self.assertEqual(first_error.code, "incorrect_code")
+
+        limited_response = self.client.post(
+            activate_url,
+            {"code": invalid_code},
+            HTTP_X_ACERVO_CLIENT_IP="198.51.100.10",
+            HTTP_X_FORWARDED_FOR="203.0.113.250",
+        )
+        self.assertEqual(limited_response.status_code, 200)
+        limited_error = limited_response.context["form"].errors.as_data()["code"][0]
+        self.assertEqual(limited_error.code, "rate_limited")
+
+        other_ip_response = self.client.post(
+            activate_url,
+            {"code": invalid_code},
+            HTTP_X_ACERVO_CLIENT_IP="198.51.100.11",
+            HTTP_X_FORWARDED_FOR="203.0.113.250",
+        )
+        self.assertEqual(other_ip_response.status_code, 200)
+        other_ip_error = other_ip_response.context["form"].errors.as_data()["code"][0]
+        self.assertEqual(other_ip_error.code, "incorrect_code")
+        self.assertFalse(
+            Authenticator.objects.filter(
+                user=self.user,
+                type=Authenticator.Type.TOTP,
+            ).exists()
+        )
+
+    def test_stale_totp_user_cannot_regenerate_recovery_codes(self):
+        """stale sessionではRecovery Codes再生成前に再認証を要求し、既存seedを保持すること。"""
+        TOTP.activate(self.user, "JBSWY3DPEHPK3PXP")
+        recovery_codes = RecoveryCodes.activate(self.user).instance
+        original_data = dict(recovery_codes.data)
+        self._login_with_stale_auth(self.user, age_seconds=600)
+
+        response = self.client.post(
+            reverse("mfa_generate_recovery_codes"),
+            **CLIENT_IP_HEADER,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].startswith(reverse("account_reauthenticate")))
+        recovery_codes.refresh_from_db()
+        self.assertEqual(recovery_codes.data, original_data)
 
     def test_deactivate_totp_get_renders_confirmation_screen_without_deleting(self):
         """TOTP登録済みユーザーでdeactivateをGETした場合、確認画面が表示され、削除はされないこと。"""
@@ -173,8 +304,10 @@ class TOTPUserInterfaceTests(TestCase):
 
         response = self.client.get(reverse("mfa_deactivate_totp"), **CLIENT_IP_HEADER)
         self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "mfa/totp/deactivate_form.html")
         self.assertContains(response, "認証アプリによる二要素認証を無効にしますか？")
         self.assertContains(response, "認証アプリを無効化する")
+        self.assertContains(response, 'name="csrfmiddlewaretoken"')
 
         # GETだけではAuthenticatorは削除されない
         self.assertTrue(
@@ -227,6 +360,7 @@ class TOTPUserInterfaceTests(TestCase):
         # 1. 未設定状態
         resp_unconfigured = self.client.get(reverse("mfa_index"), **CLIENT_IP_HEADER)
         self.assertEqual(resp_unconfigured.status_code, 200)
+        self.assertTemplateUsed(resp_unconfigured, "mfa/index.html")
         self.assertContains(resp_unconfigured, "二要素認証設定")
         self.assertContains(resp_unconfigured, "未設定")
         self.assertContains(resp_unconfigured, reverse("mfa_activate_totp"))

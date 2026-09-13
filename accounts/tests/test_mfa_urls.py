@@ -111,7 +111,11 @@ class MFAURLRoutingTests(TestCase):
             "/accounts/mfa/trust/",
             "/accounts/mfa/webauthn/",
             "/accounts/mfa/webauthn/add/",
+            "/accounts/mfa/webauthn/reauthenticate/",
+            "/accounts/mfa/webauthn/1/remove/",
+            "/accounts/mfa/webauthn/1/edit/",
             "/accounts/mfa/webauthn/login/",
+            "/accounts/mfa/webauthn/signup/",
         ]
         for path in unexposed_paths:
             with self.subTest(path=path):
@@ -141,6 +145,34 @@ class MFAURLRoutingTests(TestCase):
                 response = self.client.get(target_url)
                 self.assertEqual(response.status_code, 302)
                 self.assertEqual(response.headers["Location"], change_password_url)
+
+    def test_must_change_password_user_cannot_bypass_gate_with_post(self):
+        """初回パスワード変更前は状態変更POSTも遮断され、Authenticatorを変更しないこと。"""
+        from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
+        from allauth.mfa.totp.internal.auth import TOTP
+
+        TOTP.activate(self.must_change_user, "JBSWY3DPEHPK3PXP")
+        recovery_codes = RecoveryCodes.activate(self.must_change_user).instance
+        original_recovery_data = dict(recovery_codes.data)
+        self._login_with_recent_auth(self.must_change_user)
+
+        for name in ("mfa_deactivate_totp", "mfa_generate_recovery_codes"):
+            with self.subTest(name=name):
+                response = self.client.post(reverse(name))
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(
+                    response.headers["Location"],
+                    reverse("account_change_password"),
+                )
+
+        self.assertTrue(
+            Authenticator.objects.filter(
+                user=self.must_change_user,
+                type=Authenticator.Type.TOTP,
+            ).exists()
+        )
+        recovery_codes.refresh_from_db()
+        self.assertEqual(recovery_codes.data, original_recovery_data)
 
     def test_authenticated_user_can_access_mfa_urls(self):
         """通常認証済みユーザーが公開URLにアクセス可能なこと。"""
@@ -199,7 +231,8 @@ class MFAURLRoutingTests(TestCase):
         # RecoveryCodes Authenticator を作成
         from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
 
-        RecoveryCodes.activate(self.normal_user)
+        recovery_codes = RecoveryCodes.activate(self.normal_user)
+        plaintext_codes = recovery_codes.get_unused_codes()
 
         # 1回目のアクセス: まだ閲覧されていないためダウンロード可能 (200 OK)
         resp_download = self.client.get(reverse("mfa_download_recovery_codes"))
@@ -223,6 +256,11 @@ class MFAURLRoutingTests(TestCase):
         resp_view = self.client.get(reverse("mfa_view_recovery_codes"))
         self.assertEqual(resp_view.status_code, 200)
         self.assertFalse(resp_view.context["can_view_codes"])
+        self.assertTrue(all(code == "****" for code in resp_view.context["unused_codes"]))
+        for code in plaintext_codes:
+            self.assertNotContains(resp_view, code)
+        recovery_codes.instance.refresh_from_db()
+        self.assertIn("viewed_at", recovery_codes.instance.data)
 
     def test_stale_session_redirects_to_reauthenticate_without_no_reverse_match(self):
         """直近認証タイムアウト（stale session）の状態で保護操作をPOSTした際、
@@ -249,6 +287,29 @@ class MFAURLRoutingTests(TestCase):
         self.assertTrue(
             resp_totp_user.headers["Location"].startswith(reverse("account_reauthenticate"))
         )
+        self.assertTrue(
+            Authenticator.objects.filter(
+                user=self.normal_user,
+                type=Authenticator.Type.TOTP,
+            ).exists()
+        )
+
+        # パスワード再認証画面はMFA再認証を代替手段として列挙する
+        password_reauth = self.client.get(resp_totp_user.headers["Location"])
+        self.assertEqual(password_reauth.status_code, 200)
+        password_alternatives = {
+            alternative["id"]
+            for alternative in password_reauth.context["reauthentication_alternatives"]
+        }
+        self.assertIn("mfa_reauthenticate", password_alternatives)
+
+        # MFA再認証画面もパスワード再認証を代替手段として列挙する
+        mfa_reauth = self.client.get(reverse("mfa_reauthenticate"))
+        self.assertEqual(mfa_reauth.status_code, 200)
+        mfa_alternatives = {
+            alternative["id"] for alternative in mfa_reauth.context["reauthentication_alternatives"]
+        }
+        self.assertIn("reauthenticate", mfa_alternatives)
 
     def test_no_state_change_on_get(self):
         """GETリクエストによって状態変更（Authenticatorの生成・削除等）が発生しないこと。"""
@@ -289,16 +350,25 @@ class MFAURLRoutingTests(TestCase):
         # (初回表示時: Recovery Codesが表示される最重要画面: never_cache適用済み)
         from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
 
-        RecoveryCodes.activate(self.normal_user)
+        recovery_codes = RecoveryCodes.activate(self.normal_user)
+        initial_codes = recovery_codes.get_unused_codes()
         resp_rc_view = self.client.get(reverse("mfa_view_recovery_codes"))
         self.assertEqual(resp_rc_view.status_code, 200)
         self.assertTrue(resp_rc_view.context["can_view_codes"])
+        for code in initial_codes:
+            self.assertContains(resp_rc_view, code)
         rc_cache_control = resp_rc_view.headers.get("Cache-Control")
         self.assertIsNotNone(rc_cache_control)
         self.assertIn("max-age=0", rc_cache_control)
         self.assertIn("no-cache", rc_cache_control)
         self.assertIn("no-store", rc_cache_control)
         self.assertIn("must-revalidate", rc_cache_control)
+
+        second_rc_view = self.client.get(reverse("mfa_view_recovery_codes"))
+        self.assertEqual(second_rc_view.status_code, 200)
+        self.assertFalse(second_rc_view.context["can_view_codes"])
+        for code in initial_codes:
+            self.assertNotContains(second_rc_view, code)
 
         # 5. mfa_download_recovery_codes (allauth標準でnever_cache適用済み)
         # SHOW_ONCE=True のため未閲覧の別ユーザーでダウンロードを実行

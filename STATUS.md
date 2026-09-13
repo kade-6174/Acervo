@@ -3,11 +3,15 @@
 最終更新: 2026-09-13
 
 ## Current Task
- 
-Phase 1C Sub-step 3B「TOTP登録・無効化の日本語UI」は実装・検証完了。Sub-step 3C「リカバリーコード表示・ダウンロード・再生成の日本語UI」に着手準備中。
+
+Gemini移行期間（`927256e..eb02cce`）の独立監査と必要最小限の補正が完了。Phase 1C Sub-step 3Cには未着手。
 
 ## Completed
 
+- Gemini移行期間の全5コミット・全9変更ファイルを、実コード、django-allauth 65.19.3本体、テスト、実レスポンス・DB状態、GitHub Actions実行結果から照合
+- URL公開範囲、stale session再認証、初回パスワード変更ゲート、TOTP登録・無効化、MultiFernet統合、Recovery Codes SHOW_ONCE、Cache-Control、クライアントIP信頼境界を再検証
+- `accounts/tests/test_mfa_urls.py` と `accounts/tests/test_mfa_totp.py` を補強し、状態変更POSTの初回パスワードゲート、CSRF拒否、stale時のRecovery Codes非再生成、再認証方法列挙、専用IPヘッダーによる実レート制限、SHOW_ONCE後の平文非再表示を追加検証
+- `PLAN.md` から誤って削除された完了済みPhase 1C Step 2を復元し、`STATUS.md` の矛盾したキャッシュ記録・テスト件数・残作業記録を実測結果に合わせて修正
 - `accounts/mfa_urls.py` で `never_cache` を `recovery_views.view_recovery_codes` に適用し、初回Recovery Codes平文表示画面のキャッシュ無効化（`Cache-Control: max-age=0, no-cache, no-store, must-revalidate, private`）を実装（`mfa_activate_totp`, `mfa_view_recovery_codes`, `mfa_download_recovery_codes` の3画面すべてで確実なキャッシュ無効化を統一）
 - `accounts/mfa_urls.py` で `never_cache` を `totp_views.activate_totp` に適用し、TOTPシークレット（秘密鍵）表示画面の確実なキャッシュ無効化（`Cache-Control: max-age=0, no-cache, no-store, must-revalidate, private`）を実装
 - `templates/mfa/totp/activate_form.html` を新設し、TOTP登録の日本語UI、3ステップ手順説明、QRコード（SVG data URI）、手動入力用キー、ワンクリックコピー機能（外部依存なしローカルJS）、6桁確認コード入力フォームを実装
@@ -23,7 +27,6 @@ Phase 1C Sub-step 3B「TOTP登録・無効化の日本語UI」は実装・検証
 - 匿名ユーザーが各URLへのアクセスで `account_login?next=...` へリダイレクトされることを検証
 - 通常認証済みユーザーによるMFA各画面への到達性、およびGETのみでの状態変更防止を検証
 - `MFA_RECOVERY_CODES_SHOW_ONCE = True` により、初回ダウンロード成功後に2回目のダウンロードが 403 PermissionDenied となり、一覧画面のコードがマスキングされる防御仕様を実証
-- Cache-Controlヘッダーの実測（`DownloadRecoveryCodesView` は `never_cache` 付与済み、`ActivateTOTPView` および `ViewRecoveryCodesView` には `never_cache` が付与されていない現状を確認）
 - MFA URLルーティング・アクセス制御・stale session再認証テスト（`accounts/tests/test_mfa_urls.py`）の追加（全84テスト成功）
 - `accounts/adapters.py` に `AcervoMFAAdapter(DefaultMFAAdapter)` を実装し、`encrypt()` / `decrypt()` をオーバーライド
 - `config/settings/base.py` に `MFA_ADAPTER = "accounts.adapters.AcervoMFAAdapter"` を設定
@@ -82,21 +85,27 @@ Phase 1C Sub-step 3B「TOTP登録・無効化の日本語UI」は実装・検証
 ## Remaining
 
 - 実際の公開ドメイン決定後に、直接HTTPSの証明書取得を手動確認する
-- Phase 1Cは設計責任者から開始指示があるまで着手しない
+- Phase 1C Sub-step 3Cは設計責任者から開始指示があるまで着手しない
 
 ## Tests
 
 ### ローカル
 
 - `ruff check .`: 成功
-- `ruff format --check .`: 成功（49ファイル）
+- `ruff format --check .`: 成功（50ファイル）
 - `python manage.py check --settings=config.settings.test`: 成功
 - `python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（差分なし）
-- `python manage.py test --settings=config.settings.test`: 成功（SQLite、84件全成功）
+- `python manage.py test accounts.tests.test_mfa_urls --settings=config.settings.test`: 成功（11件全成功）
+- `python manage.py test accounts.tests.test_mfa_totp --settings=config.settings.test`: 成功（12件全成功）
+- `python manage.py test --settings=config.settings.test`: 成功（SQLite、97件全成功）
 - 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
+- ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。同一HEADのGitHub Actionsで本番コンテナ検証済み
 
 ### GitHub Actions
 
+- Gemini移行期間最終検証（HEAD: `eb02cce5642318388c3298379dd813177211c286`）: run 34752369353（全ジョブ成功）
+- `test` job: 成功。PostgreSQL 18.6上で全93テスト、Ruff lint・format、Django system check、migration差分なしを確認
+- `production-container` job: 成功。本番Compose・Cloudflare追加Compose、Caddy設定、本番イメージ、全サービスhealthy、非root・`check --deploy`、Caddy応答、共有cache table、クライアントIP境界、ポート非公開、DB・写真永続化を確認
 - Phase 1C Sub-step 3A 最終検証（HEAD: 9e0ba84）: run 34750863642（全ジョブ成功）
 - `test` job: 成功（35s）
 - PostgreSQL 18上で全84テスト成功
@@ -151,6 +160,9 @@ Phase 1C Sub-step 3B「TOTP登録・無効化の日本語UI」は実装・検証
 - Phase 1Bと追加タスク0-SHの自動検証に未解決の問題はない。
 - 実ドメインでの証明書取得は、公開ドメインと本番ホスト決定後の手動確認事項として残る。
 - 既存開発DBへDjango標準Userのauthマイグレーションを適用済みの場合、Custom Userへの後付け切替は安全に継続できない。対象は開発用PostgreSQL DBと開発用Composeの `postgres_data` ボリューム（通常 `acervo_postgres_data`）。今回は接続、削除、初期化を行っていない。再作成が必要な環境では、保存データの有無を確認し、設計責任者または運用者の承認を得て別作業で行う。
+- `mfa_authenticate` はSub-step 3Dまで意図的に非公開である。この中間状態ではTOTP設定後の次回パスワードログイン時にMFAチャレンジを完了できないため、Phase 1C全体の完成版として本番提供しない。
+
+## Change history
 
 - `accounts/mfa_urls.py`: `never_cache` を `view_recovery_codes` にも適用し、Recovery Codes表示画面の確実なキャッシュ無効化を実装
 - `accounts/tests/test_mfa_urls.py`: `view_recovery_codes` および `download_recovery_codes` の `never_cache` ヘッダーアサーションを更新
