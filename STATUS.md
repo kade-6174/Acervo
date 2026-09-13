@@ -3,11 +3,20 @@
 最終更新: 2026-09-13
 
 ## Current Task
-
-Phase 1C Step 2「MultiFernet MFA Adapterによる秘密情報暗号化基盤」は実装・検証完了。Step 3以降には未着手。
+ 
+Phase 1C Step 3A「TOTP / Recovery Codes の最小URLルーティングとアクセス制御検証」は実装・検証完了。Sub-step 3B以降には未着手。
 
 ## Completed
 
+- `accounts/mfa_urls.py` を新設し、TOTP・リカバリーコード設定管理に必要な最小限のview（`mfa_index`, `mfa_activate_totp`, `mfa_deactivate_totp`, `mfa_view_recovery_codes`, `mfa_generate_recovery_codes`, `mfa_download_recovery_codes`）を明示的にマッピング
+- `accounts/urls.py` に `path("mfa/", include("accounts.mfa_urls"))` を追加
+- WebAuthn関連URL（`mfa_list_webauthn` 等）および `mfa_authenticate`, `mfa_reauthenticate` の完全非露出（404およびNoReverseMatch）をテストで担保
+- `InitialPasswordChangeMiddleware` がMFA関連全URLを確実に遮断し `account_change_password` へ302リダイレクトすることを検証
+- 匿名ユーザーが各MFA URLへのアクセスで `account_login?next=...` へリダイレクトされることを検証
+- 通常認証済みユーザーによるMFA各画面への到達性、およびGETのみでの状態変更防止を検証
+- `MFA_RECOVERY_CODES_SHOW_ONCE = True` により、初回ダウンロード成功後に2回目のダウンロードが 403 PermissionDenied となり、一覧画面のコードがマスキングされる防御仕様を実証
+- Cache-Controlヘッダーの実測（`DownloadRecoveryCodesView` は `never_cache` が付与されているが、`ActivateTOTPView` には `never_cache` が付与されていないことを確認）
+- MFA URLルーティング・アクセス制御テスト（`accounts/tests/test_mfa_urls.py`）の追加（全83テスト成功）
 - `accounts/adapters.py` に `AcervoMFAAdapter(DefaultMFAAdapter)` を実装し、`encrypt()` / `decrypt()` をオーバーライド
 - `config/settings/base.py` に `MFA_ADAPTER = "accounts.adapters.AcervoMFAAdapter"` を設定
 - `MultiFernet` による先頭鍵暗号化・全登録鍵復号・旧鍵ローテーション互換性・不正暗号文の安全な拒否
@@ -72,11 +81,11 @@ Phase 1C Step 2「MultiFernet MFA Adapterによる秘密情報暗号化基盤」
 ### ローカル
 
 - `ruff check .`: 成功
-- `ruff format --check .`: 成功（47ファイル）
+- `ruff format --check .`: 成功（49ファイル）
 - `python manage.py check --settings=config.settings.test`: 成功
 - `python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（差分なし）
-- `python manage.py test --settings=config.settings.test`: 成功（SQLite、74件全成功）
-- 本番相当設定での `python manage.py check --deploy`: 成功
+- `python manage.py test --settings=config.settings.test`: 成功（SQLite、83件全成功）
+- 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
 
 ### GitHub Actions
 

@@ -1,5 +1,5 @@
 from allauth.account import views
-from django.urls import path
+from django.urls import include, path
 
 urlpatterns = [
     path("login/", views.login, name="account_login"),
@@ -7,4 +7,5 @@ urlpatterns = [
     path("inactive/", views.account_inactive, name="account_inactive"),
     path("signup/", views.signup, name="account_signup"),
     path("password/change/", views.password_change, name="account_change_password"),
+    path("mfa/", include("accounts.mfa_urls")),
 ]
