@@ -73,7 +73,7 @@
 ### Phase 1C — パスキー・TOTP・リカバリーコード
 
 - [x] Step 1: `allauth.mfa` の有効化、`cryptography` 依存追加、allauth標準MFA設定（ブラウザ信頼無効化、リカバリーコード10個・一度限り表示、WebAuthn安全オリジン等）、`ACERVO_MFA_FERNET_KEYS` の本番バリデーション。
-- [ ] Step 2: `allauth.mfa` のMFA adapterを拡張し、TOTP秘密とリカバリーコードを `cryptography.fernet.MultiFernet` で暗号化する。`ACERVO_MFA_FERNET_KEYS` の全鍵で復号し、新規保存は先頭鍵を使う。
+- [x] Step 2: `allauth.mfa` のMFA adapterを拡張し、TOTP秘密とリカバリーコードを `cryptography.fernet.MultiFernet` で暗号化する。`ACERVO_MFA_FERNET_KEYS` の全鍵で復号し、新規保存は先頭鍵を使う。
 - [ ] Step 3: TOTP登録・認証、リカバリーコード（10個の一度限り表示・再生成による旧コード無効化）のUIとルーティング。
 - [ ] Step 4: WebAuthn（パスキー）の登録・ログイン・オリジン検証。安全でない本番オリジンの拒否。
 - [ ] Step 5: 全利用者へのMFA設定画面提供と管理者MFA必須化（検証済みパスキーまたはTOTP必須、セッション内MFA確認）。

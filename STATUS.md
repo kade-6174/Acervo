@@ -4,16 +4,20 @@
 
 ## Current Task
 
-Phase 1C Step 1「MFA設定・暗号鍵バリデーション・allauth.mfa基盤」は実装・検証完了。Step 2以降には未着手。
+Phase 1C Step 2「MultiFernet MFA Adapterによる秘密情報暗号化基盤」は実装・検証完了。Step 3以降には未着手。
 
 ## Completed
 
+- `accounts/adapters.py` に `AcervoMFAAdapter(DefaultMFAAdapter)` を実装し、`encrypt()` / `decrypt()` をオーバーライド
+- `config/settings/base.py` に `MFA_ADAPTER = "accounts.adapters.AcervoMFAAdapter"` を設定
+- `MultiFernet` による先頭鍵暗号化・全登録鍵復号・旧鍵ローテーション互換性・不正暗号文の安全な拒否
+- allauth標準の `TOTP.activate` および `RecoveryCodes.activate` 経路でのDB平文非保存・暗号化保存を検証
+- MFA Adapter単体およびallauth TOTP/RecoveryCodes統合テストの追加（全73テスト成功）
 - `cryptography==50.0.1` を直接依存へ追加
 - `INSTALLED_APPS` への `allauth.mfa` 有効化とMFA基本設定（ブラウザ信頼無効化、リカバリーコード数10・一度限り表示、WebAuthn安全設定）
 - `accounts/security.py` による `ACERVO_MFA_FERNET_KEYS` のFernet鍵バリデーション
 - 本番環境（`production.py`）での鍵未設定・不正鍵・空文字・不正複数キー時の起動失敗（秘密鍵の非漏洩）
 - 本番環境での安全でないWebAuthnオリジン許可の拒否
-- MFA設定およびFernet鍵バリデーションの自動テスト追加（全65テスト成功）
 
 - Phase 0のDjango開発基盤
 - 開発用と本番用のCompose構成の分離
@@ -68,10 +72,10 @@ Phase 1C Step 1「MFA設定・暗号鍵バリデーション・allauth.mfa基盤
 ### ローカル
 
 - `ruff check .`: 成功
-- `ruff format --check .`: 成功（46ファイル）
+- `ruff format --check .`: 成功（47ファイル）
 - `python manage.py check --settings=config.settings.test`: 成功
 - `python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（差分なし）
-- `python manage.py test --settings=config.settings.test`: 成功（SQLite、65件全成功）
+- `python manage.py test --settings=config.settings.test`: 成功（SQLite、73件全成功）
 - 本番相当設定での `python manage.py check --deploy`: 成功
 
 ### GitHub Actions
@@ -118,6 +122,11 @@ Phase 1C Step 1「MFA設定・暗号鍵バリデーション・allauth.mfa基盤
 - 実ドメインでの証明書取得は、公開ドメインと本番ホスト決定後の手動確認事項として残る。
 - 既存開発DBへDjango標準Userのauthマイグレーションを適用済みの場合、Custom Userへの後付け切替は安全に継続できない。対象は開発用PostgreSQL DBと開発用Composeの `postgres_data` ボリューム（通常 `acervo_postgres_data`）。今回は接続、削除、初期化を行っていない。再作成が必要な環境では、保存データの有無を確認し、設計責任者または運用者の承認を得て別作業で行う。
 
+- `accounts/adapters.py`: `AcervoMFAAdapter(DefaultMFAAdapter)` を実装（`encrypt()` / `decrypt()` をMultiFernetでオーバーライド）
+- `config/settings/base.py`: `MFA_ADAPTER = "accounts.adapters.AcervoMFAAdapter"` を追加
+- `accounts/security.py`: `get_mfa_multi_fernet()` ヘルパー関数を追加
+- `accounts/tests/test_mfa_adapter.py`: MFA Adapter単体、暗号化・復号、先頭鍵利用、旧鍵ローテーション互換、不正暗号文拒否、allauth TOTP/RecoveryCodesのDB暗号化保存（平文非保存）テスト（8件）を追加
+- `PLAN.md`、`STATUS.md`: Phase 1C Step 2 の完了実績を記録
 - `pyproject.toml`: `cryptography==50.0.1` を直接依存へ追加
 - `config/settings/base.py`: `allauth.mfa` 有効化、MFA基本設定（ブラウザ信頼無効化、リカバリーコード設定、WebAuthn安全設定）、`ACERVO_MFA_FERNET_KEYS`
 - `config/settings/production.py`: Fernet鍵バリデーション、安全でないWebAuthnオリジン許可の拒否

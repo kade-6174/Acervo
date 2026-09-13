@@ -3,7 +3,7 @@
 import binascii
 from collections.abc import Sequence
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
 from django.core.exceptions import ImproperlyConfigured
 
 
@@ -44,3 +44,13 @@ def validate_mfa_fernet_keys(keys: Sequence[str] | str | None) -> list[bytes]:
         validated.append(key_bytes)
 
     return validated
+
+
+def get_mfa_multi_fernet(keys: Sequence[str] | str | None = None) -> MultiFernet:
+    """ACERVO_MFA_FERNET_KEYSからMultiFernetインスタンスを構築する。"""
+    from django.conf import settings
+
+    if keys is None:
+        keys = getattr(settings, "ACERVO_MFA_FERNET_KEYS", [])
+    key_bytes_list = validate_mfa_fernet_keys(keys)
+    return MultiFernet([Fernet(k) for k in key_bytes_list])
