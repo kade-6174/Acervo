@@ -4,7 +4,7 @@
 
 ## Current Task
 
-Phase 1A「Userモデルと在籍判定」の追加修正と再検証まで完了。Phase 1B以降には未着手。
+Phase 1B「ログイン・初回パスワード・レート制限」は実装・検証完了。Phase 1C以降には未着手。
 
 ## Completed
 
@@ -33,6 +33,19 @@ Phase 1A「Userモデルと在籍判定」の追加修正と再検証まで完�
 - 通常ユーザー・superuserをCustom Userとして作成するUser manager
 - 非同期User managerで、同期版と同じ `full_clean()` をthread-sensitiveな同期処理として保存前に安全に実行
 - managerと `full_clean()` を経由しない直接保存に対するrole・正の回生のDB制約テスト
+- `django-allauth[mfa]==65.19.3` の導入と、Phase 1Bに限定した `allauth`・`allauth.account` の有効化
+- username/passwordのみの日本語ログイン、パスワード変更、POSTログアウト画面
+- セルフ登録、メールログイン・確認・リセット導線、ログインコード、ソーシャルログインの無効化
+- 安全な内部 `next` だけを許可するログイン後リダイレクトと、無効ユーザー・CSRFの拒否
+- 暗号学的乱数とDjango password validatorを使う一時パスワード付きユーザー作成・再発行サービス
+- 再発行対象の行ロック、既存セッション無効化、平文パスワードの非保存
+- `bootstrap_admin` コマンドと、既存username・既存有効adminを変更しない再実行安全性
+- `must_change_password` 利用者をパスワード変更とPOSTログアウト以外から遮断するサーバー側middleware
+- 正常なパスワード変更時だけのフラグ解除と、現在セッションの維持
+- 本番default cacheのPostgreSQL `DatabaseCache` 化と `acervo_rate_limit_cache` の冪等初期化
+- django-allauth 65.19.3既定のログイン・失敗レート制限と、期限付き429応答
+- Caddyの直接HTTPS・Tunnel別クライアントIP正規化と `X-Acervo-Client-IP` の強制上書き
+- Django側での専用IPヘッダー限定、`X-Forwarded-For` 非信頼、Tunnel用8080番のホスト非公開
 
 ## In Progress
 
@@ -41,27 +54,36 @@ Phase 1A「Userモデルと在籍判定」の追加修正と再検証まで完�
 ## Remaining
 
 - 実際の公開ドメイン決定後に、直接HTTPSの証明書取得を手動確認する
-- Phase 1Bは設計責任者から開始指示があるまで着手しない
+- Phase 1Cは設計責任者から開始指示があるまで着手しない
 
 ## Tests
 
 ### ローカル
 
 - `ruff check .`: 成功
-- `ruff format --check .`: 成功（31ファイル）
+- `ruff format --check .`: 成功（45ファイル）
 - `python manage.py check --settings=config.settings.test`: 成功
 - `python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（差分なし）
-- `python manage.py test --settings=config.settings.test`: 成功（SQLite、20件）
+- `python manage.py test --settings=config.settings.test`: 成功（SQLite、55件）
 - 本番相当設定での `python manage.py check --deploy`: 成功
 
 ### GitHub Actions
 
-- Phase 1A追加修正の最終検証: run 34741189245（全ジョブ成功）
-- PostgreSQL 18でaccounts初回マイグレーションと全20テスト: 成功
+- Phase 1B最終検証: run 34742303012（全ジョブ成功）
+- PostgreSQL 18でallauth・accountsマイグレーションと全55テスト: 成功
 - Ruff lint、Ruff format check、Django system check: 成功
 - 本番ComposeとCloudflare追加Composeの設定検証: 成功
+- Caddy 2.11.4でadapt・validate: 成功
 - 本番Webイメージのビルド: 成功
-- Phase 1A追加修正後の0-SH本番コンテナ検証: 成功
+- Phase 1B追加後の0-SH本番コンテナ検証: 成功
+- PostgreSQL DatabaseCacheの独立instance間レート制限共有: 成功
+- `createcachetable` 再実行時の既存データ保持: 成功
+- 連続ログイン試行の期限付き429応答: 成功
+- 直接HTTPS相当経路とTunnel経路のクライアントIP判定・偽装ヘッダー無視: 成功
+- Caddy経由 `/accounts/login/`: 200
+- `acervo_rate_limit_cache` tableの存在確認: 成功
+- Phase 1A追加修正の最終検証: run 34741189245（全ジョブ成功）
+- PostgreSQL 18でaccounts初回マイグレーションと全20テスト: 成功
 - Phase 1A初回実装成功: run 34705401207
 - 実装内容の全項目成功: run 34683368629
 - 通常テストジョブ: 成功
@@ -77,6 +99,7 @@ Phase 1A「Userモデルと在籍判定」の追加修正と再検証まで完�
 
 ### 修正中の失敗履歴
 
+- run 34742173720: 直接HTTPS検証で接続先コンテナ名がTLS SNIに使われ失敗。検証用SNIを `acervo.localhost` に固定して修正。
 - run 34682467963: Webがunhealthy。HTTPS転送ヘッダー不足と読み取り専用環境のGunicorn設定を修正。
 - run 34682933452: Caddy疎通が400。CIリクエストへ許可済みHostを追加。
 - run 34683037889、34683139632: `/admin/` が404にならない。Caddyの拒否処理を専用 `handle` へ修正。
@@ -84,7 +107,7 @@ Phase 1A「Userモデルと在籍判定」の追加修正と再検証まで完�
 
 ## Problems
 
-- 追加タスク0-SHの自動検証に未解決の問題はない。
+- Phase 1Bと追加タスク0-SHの自動検証に未解決の問題はない。
 - 実ドメインでの証明書取得は、公開ドメインと本番ホスト決定後の手動確認事項として残る。
 - 既存開発DBへDjango標準Userのauthマイグレーションを適用済みの場合、Custom Userへの後付け切替は安全に継続できない。対象は開発用PostgreSQL DBと開発用Composeの `postgres_data` ボリューム（通常 `acervo_postgres_data`）。今回は接続、削除、初期化を行っていない。再作成が必要な環境では、保存データの有無を確認し、設計責任者または運用者の承認を得て別作業で行う。
 
@@ -102,3 +125,11 @@ Phase 1A「Userモデルと在籍判定」の追加修正と再検証まで完�
 - `accounts/tests/`: 非同期manager、DB制約、年度境界、学年・在籍判定のテスト
 - `config/settings/base.py`: `accounts` と `AUTH_USER_MODEL` の設定
 - `Dockerfile`、`pyproject.toml`: accountsパッケージを本番イメージへ追加
+- `pyproject.toml`、`config/settings/base.py`、`config/urls.py`: django-allauth依存、Phase 1B認証設定、URL
+- `accounts/adapters.py`、`accounts/forms.py`、`accounts/middleware.py`: セルフ登録停止、認証フォーム、初回変更ゲート
+- `accounts/services.py`、`accounts/management/commands/bootstrap_admin.py`: ユーザー作成・再発行サービスと初期管理者コマンド
+- `templates/account/`、`templates/429.html`、`templates/base.html`: 日本語認証画面と期限付き制限画面
+- `config/settings/production.py`、`deploy/entrypoint.sh`: PostgreSQL DatabaseCacheとcache table初期化
+- `deploy/Caddyfile`: 直接HTTPS・Tunnel別のクライアントIP信頼境界
+- `.github/workflows/ci.yml`: Caddy、認証経路、cache table、クライアントIP境界の本番コンテナ検証
+- `accounts/tests/`、`core/tests/`: Phase 1Bの認証・サービス・ゲート・レート制限・配備設定テスト

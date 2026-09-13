@@ -60,13 +60,13 @@
 
 ### Phase 1B — ログイン・初回パスワード・レート制限
 
-- `django-allauth[mfa]` を導入し、usernameログイン、DBセッション、セルフ登録禁止、メール不要を設定する。
-- 管理者がユーザーを作成・再設定するサービスと、ランダムな一時パスワードの一度限り表示を実装する。
-- `must_change_password=True` の利用者をパスワード変更、ログアウト以外へ進ませないサーバー側ゲートを実装する。
-- django-allauthのレート制限用にPostgreSQL-backed `DatabaseCache` を構成し、初期化手順をコンテナ起動とCIへ組み込む。LocMemCacheやDummyCacheを本番で使わない。
-- Caddyが直接接続とTunnel接続のクライアントIPを正規化し、外部から同名ヘッダーが来ても上書きするAcervo専用ヘッダーをDjangoへ渡す。django-allauthはそのヘッダーだけを信頼する。
-- ログインレート制限を有効にし、複数Gunicornワーカーをまたいでも制限が共有されることを確認する。任意の `X-Forwarded-For` を信頼しない。
-- 初期管理者を安全に作成する管理コマンドを実装する。
+- [x] `django-allauth[mfa]` を導入し、usernameログイン、DBセッション、セルフ登録禁止、メール不要を設定する。
+- [x] 管理者がユーザーを作成・再設定するサービスと、ランダムな一時パスワードの一度限り表示を実装する。
+- [x] `must_change_password=True` の利用者をパスワード変更、ログアウト以外へ進ませないサーバー側ゲートを実装する。
+- [x] django-allauthのレート制限用にPostgreSQL-backed `DatabaseCache` を構成し、初期化手順をコンテナ起動とCIへ組み込む。LocMemCacheやDummyCacheを本番で使わない。
+- [x] Caddyが直接接続とTunnel接続のクライアントIPを正規化し、外部から同名ヘッダーが来ても上書きするAcervo専用ヘッダーをDjangoへ渡す。django-allauthはそのヘッダーだけを信頼する。
+- [x] ログインレート制限を有効にし、複数Gunicornワーカーをまたいでも制限が共有されることを確認する。任意の `X-Forwarded-For` を信頼しない。
+- [x] 初期管理者を安全に作成する管理コマンドを実装する。
 
 **必須テスト:** セルフ登録拒否、メール不要、正誤パスワード、初回変更の迂回不可、一時パスワード再表示不可、無効ユーザー、初期管理者コマンドの再実行安全性、複数プロセスで共有されるレート制限、偽装した転送ヘッダーの無視、直接HTTPS・Tunnel相当経路のIP判定。
 
