@@ -1,0 +1,2 @@
+{% extends "mfa/webauthn/base.html" %}
+{% block content %}<section class="container py-5"><div class="row justify-content-center"><div class="col-md-7"><h1 class="h2 mb-3">パスキーまたはセキュリティキーを削除</h1><p><strong>{{ authenticator }}</strong> を削除しますか？</p><p class="text-danger">最後の主要なMFA方式を削除すると、二要素認証が無効になり、リカバリーコードも無効になる場合があります。</p><form method="post" data-webauthn-submit>{% csrf_token %}<button class="btn btn-danger" type="submit">削除する</button> <a class="btn btn-outline-secondary" href="{% url 'mfa_list_webauthn' %}">キャンセル</a></form></div></div></section>{% endblock %}

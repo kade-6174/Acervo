@@ -86,15 +86,12 @@ class MFAURLRoutingTests(TestCase):
             with self.subTest(name=name):
                 self.assertEqual(reverse(name), expected_path)
 
-    def test_unexposed_url_names_raise_no_reverse_match(self):
-        """WebAuthnや信頼済みブラウザなど未公開URL nameは解決できないこと。"""
+    def test_webauthn_management_names_are_exposed_but_passwordless_names_are_not(self):
+        """Step 4Bの管理URLだけを公開し、passwordless入口は非公開に保つこと。"""
+        for name in ("mfa_list_webauthn", "mfa_add_webauthn", "mfa_reauthenticate_webauthn"):
+            self.assertTrue(reverse(name).startswith("/accounts/mfa/webauthn/"))
         unexposed_names = [
             "mfa_trust",
-            "mfa_list_webauthn",
-            "mfa_add_webauthn",
-            "mfa_reauthenticate_webauthn",
-            "mfa_remove_webauthn",
-            "mfa_edit_webauthn",
             "mfa_login_webauthn",
             "mfa_signup_webauthn",
         ]
@@ -103,16 +100,11 @@ class MFAURLRoutingTests(TestCase):
                 with self.assertRaises(NoReverseMatch):
                     reverse(name)
 
-    def test_unexposed_url_paths_return_404(self):
+    def test_passwordless_and_signup_paths_return_404(self):
         """未公開のパスへ直接アクセスした場合は404を返すこと。"""
         self._login_with_recent_auth(self.normal_user)
         unexposed_paths = [
             "/accounts/mfa/trust/",
-            "/accounts/mfa/webauthn/",
-            "/accounts/mfa/webauthn/add/",
-            "/accounts/mfa/webauthn/reauthenticate/",
-            "/accounts/mfa/webauthn/1/remove/",
-            "/accounts/mfa/webauthn/1/edit/",
             "/accounts/mfa/webauthn/login/",
             "/accounts/mfa/webauthn/signup/",
         ]
@@ -209,6 +201,26 @@ class MFAURLRoutingTests(TestCase):
         # mfa_download_recovery_codes: 未作成時は404
         resp = self.client.get(reverse("mfa_download_recovery_codes"))
         self.assertEqual(resp.status_code, 404)
+
+        # Step 4B: WebAuthn登録はallauth標準のchallengeとpasskey要件を返す。
+        webauthn_add = self.client.get(reverse("mfa_add_webauthn"))
+        self.assertEqual(webauthn_add.status_code, 200)
+        self.assertEqual(
+            webauthn_add.headers["Cache-Control"],
+            "max-age=0, no-cache, no-store, must-revalidate, private",
+        )
+        selection = webauthn_add.context["js_data"]["creation_options"]["publicKey"][
+            "authenticatorSelection"
+        ]
+        # allauthは標準値を返し、チェック済みのpasswordless選択肢を標準JSが
+        # resident key / user verification required に切り替える。
+        self.assertEqual(selection["residentKey"].value, "discouraged")
+        self.assertEqual(selection["userVerification"].value, "discouraged")
+        self.assertContains(webauthn_add, 'name="passwordless"')
+        self.assertContains(webauthn_add, 'id="id_passwordless" checked')
+        self.assertContains(
+            webauthn_add, "秘密鍵や生体情報がAcervoへ送信・保存されることはありません"
+        )
 
     def test_authenticated_user_with_authenticators_can_access_views(self):
         """Authenticator登録済みユーザーが各管理URLに正常にアクセスできること。"""
@@ -328,7 +340,10 @@ class MFAURLRoutingTests(TestCase):
         # 1. mfa_index
         resp_index = self.client.get(reverse("mfa_index"))
         self.assertEqual(resp_index.status_code, 200)
-        self.assertIsNone(resp_index.headers.get("Cache-Control"))
+        self.assertEqual(
+            resp_index.headers.get("Cache-Control"),
+            "max-age=0, no-cache, no-store, must-revalidate, private",
+        )
 
         # 2. mfa_activate_totp (TOTP secretが表示される画面: never_cache適用済み)
         resp_totp = self.client.get(reverse("mfa_activate_totp"))

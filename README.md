@@ -73,6 +73,8 @@ Tunnel tokenは秘密情報です。リポジトリやログへ記録しない�
 - [AGENTS.md](AGENTS.md) — Codexが守る恒久的な作業ルール
 - [STATUS.md](STATUS.md) — 実装状況、テスト結果、問題点
 
+現在はパスキー／セキュリティキーの登録・管理と、パスワードログイン後の第二要素認証を提供します。パスキーだけによるログインはまだ公開していません。
+
 ## 開発環境
 
 必要なものはPython 3.13、PostgreSQL 18、Gitです。Dockerを利用できる環境では、同梱の開発用 `compose.yaml` でPostgreSQLを起動できます。

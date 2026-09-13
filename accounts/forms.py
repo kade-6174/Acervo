@@ -1,6 +1,7 @@
 from allauth.account.adapter import get_adapter as get_account_adapter
 from allauth.account.forms import ChangePasswordForm, LoginForm
 from allauth.mfa.base.forms import AuthenticateForm
+from allauth.mfa.webauthn.forms import AddWebAuthnForm, EditWebAuthnForm
 from django import forms
 from django.core.exceptions import ValidationError
 
@@ -61,3 +62,22 @@ class AcervoAuthenticateForm(AuthenticateForm):
             if error.code == "too_many_login_attempts":
                 raise get_account_adapter().validation_error("rate_limited") from None
             raise
+
+
+class AcervoAddWebAuthnForm(AddWebAuthnForm):
+    """allauth標準のWebAuthn検証を維持した日本語の登録フォーム。"""
+
+    def __init__(self, *args, **kwargs):
+        initial = kwargs.setdefault("initial", {})
+        initial.setdefault("passwordless", True)
+        super().__init__(*args, **kwargs)
+        self.fields["name"].label = "端末名（任意）"
+        self.fields["name"].widget.attrs["class"] = "form-control"
+        self.fields["passwordless"].label = "パスキーとして登録する"
+
+
+class AcervoEditWebAuthnForm(EditWebAuthnForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].label = "端末名"
+        self.fields["name"].widget.attrs["class"] = "form-control"

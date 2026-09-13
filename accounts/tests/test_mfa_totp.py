@@ -364,7 +364,8 @@ class TOTPUserInterfaceTests(TestCase):
         self.assertContains(resp_unconfigured, "二要素認証設定")
         self.assertContains(resp_unconfigured, "未設定")
         self.assertContains(resp_unconfigured, reverse("mfa_activate_totp"))
-        self.assertContains(resp_unconfigured, "準備中")  # パスキー
+        self.assertContains(resp_unconfigured, "パスキー / セキュリティキー")
+        self.assertContains(resp_unconfigured, "管理する")
 
         # 2. 設定済み状態
         TOTP.activate(self.user, "JBSWY3DPEHPK3PXP")
@@ -382,9 +383,9 @@ class TOTPUserInterfaceTests(TestCase):
                 self.assertEqual(resp.status_code, 302)
                 self.assertEqual(resp.headers["Location"], reverse("account_change_password"))
 
-    def test_webauthn_urls_remain_unexposed(self):
-        """WebAuthn関連URLは引き続き非公開であること。"""
-        for name in ("mfa_list_webauthn", "mfa_add_webauthn"):
+    def test_passwordless_webauthn_urls_remain_unexposed(self):
+        """Step 4Bでは管理URLのみ公開し、passwordless URLは非公開であること。"""
+        for name in ("mfa_login_webauthn", "mfa_signup_webauthn"):
             with self.subTest(name=name):
                 with self.assertRaises(NoReverseMatch):
                     reverse(name)

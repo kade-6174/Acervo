@@ -66,20 +66,21 @@ class MFAAuthenticateTests(TestCase):
             **CLIENT_IP_HEADER,
         )
 
-    def test_only_authenticate_is_newly_exposed_and_webauthn_stays_private(self):
+    def test_webauthn_mfa_management_is_exposed_but_passwordless_stays_private(self):
         self.assertEqual(reverse("mfa_authenticate"), "/accounts/mfa/authenticate/")
+        for name in ("mfa_list_webauthn", "mfa_add_webauthn", "mfa_reauthenticate_webauthn"):
+            self.assertTrue(reverse(name).startswith("/accounts/mfa/webauthn/"))
         for name in (
             "mfa_trust",
-            "mfa_list_webauthn",
-            "mfa_add_webauthn",
             "mfa_login_webauthn",
+            "mfa_signup_webauthn",
         ):
             with self.subTest(name=name), self.assertRaises(NoReverseMatch):
                 reverse(name)
         for path in (
             "/accounts/mfa/trust/",
-            "/accounts/mfa/webauthn/",
             "/accounts/mfa/webauthn/login/",
+            "/accounts/mfa/webauthn/signup/",
         ):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path, **CLIENT_IP_HEADER).status_code, 404)

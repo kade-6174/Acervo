@@ -21,9 +21,9 @@ class Phase1ConfigurationTests(SimpleTestCase):
     def test_mfa_policy_is_explicit(self):
         self.assertEqual(
             settings.MFA_SUPPORTED_TYPES,
-            ["recovery_codes", "totp"],
+            ["recovery_codes", "totp", "webauthn"],
         )
-        self.assertFalse(settings.MFA_PASSKEY_LOGIN_ENABLED)
+        self.assertTrue(settings.MFA_PASSKEY_LOGIN_ENABLED)
         self.assertFalse(settings.MFA_PASSKEY_SIGNUP_ENABLED)
         self.assertEqual(settings.MFA_RECOVERY_CODE_COUNT, 10)
         self.assertTrue(settings.MFA_RECOVERY_CODES_SHOW_ONCE)

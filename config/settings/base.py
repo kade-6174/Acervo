@@ -88,12 +88,16 @@ ALLAUTH_TRUSTED_CLIENT_IP_HEADER = "X-Acervo-Client-IP"
 ALLAUTH_TRUSTED_PROXY_COUNT = 0
 
 MFA_ADAPTER = "accounts.adapters.AcervoMFAAdapter"
-# Step 4でWebAuthnとパスキーログインを再有効化するまでの機能ゲート。
-MFA_SUPPORTED_TYPES = ["recovery_codes", "totp"]
-MFA_PASSKEY_LOGIN_ENABLED = False
+# Step 4B: 登録済みWebAuthn credentialをMFAとしてのみ公開する。
+# passwordless 用 credential の登録選択肢にはこの設定が必要だが、対応URLは
+# accounts.mfa_urls の allowlist に含めないため、Step 4Cまでpasswordlessログインは非公開。
+MFA_SUPPORTED_TYPES = ["recovery_codes", "totp", "webauthn"]
+MFA_PASSKEY_LOGIN_ENABLED = True
 MFA_PASSKEY_SIGNUP_ENABLED = False
 MFA_FORMS = {
     "authenticate": "accounts.forms.AcervoAuthenticateForm",
+    "add_webauthn": "accounts.forms.AcervoAddWebAuthnForm",
+    "edit_webauthn": "accounts.forms.AcervoEditWebAuthnForm",
 }
 MFA_RECOVERY_CODE_COUNT = 10
 MFA_RECOVERY_CODES_SHOW_ONCE = True

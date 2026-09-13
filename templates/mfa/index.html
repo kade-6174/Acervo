@@ -76,19 +76,26 @@
           </div>
         </div>
 
-        <!-- パスキー / セキュリティキー (WebAuthn: Phase 1C Step 4にて提供予定) -->
-        <div class="card shadow-sm text-muted bg-light">
+        <div class="card shadow-sm mb-4">
           <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <div>
-                <h2 class="h5 card-title mb-1 text-secondary">パスキー / セキュリティキー</h2>
+                <h2 class="h5 card-title mb-1">パスキー / セキュリティキー</h2>
                 <p class="small mb-0">
                   Touch ID、Face ID、Windows Hello、YubiKeyなどの生体認証や物理キーで認証します。
                 </p>
               </div>
               <div>
-                <span class="badge bg-secondary">準備中</span>
+                {% if authenticators.webauthn %}
+                  <span class="badge bg-success">{{ authenticators.webauthn|length }}件登録済み</span>
+                {% else %}
+                  <span class="badge bg-secondary">未設定</span>
+                {% endif %}
               </div>
+            </div>
+            <hr class="my-3">
+            <div class="d-flex justify-content-end">
+              <a href="{% url 'mfa_list_webauthn' %}" class="btn btn-outline-primary btn-sm">管理する</a>
             </div>
           </div>
         </div>

@@ -1,0 +1,23 @@
+{% extends "mfa/webauthn/base.html" %}
+{% load static %}
+{% block content %}
+<section class="container py-5"><div class="row justify-content-center"><div class="col-md-8 col-lg-7">
+  <h1 class="h2 mb-3">パスキーまたはセキュリティキーを追加</h1>
+  <p>端末の画面ロック、PIN、生体認証、または物理キーを使って登録します。共有端末には登録しないでください。</p>
+  <p class="text-muted small">秘密鍵や生体情報がAcervoへ送信・保存されることはありません。</p>
+  <div id="webauthn-status" class="alert d-none" role="status" aria-live="polite"></div>
+  <form method="post" novalidate data-webauthn-form>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="mb-3"><label class="form-label" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>{{ form.name }}{{ form.name.errors }}</div>
+    <div class="form-check mb-4">{{ form.passwordless }}<label class="form-check-label" for="{{ form.passwordless.id_for_label }}">{{ form.passwordless.label }}</label><div class="form-text">有効にすると、端末内のパスキーとして登録されます。</div></div>
+    {{ form.credential }}
+    <button id="mfa_webauthn_add" class="btn btn-primary" type="button">登録を開始する</button>
+    <a class="btn btn-outline-secondary" href="{% url 'mfa_list_webauthn' %}">キャンセル</a>
+  </form>
+  {{ js_data|json_script:"js_data" }}
+  <script src="{% static 'mfa/js/webauthn-json.js' %}"></script><script src="{% static 'mfa/js/webauthn.js' %}"></script><script src="{% static 'account/js/onload.js' %}"></script>
+  <script src="{% static 'js/webauthn-ui.js' %}"></script>
+  <script data-allauth-onload="allauth.webauthn.forms.addForm" type="application/json">{"ids":{"add":"mfa_webauthn_add","passwordless":"{{ form.passwordless.auto_id }}","credential":"{{ form.credential.auto_id }}","data":"js_data"}}</script>
+</div></div></section>
+{% endblock %}

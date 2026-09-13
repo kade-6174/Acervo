@@ -29,6 +29,20 @@
           <button class="btn btn-primary" type="submit">確認してログイン</button>
         </form>
 
+        {% if has_webauthn %}
+          <hr class="my-4">
+          <h2 class="h5">別の方法</h2>
+          <p class="text-muted small">登録済みのパスキーまたはセキュリティキーも使用できます。</p>
+          <div id="webauthn-status" class="alert d-none" role="status" aria-live="polite"></div>
+          <form id="webauthn_form" method="post" data-webauthn-form>
+            {% csrf_token %}{{ webauthn_form.credential }}
+            <button id="mfa_webauthn_authenticate" class="btn btn-outline-primary" type="button">パスキーまたはセキュリティキーを使う</button>
+          </form>
+          {{ js_data|json_script:"js_data" }}
+          {% load static %}<script src="{% static 'mfa/js/webauthn-json.js' %}"></script><script src="{% static 'mfa/js/webauthn.js' %}"></script><script src="{% static 'account/js/onload.js' %}"></script><script src="{% static 'js/webauthn-ui.js' %}"></script>
+          <script data-allauth-onload="allauth.webauthn.forms.authenticateForm" type="application/json">{"ids":{"authenticate":"mfa_webauthn_authenticate","credential":"{{ webauthn_form.credential.auto_id }}","data":"js_data"}}</script>
+        {% endif %}
+
         <form method="post" action="{% url 'account_logout' %}" class="mt-3">
           {% csrf_token %}
           <button class="btn btn-outline-secondary" type="submit">ログインを中止する</button>

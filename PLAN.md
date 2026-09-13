@@ -81,8 +81,8 @@
   - [x] Sub-step 3D: ログイン時のMFA認証画面（TOTP / リカバリーコード入力）および総合検証。
 - [ ] Step 4: WebAuthn（パスキー）の登録・ログイン・オリジン検証。安全でない本番オリジンの拒否。
   - [x] Sub-step 4A: 固定公開OriginからのRP ID決定、本番設定のfail-fast検証、WebAuthn機能ゲート維持。
-  - [ ] Sub-step 4B: パスキー登録・一覧・名称変更・削除・再認証。
-  - [ ] Sub-step 4C: パスワードレスログインとログイン時第二要素。ここで `MFA_SUPPORTED_TYPES` の `webauthn` と `MFA_PASSKEY_LOGIN_ENABLED` を再有効化する。
+  - [x] Sub-step 4B: パスキー登録・一覧・名称変更・削除・再認証、およびパスワードログイン後のWebAuthn第二要素。
+  - [ ] Sub-step 4C: パスワードレスログイン。登録用の設定は4Bで有効だが、ログインURLと画面は引き続き非公開。
   - [ ] Sub-step 4D: 本番相当・実ブラウザ検証と最終レビュー。
 - [ ] Step 5: 全利用者へのMFA設定画面提供と管理者MFA必須化（検証済みパスキーまたはTOTP必須、セッション内MFA確認）。
 - [ ] Step 6: 別管理者によるMFAリセットと、最後の管理者向けサーバー管理コマンド。リセット後の再登録強制。

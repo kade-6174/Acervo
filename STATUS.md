@@ -4,9 +4,13 @@
 
 ## Current Task
 
-Phase 1C Sub-step 4A（WebAuthnの固定RP ID／公開Origin基盤）の実装とローカル検証を完了。WebAuthn画面公開、パスキー登録・認証、管理者MFAゲートには未着手。
+Phase 1C Sub-step 4B（WebAuthn登録・管理・パスワードログイン後の第二要素）の実装とローカル検証を完了。パスワードレスログイン、実ブラウザ最終検証、管理者MFAゲートには未着手。
 
 ## Completed
+
+- Sub-step 4Bとして、allauth 65.19.3の個別WebAuthn viewだけを明示的に公開し、一覧・追加・名称変更・削除・WebAuthn再認証・ログイン時第二要素を追加。passwordless login、signup、Trust browser URLは非公開のまま維持
+- パスキー登録の日本語UI、標準WebAuthn JavaScript、機能検出・一般的なaria-liveエラー、二重送信防止、全WebAuthn管理画面のnever-cacheを追加。秘密鍵、生体情報、challenge、credential JSONを独自に保存・表示しない
+- `MFA_SUPPORTED_TYPES`へ`webauthn`を追加。登録用のpasswordless選択肢を有効にする設定は追加したが、パスワードレスログインURLはallowlist外のためStep 4Cまで利用できない
 
 - Sub-step 4Aとして、`ACERVO_PUBLIC_BASE_URL`を唯一の情報源にして小文字のhostnameをWebAuthn RP IDへ固定し、RP表示名を`Acervo`へ固定。リクエストの`Host`、`X-Forwarded-Host`、`X-Forwarded-For`はRP IDの決定に使わない
 - 本番起動時に公開URLのHTTPS、DNS hostname、認証情報・query・fragment・subpath不在、IP／localhost拒否、`DJANGO_ALLOWED_HOSTS`完全一致、`DJANGO_CSRF_TRUSTED_ORIGINS`完全Origin一致をfail-fastで検証。allauth／python-fido2標準のOrigin検証は緩和していない
@@ -104,7 +108,7 @@ Phase 1C Sub-step 4A（WebAuthnの固定RP ID／公開Origin基盤）の実装�
 
 - 実際の公開ドメイン決定後に、直接HTTPSの証明書取得を手動確認する
 - Phase 1C全体の受入前に、実運用HTTPSブラウザでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告を確認する（未実施）。
-- Phase 1C Sub-step 4B（パスキー登録・一覧・名称変更・削除・再認証）、4C（パスワードレスログインとログイン時第二要素）、4D（本番相当・実ブラウザ検証と最終レビュー）
+- Phase 1C Sub-step 4C（パスワードレスログイン）、4D（本番相当・実ブラウザ検証と最終レビュー）。WebAuthn登録・端末認証の実ブラウザ確認は未実施。
 
 ## Tests
 
@@ -120,6 +124,8 @@ Phase 1C Sub-step 4A（WebAuthnの固定RP ID／公開Origin基盤）の実装�
 - `python manage.py test accounts.tests.test_mfa_authenticate --settings=config.settings.test`: 成功（12件全成功）
 - `python manage.py test accounts.tests --settings=config.settings.test`: 成功（112件全成功）
 - `python manage.py test --settings=config.settings.test`: 成功（SQLite、119件全成功）
+- Step 4B作業ツリー: `python manage.py test --settings=config.settings.test`: 成功（SQLite、119件全成功）、`ruff check .`／`ruff format --check .`／`python manage.py check --settings=config.settings.test`／`makemigrations --check --dry-run`: 成功。production設定の`check --deploy`: 警告なしで成功
+- Step 4BのPostgreSQL 18、本番Compose・Cloudflare追加Compose、Caddy、本番イメージ・コンテナ検証: このローカル環境ではDocker CLIが利用できないため未実行。push後のGitHub Actionsで確認予定
 - 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
 - ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。Sub-step 4A HEADのGitHub Actionsで本番コンテナ検証を実行し、全項目成功
 
