@@ -26,5 +26,6 @@
     </header>
     <main>{% block content %}{% endblock %}</main>
     <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+    {% block extra_body %}{% endblock %}
   </body>
 </html>

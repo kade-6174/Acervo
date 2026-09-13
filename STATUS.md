@@ -4,10 +4,16 @@
 
 ## Current Task
 
-Gemini移行期間（`927256e..eb02cce`）の独立監査と必要最小限の補正が完了。Phase 1C Sub-step 3Cには未着手。
+Phase 1C Sub-step 3C（Recovery Codesの一回限り表示・直接ダウンロード・再生成）の実装とローカル検証を完了。Sub-step 3D、ログイン時MFA、WebAuthn、パスキー、管理者MFAゲートには未着手。
 
 ## Completed
 
+- 監査補正コミット `66c63fc` と `7dcb3ca` を変更・squashせず `origin/main` へpushし、GitHub Actions run 34754182073 の `test` と `production-container` が全成功したことを確認
+- `templates/mfa/recovery_codes/index.html` と `generate.html` を追加し、初回だけの日本語表示、10個のコードの個別行表示、コピー、ブラウザ永続ストレージを使わない一時Blobによるファイル保存、保存確認、未確認離脱のbest-effort警告、再訪時の平文非表示を実装
+- allauth標準のRecovery Codes生成・一回性・ユーザー行ロック・再認証・10個発行を維持し、Acervo側は画面と最小の遷移境界だけを実装。古い認証状態の再生成POSTは再認証へ案内するが、allauthのPOST再送を使わず、再認証後も生成確認GETへ戻るようにした
+- 再生成確認画面へ未使用数、全旧コードの即時無効化、取消不能、TOTPを無効にしないこと、新コードも一度だけ表示すること、明示的な実行・キャンセル導線を追加
+- `mfa_generate_recovery_codes` にも `never_cache` を適用し、Recovery Codesの表示・再生成・直接ダウンロード成功応答で `Cache-Control: max-age=0, no-cache, no-store, must-revalidate, private` を実測
+- `accounts/tests/test_mfa_recovery_codes.py` を追加し、初回表示・再訪・表示後/ダウンロード後の403・再生成・旧コード無効化・TOTP維持・CSRF・stale session・初回パスワード変更ゲート・匿名拒否を検証
 - Gemini移行期間の全5コミット・全9変更ファイルを、実コード、django-allauth 65.19.3本体、テスト、実レスポンス・DB状態、GitHub Actions実行結果から照合
 - URL公開範囲、stale session再認証、初回パスワード変更ゲート、TOTP登録・無効化、MultiFernet統合、Recovery Codes SHOW_ONCE、Cache-Control、クライアントIP信頼境界を再検証
 - `accounts/tests/test_mfa_urls.py` と `accounts/tests/test_mfa_totp.py` を補強し、状態変更POSTの初回パスワードゲート、CSRF拒否、stale時のRecovery Codes非再生成、再認証方法列挙、専用IPヘッダーによる実レート制限、SHOW_ONCE後の平文非再表示を追加検証
@@ -85,21 +91,22 @@ Gemini移行期間（`927256e..eb02cce`）の独立監査と必要最小限の�
 ## Remaining
 
 - 実際の公開ドメイン決定後に、直接HTTPSの証明書取得を手動確認する
-- Phase 1C Sub-step 3Cは設計責任者から開始指示があるまで着手しない
+- Phase 1C Sub-step 3D（ログイン時MFA認証画面および総合検証）
 
 ## Tests
 
 ### ローカル
 
 - `ruff check .`: 成功
-- `ruff format --check .`: 成功（50ファイル）
+- `ruff format --check .`: 成功（52ファイル）
 - `python manage.py check --settings=config.settings.test`: 成功
 - `python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（差分なし）
 - `python manage.py test accounts.tests.test_mfa_urls --settings=config.settings.test`: 成功（11件全成功）
 - `python manage.py test accounts.tests.test_mfa_totp --settings=config.settings.test`: 成功（12件全成功）
-- `python manage.py test --settings=config.settings.test`: 成功（SQLite、97件全成功）
+- `python manage.py test accounts.tests.test_mfa_recovery_codes --settings=config.settings.test`: 成功（5件全成功）
+- `python manage.py test --settings=config.settings.test`: 成功（SQLite、102件全成功）
 - 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
-- ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。監査対象HEAD `eb02cce` のGitHub Actionsで本番コンテナ検証済み。監査補正コミットは未pushのためCI未実行
+- ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。Sub-step 3Cのpush後、GitHub Actionsで本番コンテナ検証を実行する
 
 ### GitHub Actions
 

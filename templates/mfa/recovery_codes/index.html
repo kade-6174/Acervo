@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}リカバリーコード — Acervo{% endblock %}
+
+{% block content %}
+  <section class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-md-9 col-lg-8">
+        <h1 class="h2 mb-4">リカバリーコード</h1>
+        <p class="text-muted">未使用のコードは {{ unused_codes|length }} / {{ total_count }} 個です。</p>
+
+        {% if can_view_codes %}
+          <div class="alert alert-warning" role="alert">
+            <h2 class="h5 alert-heading">今回しか表示されません</h2>
+            <p>各コードは1回だけ使用できます。安全な場所へ保存してください。</p>
+            <p class="mb-0">スクリーンショットは推奨しません。端末の写真や共有先に残るおそれがあります。</p>
+          </div>
+
+          <ol id="recovery-codes" class="list-group list-group-numbered mb-4" aria-label="リカバリーコード">
+            {% for code in unused_codes %}
+              <li class="list-group-item font-monospace" data-recovery-code>{{ code }}</li>
+            {% endfor %}
+          </ol>
+
+          <div class="d-flex flex-wrap gap-2 mb-4">
+            <button id="copy-recovery-codes" class="btn btn-outline-secondary" type="button">すべてコピー</button>
+            <button id="save-recovery-codes" class="btn btn-outline-primary" type="button">ファイルとして保存</button>
+          </div>
+
+          <div class="form-check mb-3">
+            <input id="codes-saved" class="form-check-input" type="checkbox">
+            <label class="form-check-label" for="codes-saved">安全な場所へ保存しました</label>
+          </div>
+          <a id="complete-recovery-codes" class="btn btn-primary disabled" href="{% url 'mfa_index' %}" aria-disabled="true">完了</a>
+        {% else %}
+          <div class="alert alert-secondary" role="alert">
+            <h2 class="h5 alert-heading">同じコードは再表示できません</h2>
+            <p class="mb-0">紛失した場合は再生成が必要です。再生成すると、現在のすべてのコードが無効になります。</p>
+          </div>
+          {% if can_generate_codes %}
+            <a class="btn btn-outline-warning" href="{% url 'mfa_generate_recovery_codes' %}">再生成する</a>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </section>
+{% endblock %}
+
+{% block extra_body %}
+  {% if can_view_codes %}
+    <script>
+      (() => {
+        const codes = Array.from(document.querySelectorAll("[data-recovery-code]"), (element) => element.textContent.trim());
+        const confirmation = document.getElementById("codes-saved");
+        const complete = document.getElementById("complete-recovery-codes");
+        let completionConfirmed = false;
+
+        confirmation.addEventListener("change", () => {
+          completionConfirmed = confirmation.checked;
+          complete.classList.toggle("disabled", !completionConfirmed);
+          complete.setAttribute("aria-disabled", String(!completionConfirmed));
+        });
+        complete.addEventListener("click", (event) => {
+          if (!completionConfirmed) {
+            event.preventDefault();
+          }
+        });
+        document.getElementById("copy-recovery-codes").addEventListener("click", async () => {
+          await navigator.clipboard.writeText(codes.join("\n"));
+        });
+        document.getElementById("save-recovery-codes").addEventListener("click", () => {
+          const blob = new Blob([`${codes.join("\n")}\n`], {type: "text/plain"});
+          const objectUrl = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = objectUrl;
+          link.download = "acervo-recovery-codes.txt";
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+        });
+        window.addEventListener("beforeunload", (event) => {
+          if (!completionConfirmed) {
+            event.preventDefault();
+            event.returnValue = "";
+          }
+        });
+      })();
+    </script>
+  {% endif %}
+{% endblock %}

@@ -344,7 +344,10 @@ class MFAURLRoutingTests(TestCase):
         # 3. mfa_generate_recovery_codes
         resp_gen = self.client.get(reverse("mfa_generate_recovery_codes"))
         self.assertEqual(resp_gen.status_code, 200)
-        self.assertIsNone(resp_gen.headers.get("Cache-Control"))
+        self.assertEqual(
+            resp_gen.headers.get("Cache-Control"),
+            "max-age=0, no-cache, no-store, must-revalidate, private",
+        )
 
         # 4. mfa_view_recovery_codes
         # (初回表示時: Recovery Codesが表示される最重要画面: never_cache適用済み)

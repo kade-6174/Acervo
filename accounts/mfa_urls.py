@@ -11,6 +11,8 @@ from allauth.mfa.totp import views as totp_views
 from django.urls import path
 from django.views.decorators.cache import never_cache
 
+from . import mfa_views
+
 urlpatterns = [
     path("", base_views.index, name="mfa_index"),
     path("reauthenticate/", base_views.reauthenticate, name="mfa_reauthenticate"),
@@ -23,7 +25,7 @@ urlpatterns = [
     ),
     path(
         "recovery-codes/generate/",
-        recovery_views.generate_recovery_codes,
+        never_cache(mfa_views.generate_recovery_codes),
         name="mfa_generate_recovery_codes",
     ),
     path(

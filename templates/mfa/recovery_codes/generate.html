@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}リカバリーコードを再生成 — Acervo{% endblock %}
+
+{% block content %}
+  <section class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-md-8 col-lg-7">
+        <h1 class="h2 mb-4">リカバリーコードを再生成</h1>
+        <div class="alert alert-danger" role="alert">
+          <p>現在の未使用コードは <strong>{{ unused_code_count }} 個</strong>です。</p>
+          <ul class="mb-0">
+            <li>既存の全コードは直ちに無効になります。</li>
+            <li>この操作は取り消せません。</li>
+            <li>TOTPの認証アプリ設定は無効になりません。</li>
+            <li>新しいコードも一度だけ表示されます。</li>
+          </ul>
+        </div>
+        <form method="post" action="{% url 'mfa_generate_recovery_codes' %}">
+          {% csrf_token %}
+          {{ form.non_field_errors }}
+          <div class="d-flex gap-2">
+            <button class="btn btn-danger" type="submit">既存コードを無効にして再生成</button>
+            <a class="btn btn-outline-secondary" href="{% url 'mfa_index' %}">キャンセル</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+{% endblock %}
