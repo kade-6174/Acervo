@@ -8,6 +8,8 @@ Phase 1C Sub-step 3C（Recovery Codesの一回限り表示・直接ダウンロ�
 
 ## Completed
 
+- Sub-step 3Cレビュー指摘対応として、Clipboard APIの機能検出・例外処理、日本語 `aria-live` 通知、Blob保存の開始・失敗通知、一時リンク削除・Object URL破棄、再生成フォームの通常二重送信防止を追加
+- Recovery Codesだけを持つ利用者の再生成POSTがallauth標準フォームで拒否され、Authenticator、暗号化seed、used mask、閲覧済み時刻が不変で、レスポンスへ平文コードを返さない回帰テストを追加
 - 監査補正コミット `66c63fc` と `7dcb3ca` を変更・squashせず `origin/main` へpushし、GitHub Actions run 34754182073 の `test` と `production-container` が全成功したことを確認
 - `templates/mfa/recovery_codes/index.html` と `generate.html` を追加し、初回だけの日本語表示、10個のコードの個別行表示、コピー、ブラウザ永続ストレージを使わない一時Blobによるファイル保存、保存確認、未確認離脱のbest-effort警告、再訪時の平文非表示を実装
 - allauth標準のRecovery Codes生成・一回性・ユーザー行ロック・再認証・10個発行を維持し、Acervo側は画面と最小の遷移境界だけを実装。古い認証状態の再生成POSTは再認証へ案内するが、allauthのPOST再送を使わず、再認証後も生成確認GETへ戻るようにした
@@ -103,8 +105,8 @@ Phase 1C Sub-step 3C（Recovery Codesの一回限り表示・直接ダウンロ�
 - `python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（差分なし）
 - `python manage.py test accounts.tests.test_mfa_urls --settings=config.settings.test`: 成功（11件全成功）
 - `python manage.py test accounts.tests.test_mfa_totp --settings=config.settings.test`: 成功（12件全成功）
-- `python manage.py test accounts.tests.test_mfa_recovery_codes --settings=config.settings.test`: 成功（5件全成功）
-- `python manage.py test --settings=config.settings.test`: 成功（SQLite、102件全成功）
+- `python manage.py test accounts.tests.test_mfa_recovery_codes --settings=config.settings.test`: 成功（6件全成功）
+- `python manage.py test --settings=config.settings.test`: 成功（SQLite、103件全成功）
 - 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
 - ローカルDocker検証: 未実行（このWindows環境にDocker CLIが存在しないため）。Sub-step 3C HEADのGitHub Actionsで本番コンテナ検証を実行し、全項目成功
 

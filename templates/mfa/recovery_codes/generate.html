@@ -16,15 +16,28 @@
             <li>新しいコードも一度だけ表示されます。</li>
           </ul>
         </div>
-        <form method="post" action="{% url 'mfa_generate_recovery_codes' %}">
+        <form id="generate-recovery-codes-form" method="post" action="{% url 'mfa_generate_recovery_codes' %}">
           {% csrf_token %}
           {{ form.non_field_errors }}
           <div class="d-flex gap-2">
-            <button class="btn btn-danger" type="submit">既存コードを無効にして再生成</button>
+            <button id="generate-recovery-codes-submit" class="btn btn-danger" type="submit">既存コードを無効にして再生成</button>
             <a class="btn btn-outline-secondary" href="{% url 'mfa_index' %}">キャンセル</a>
           </div>
         </form>
       </div>
     </div>
   </section>
+{% endblock %}
+
+{% block extra_body %}
+  <script>
+    (() => {
+      const form = document.getElementById("generate-recovery-codes-form");
+      const submit = document.getElementById("generate-recovery-codes-submit");
+      form.addEventListener("submit", () => {
+        submit.disabled = true;
+        submit.textContent = "再生成しています";
+      });
+    })();
+  </script>
 {% endblock %}

@@ -26,6 +26,7 @@
             <button id="copy-recovery-codes" class="btn btn-outline-secondary" type="button">すべてコピー</button>
             <button id="save-recovery-codes" class="btn btn-outline-primary" type="button">ファイルとして保存</button>
           </div>
+          <p id="recovery-codes-status" class="small text-muted" role="status" aria-live="polite" aria-atomic="true"></p>
 
           <div class="form-check mb-3">
             <input id="codes-saved" class="form-check-input" type="checkbox">
@@ -53,7 +54,12 @@
         const codes = Array.from(document.querySelectorAll("[data-recovery-code]"), (element) => element.textContent.trim());
         const confirmation = document.getElementById("codes-saved");
         const complete = document.getElementById("complete-recovery-codes");
+        const status = document.getElementById("recovery-codes-status");
         let completionConfirmed = false;
+
+        const announce = (message) => {
+          status.textContent = message;
+        };
 
         confirmation.addEventListener("change", () => {
           completionConfirmed = confirmation.checked;
@@ -66,16 +72,40 @@
           }
         });
         document.getElementById("copy-recovery-codes").addEventListener("click", async () => {
-          await navigator.clipboard.writeText(codes.join("\n"));
+          try {
+            if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+              announce("コピー機能を利用できません。コードを手動で選択してコピーしてください。");
+              return;
+            }
+            await navigator.clipboard.writeText(codes.join("\n"));
+            announce("すべてのコードをコピーしました。");
+          } catch {
+            announce("コピーできませんでした。コードを手動で選択してコピーしてください。");
+          }
         });
         document.getElementById("save-recovery-codes").addEventListener("click", () => {
-          const blob = new Blob([`${codes.join("\n")}\n`], {type: "text/plain"});
-          const objectUrl = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = objectUrl;
-          link.download = "acervo-recovery-codes.txt";
-          link.click();
-          setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+          let objectUrl;
+          let link;
+          try {
+            const blob = new Blob([`${codes.join("\n")}\n`], {type: "text/plain"});
+            objectUrl = URL.createObjectURL(blob);
+            link = document.createElement("a");
+            link.href = objectUrl;
+            link.download = "acervo-recovery-codes.txt";
+            link.hidden = true;
+            document.body.appendChild(link);
+            link.click();
+            announce("ファイルの保存を開始しました。");
+          } catch {
+            announce("ファイルの保存を開始できませんでした。コードを手動で選択して保存してください。");
+          } finally {
+            if (link) {
+              link.remove();
+            }
+            if (objectUrl) {
+              setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+            }
+          }
         });
         window.addEventListener("beforeunload", (event) => {
           if (!completionConfirmed) {

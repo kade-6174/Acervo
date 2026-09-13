@@ -78,6 +78,13 @@ class RecoveryCodesUserInterfaceTests(TestCase):
             self.assertContains(response, text)
         for forbidden in ("localStorage", "sessionStorage", "indexedDB", "document.cookie"):
             self.assertNotContains(response, forbidden)
+        self.assertContains(response, 'aria-live="polite"')
+        self.assertContains(response, 'typeof navigator.clipboard.writeText !== "function"')
+        self.assertContains(response, "コードを手動で選択してコピーしてください")
+        self.assertContains(response, "すべてのコードをコピーしました")
+        self.assertContains(response, "ファイルの保存を開始しました")
+        self.assertContains(response, "document.body.appendChild(link)")
+        self.assertContains(response, "link.remove()")
         self.assertContains(response, "URL.revokeObjectURL")
 
         revisit = self.client.get(reverse("mfa_view_recovery_codes"))
@@ -147,6 +154,9 @@ class RecoveryCodesUserInterfaceTests(TestCase):
             "キャンセル",
         ):
             self.assertContains(confirmation, text)
+        self.assertContains(confirmation, 'id="generate-recovery-codes-form"')
+        self.assertContains(confirmation, "submit.disabled = true")
+        self.assertContains(confirmation, 'submit.textContent = "再生成しています"')
         old_authenticator.refresh_from_db()
         self.assertEqual(old_authenticator.wrap().get_unused_codes(), old_codes)
 
@@ -167,6 +177,35 @@ class RecoveryCodesUserInterfaceTests(TestCase):
         self.assertTrue(
             Authenticator.objects.filter(user=self.user, type=Authenticator.Type.TOTP).exists()
         )
+
+    def test_recovery_codes_alone_cannot_generate_new_codes(self):
+        """Recovery Codesだけでは再生成できず、既存の秘密値と閲覧状態を維持する。"""
+        self._login_with_recent_auth(self.user)
+        recovery_codes = self._activate_recovery_codes()
+        plain_codes = recovery_codes.get_unused_codes()
+        recovery_codes.mark_as_viewed()
+        recovery_codes.instance.refresh_from_db()
+        original_pk = recovery_codes.instance.pk
+        original_data = dict(recovery_codes.instance.data)
+
+        self.assertEqual(set(original_data), {"seed", "used_mask", "viewed_at"})
+        self.assertFalse(
+            Authenticator.objects.filter(user=self.user)
+            .exclude(type=Authenticator.Type.RECOVERY_CODES)
+            .exists()
+        )
+
+        response = self.client.post(reverse("mfa_generate_recovery_codes"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["form"].is_valid())
+        authenticators = Authenticator.objects.filter(user=self.user)
+        self.assertEqual(authenticators.count(), 1)
+        unchanged = authenticators.get()
+        self.assertEqual(unchanged.pk, original_pk)
+        self.assertEqual(unchanged.data, original_data)
+        for code in plain_codes:
+            self.assertNotContains(response, code)
 
     def test_generate_post_requires_csrf_and_stale_reauthentication_does_not_replay_it(self):
         """CSRFと直近再認証を必須にし、再認証後も取消不能なPOSTを自動再送しない。"""
