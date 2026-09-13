@@ -90,6 +90,18 @@ Phase 1C Step 3A「TOTP / Recovery Codes の最小URLルーティングとアク
 
 ### GitHub Actions
 
+- Phase 1C Sub-step 3A 最終検証（HEAD: 9e0ba84）: run 34750863642（全ジョブ成功）
+- `test` job: 成功（35s）
+- PostgreSQL 18上で全84テスト成功
+- `production-container` job: 成功（1m36s）
+- Ruff lint、Ruff format check、Django system check: 成功
+- migration差分確認（差分なし）、本番 `check --deploy`（警告なし、0 silenced）: 成功
+- Docker Compose本番相当起動、Caddy設定変換・検証: 成功
+- ヘルスチェック（`db`、`web`、`proxy` 全healthy）: 成功
+- PostgreSQL DatabaseCacheのレート制限テーブル（`acervo_rate_limit_cache`）確認: 成功
+- 直接HTTPSとTunnelのクライアントIP境界確認: 成功
+- アプリ（8000番）とDB（5432番）のホスト非公開確認: 成功
+- DBデータおよび写真ボリュームの永続化確認: 成功
 - Phase 1B最終検証: run 34742303012（全ジョブ成功）
 - PostgreSQL 18でallauth・accountsマイグレーションと全55テスト: 成功
 - Ruff lint、Ruff format check、Django system check: 成功
