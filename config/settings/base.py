@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "allauth",
     "allauth.account",
+    "allauth.mfa",
     "accounts",
     "core",
 ]
@@ -85,6 +86,16 @@ ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = False
 ACCOUNT_SESSION_REMEMBER = False
 ALLAUTH_TRUSTED_CLIENT_IP_HEADER = "X-Acervo-Client-IP"
 ALLAUTH_TRUSTED_PROXY_COUNT = 0
+
+MFA_SUPPORTED_TYPES = ["recovery_codes", "totp", "webauthn"]
+MFA_PASSKEY_LOGIN_ENABLED = True
+MFA_RECOVERY_CODE_COUNT = 10
+MFA_RECOVERY_CODES_SHOW_ONCE = True
+MFA_TRUST_ENABLED = False
+MFA_TOTP_ISSUER = "Acervo"
+MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = False
+
+ACERVO_MFA_FERNET_KEYS = env.list("ACERVO_MFA_FERNET_KEYS", default=[])
 
 DATABASES = {
     "default": {

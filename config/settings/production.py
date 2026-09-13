@@ -4,6 +4,8 @@ from urllib.parse import urlsplit
 
 from django.core.exceptions import ImproperlyConfigured
 
+from accounts.security import validate_mfa_fernet_keys
+
 from .base import *  # noqa: F403
 
 if not SECRET_KEY:  # noqa: F405
@@ -12,6 +14,11 @@ if not ALLOWED_HOSTS:  # noqa: F405
     raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTSの設定が必要です。")
 if not DATABASES["default"]["PASSWORD"]:  # noqa: F405
     raise ImproperlyConfigured("POSTGRES_PASSWORDの設定が必要です。")
+
+validate_mfa_fernet_keys(ACERVO_MFA_FERNET_KEYS)  # noqa: F405
+
+if MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN:  # noqa: F405
+    raise ImproperlyConfigured("本番環境ではMFA_WEBAUTHN_ALLOW_INSECURE_ORIGINを有効にできません。")
 
 CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])  # noqa: F405
 if not CSRF_TRUSTED_ORIGINS:

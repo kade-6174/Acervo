@@ -4,9 +4,16 @@
 
 ## Current Task
 
-Phase 1B「ログイン・初回パスワード・レート制限」は実装・検証完了。Phase 1C以降には未着手。
+Phase 1C Step 1「MFA設定・暗号鍵バリデーション・allauth.mfa基盤」は実装・検証完了。Step 2以降には未着手。
 
 ## Completed
+
+- `cryptography==50.0.1` を直接依存へ追加
+- `INSTALLED_APPS` への `allauth.mfa` 有効化とMFA基本設定（ブラウザ信頼無効化、リカバリーコード数10・一度限り表示、WebAuthn安全設定）
+- `accounts/security.py` による `ACERVO_MFA_FERNET_KEYS` のFernet鍵バリデーション
+- 本番環境（`production.py`）での鍵未設定・不正鍵・空文字・不正複数キー時の起動失敗（秘密鍵の非漏洩）
+- 本番環境での安全でないWebAuthnオリジン許可の拒否
+- MFA設定およびFernet鍵バリデーションの自動テスト追加（全65テスト成功）
 
 - Phase 0のDjango開発基盤
 - 開発用と本番用のCompose構成の分離
@@ -61,10 +68,10 @@ Phase 1B「ログイン・初回パスワード・レート制限」は実装・
 ### ローカル
 
 - `ruff check .`: 成功
-- `ruff format --check .`: 成功（45ファイル）
+- `ruff format --check .`: 成功（46ファイル）
 - `python manage.py check --settings=config.settings.test`: 成功
 - `python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（差分なし）
-- `python manage.py test --settings=config.settings.test`: 成功（SQLite、55件）
+- `python manage.py test --settings=config.settings.test`: 成功（SQLite、65件全成功）
 - 本番相当設定での `python manage.py check --deploy`: 成功
 
 ### GitHub Actions
@@ -111,8 +118,14 @@ Phase 1B「ログイン・初回パスワード・レート制限」は実装・
 - 実ドメインでの証明書取得は、公開ドメインと本番ホスト決定後の手動確認事項として残る。
 - 既存開発DBへDjango標準Userのauthマイグレーションを適用済みの場合、Custom Userへの後付け切替は安全に継続できない。対象は開発用PostgreSQL DBと開発用Composeの `postgres_data` ボリューム（通常 `acervo_postgres_data`）。今回は接続、削除、初期化を行っていない。再作成が必要な環境では、保存データの有無を確認し、設計責任者または運用者の承認を得て別作業で行う。
 
-## Recent Changes
-
+- `pyproject.toml`: `cryptography==50.0.1` を直接依存へ追加
+- `config/settings/base.py`: `allauth.mfa` 有効化、MFA基本設定（ブラウザ信頼無効化、リカバリーコード設定、WebAuthn安全設定）、`ACERVO_MFA_FERNET_KEYS`
+- `config/settings/production.py`: Fernet鍵バリデーション、安全でないWebAuthnオリジン許可の拒否
+- `config/settings/test.py`, `config/settings/development.py`: テスト用および開発用のFernetキー設定
+- `.env.production.example`: `ACERVO_MFA_FERNET_KEYS` の例を追加
+- `accounts/security.py`: `validate_mfa_fernet_keys` 実装
+- `accounts/tests/test_deployment_config.py`: MFA設定検証、Fernet鍵バリデーション、本番設定失敗テストを追加
+- `PLAN.md`、`STATUS.md`: Phase 1C Step 1 の完了実績を記録
 - `compose.production.yaml`: HTTPSを考慮したWebヘルスチェック
 - `deploy/gunicorn.conf.py`: 読み取り専用環境向け制御ソケット無効化
 - `deploy/Caddyfile`: 管理画面の公開経路遮断修正

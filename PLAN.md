@@ -72,13 +72,13 @@
 
 ### Phase 1C — パスキー・TOTP・リカバリーコード
 
-- `allauth.mfa` のWebAuthn、TOTP、リカバリーコードを有効にし、パスキーログインを提供する。
-- 本番で安全でないWebAuthnオリジンを許可せず、公開ドメインをRP IDとして扱う。
-- 全利用者へMFA設定画面を提供し、管理者には検証済みパスキーまたはTOTPを必須とする。
-- リカバリーコードを10個、一度だけ表示し、再生成で旧コードを無効化する。
-- 「このブラウザを信頼する」は無効にする。
-- django-allauthのMFA adapterを拡張し、TOTP秘密とリカバリーコードを `cryptography.fernet.MultiFernet` で暗号化する。`ACERVO_MFA_FERNET_KEYS` の全鍵で復号し、新規保存は先頭鍵を使う。本番で未設定・不正形式なら起動を失敗させる。
-- 別管理者によるMFAリセットと、最後の管理者向けサーバー管理コマンドを実装する。リセット後は再登録まで管理操作を拒否する。
+- [x] Step 1: `allauth.mfa` の有効化、`cryptography` 依存追加、allauth標準MFA設定（ブラウザ信頼無効化、リカバリーコード10個・一度限り表示、WebAuthn安全オリジン等）、`ACERVO_MFA_FERNET_KEYS` の本番バリデーション。
+- [ ] Step 2: `allauth.mfa` のMFA adapterを拡張し、TOTP秘密とリカバリーコードを `cryptography.fernet.MultiFernet` で暗号化する。`ACERVO_MFA_FERNET_KEYS` の全鍵で復号し、新規保存は先頭鍵を使う。
+- [ ] Step 3: TOTP登録・認証、リカバリーコード（10個の一度限り表示・再生成による旧コード無効化）のUIとルーティング。
+- [ ] Step 4: WebAuthn（パスキー）の登録・ログイン・オリジン検証。安全でない本番オリジンの拒否。
+- [ ] Step 5: 全利用者へのMFA設定画面提供と管理者MFA必須化（検証済みパスキーまたはTOTP必須、セッション内MFA確認）。
+- [ ] Step 6: 別管理者によるMFAリセットと、最後の管理者向けサーバー管理コマンド。リセット後の再登録強制。
+- [ ] Step 7: 本番Compose・CI検証（production validation）。
 
 **必須テスト:** パスキー登録とログイン、パスワード後のWebAuthn認証、TOTP登録・認証、リカバリーコードの一回性、再生成、暗号化保存、旧鍵復号と新鍵暗号化、安全でない本番オリジン拒否、MFAリセット。
 
