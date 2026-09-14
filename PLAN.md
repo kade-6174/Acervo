@@ -85,6 +85,7 @@
   - [x] 4B-R: WebAuthn管理URLの所有権、CSRF、再認証、キャッシュ、登録成功時のRecovery Codes連携、および二重送信UIの回帰テスト補完。
   - [x] 4B-R2: challenge stateの消去・再利用拒否、WebAuthn再認証と第二要素の通常MFA認証記録を限定mock統合テストで補完。
   - [x] 4B-R3A: WebAuthn第二要素・再認証の検証失敗表示を日本語化し、失敗経路の統合テストを補完。
+  - [x] 4B-R3B: WebAuthn認証challenge stateと第二要素の共有レート制限・credential非再表示を補完。
   - [ ] Sub-step 4C: パスワードレスログイン。登録用の設定は4Bで有効だが、ログインURLと画面は引き続き非公開。
   - [ ] Sub-step 4D: 本番相当・実ブラウザ検証と最終レビュー。
 - [ ] Step 5: 全利用者へのMFA設定画面提供と管理者MFA必須化（検証済みパスキーまたはTOTP必須、セッション内MFA確認）。

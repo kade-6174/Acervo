@@ -18,6 +18,13 @@ class OneTimeCodeInput(forms.TextInput):
         return None
 
 
+class SensitiveCredentialInput(forms.HiddenInput):
+    """WebAuthn credential JSONを失敗応答へ再表示しない。"""
+
+    def format_value(self, value):
+        return None
+
+
 class AcervoLoginForm(LoginForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -98,6 +105,10 @@ class _AcervoWebAuthnAuthenticationForm:
             if error.code == "too_many_login_attempts":
                 raise get_account_adapter().validation_error("rate_limited") from None
             raise
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["credential"].widget = SensitiveCredentialInput()
 
 
 class AcervoAuthenticateWebAuthnForm(_AcervoWebAuthnAuthenticationForm, AuthenticateWebAuthnForm):

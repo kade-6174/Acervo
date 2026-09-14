@@ -11,6 +11,7 @@ Phase 1C Sub-step 4B（WebAuthn登録・管理・パスワードログイン後�
 - Sub-step 4Bとして、allauth 65.19.3の個別WebAuthn viewだけを明示的に公開し、一覧・追加・名称変更・削除・WebAuthn再認証・ログイン時第二要素を追加。passwordless login、signup、Trust browser URLは非公開のまま維持
 - 4B-R2として`accounts/tests/test_mfa_webauthn.py`を8件へ拡張。challenge stateの保存、成功時消去、再利用拒否、passwordless/第二要素のregistration option、WebAuthn再認証の通常MFA記録・外部next拒否を追加確認
 - 4B-R3AとしてWebAuthn専用フォームを追加し、allauth標準の検証・レート制限を変更せず、認証失敗だけを既存の日本語一般エラー／`rate_limited`表示へ正規化。第二要素失敗時にcredential hidden fieldを再表示しないこと、never-cache、未ログイン維持を統合テストで確認
+- 4B-R3Bとして認証challenge stateの成功時消去・再利用拒否・現在ユーザーのAuthenticator解決を追加確認。WebAuthn第二要素の共有レート制限と専用IP境界も確認し、失敗／制限応答にcredential JSONを再表示しない`SensitiveCredentialInput`を追加
 - 自動テストのWebAuthn成功経路では、ブラウザ認証器が出力するattestation/assertionのparse・署名検証とFido2Server完了境界だけを`autospec`付きでmockし、allauth view・フォーム・login stage・session・Authenticator DB・Recovery Codes連携・MFA認証記録は実行。補助的に無効な保存credentialを解析しないため`get_credentials`と表示用`Authenticator.wrap`を限定mockする。実ブラウザ実機による署名、実credentialでのOrigin/RP不一致は4Dの受入確認に残す
 - パスキー登録の日本語UI、標準WebAuthn JavaScript、機能検出・一般的なaria-liveエラー、二重送信防止、全WebAuthn管理画面のnever-cacheを追加。秘密鍵、生体情報、challenge、credential JSONを独自に保存・表示しない
 - `MFA_SUPPORTED_TYPES`へ`webauthn`を追加。登録用のpasswordless選択肢を有効にする設定は追加したが、パスワードレスログインURLはallowlist外のためStep 4Cまで利用できない

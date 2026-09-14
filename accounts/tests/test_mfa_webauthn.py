@@ -13,8 +13,9 @@ from allauth.mfa.models import Authenticator
 from allauth.mfa.webauthn.internal import auth as webauthn_auth
 from django.contrib.auth import SESSION_KEY
 from django.contrib.sessions.middleware import SessionMiddleware
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.test.client import RequestFactory
 from django.urls import reverse
 
@@ -238,6 +239,52 @@ class WebAuthnManagementTests(TestCase):
         key.refresh_from_db()
         self.assertIsNone(key.last_used_at)
 
+    @override_settings(ACCOUNT_RATE_LIMITS={"login_failed": "1/m/ip"})
+    def test_webauthn_second_factor_rate_limit_uses_dedicated_ip_not_xff(self):
+        cache.clear()
+        self.make_key(self.user)
+        self.client.post(
+            reverse("account_login"),
+            {"login": self.user.username, "password": self.password},
+            HTTP_X_ACERVO_CLIENT_IP="198.51.100.59",
+        )
+        with (
+            patch("allauth.mfa.webauthn.internal.auth.get_credentials", return_value=[]),
+            patch(
+                "allauth.mfa.webauthn.internal.auth.parse_authentication_response", autospec=True
+            ),
+            patch(
+                "allauth.mfa.webauthn.internal.auth.complete_authentication",
+                autospec=True,
+                side_effect=ValidationError(
+                    "認証コードを確認できませんでした。", code="incorrect_code"
+                ),
+            ),
+        ):
+            first = self.client.post(
+                reverse("mfa_authenticate"),
+                {"credential": '{"id": "secret-test"}'},
+                HTTP_X_ACERVO_CLIENT_IP="198.51.100.59",
+                HTTP_X_FORWARDED_FOR="203.0.113.1",
+            )
+            second = self.client.post(
+                reverse("mfa_authenticate"),
+                {"credential": '{"id": "secret-test"}'},
+                HTTP_X_ACERVO_CLIENT_IP="198.51.100.59",
+                HTTP_X_FORWARDED_FOR="203.0.113.2",
+            )
+        self.assertEqual(
+            first.context["webauthn_form"].errors.as_data()["credential"][0].code, "incorrect_code"
+        )
+        self.assertEqual(
+            second.context["webauthn_form"].errors.as_data()["credential"][0].code, "rate_limited"
+        )
+        self.assertContains(
+            second, "試行回数が多すぎます。しばらく待ってからもう一度お試しください。"
+        )
+        self.assertNotContains(second, "secret-test")
+        self.assertNotIn(SESSION_KEY, self.client.session)
+
     def test_reauthentication_failure_shows_generic_error_and_safe_next_is_used_on_success(self):
         self.make_key(self.user)
         self.recent_login()
@@ -316,3 +363,49 @@ class WebAuthnChallengeStateTests(TestCase):
         selection = options["publicKey"]["authenticatorSelection"]
         self.assertEqual(selection["residentKey"], "required")
         self.assertEqual(selection["userVerification"], "required")
+
+    def test_authentication_state_is_one_time_and_resolves_only_current_users_key(self):
+        request = RequestFactory().get("/")
+        SessionMiddleware(lambda request: None).process_request(request)
+        request.session.save()
+        user = User.objects.create_user(
+            username="auth-state", password="SecurePassword123!", cohort_number=31
+        )
+        other = User.objects.create_user(
+            username="auth-state-other", password="SecurePassword123!", cohort_number=31
+        )
+        key = Authenticator.objects.create(user=user, type="webauthn", data={"name": "key"})
+        Authenticator.objects.create(user=other, type="webauthn", data={"name": "other"})
+        wrapper = SimpleNamespace(
+            authenticator_data=SimpleNamespace(
+                credential_data=SimpleNamespace(credential_id=b"key")
+            )
+        )
+        with (
+            context.request_context(request),
+            patch("allauth.mfa.webauthn.internal.auth.get_credentials", return_value=[]),
+            patch.object(Authenticator, "wrap", return_value=wrapper),
+        ):
+            webauthn_auth.begin_authentication(user)
+            self.assertIn(webauthn_auth.STATE_SESSION_KEY, request.session)
+            with patch.object(
+                webauthn_auth.Fido2Server,
+                "authenticate_complete",
+                autospec=True,
+                side_effect=ValueError,
+            ):
+                with self.assertRaisesMessage(Exception, "認証コード"):
+                    webauthn_auth.complete_authentication(user, {"id": "test"})
+            with patch.object(
+                webauthn_auth.Fido2Server,
+                "authenticate_complete",
+                autospec=True,
+                return_value=SimpleNamespace(credential_id=b"key"),
+            ) as complete:
+                resolved = webauthn_auth.complete_authentication(user, {"id": "test"})
+                self.assertEqual(resolved.pk, key.pk)
+                complete.assert_called_once()
+                self.assertNotIn(webauthn_auth.STATE_SESSION_KEY, request.session)
+                with self.assertRaisesMessage(Exception, "認証コード"):
+                    webauthn_auth.complete_authentication(user, {"id": "test"})
+                complete.assert_called_once()
