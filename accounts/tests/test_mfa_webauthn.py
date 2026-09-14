@@ -63,10 +63,16 @@ class WebAuthnManagementTests(TestCase):
         self.recent_login()
         url = reverse("mfa_add_webauthn")
         with (
-            patch("allauth.mfa.webauthn.internal.auth.parse_registration_response"),
-            patch("allauth.mfa.webauthn.internal.auth.complete_registration"),
+            patch(
+                "allauth.mfa.webauthn.internal.auth.parse_registration_response", autospec=True
+            ) as parse,
+            patch(
+                "allauth.mfa.webauthn.internal.auth.complete_registration", autospec=True
+            ) as complete,
         ):
             response = self.client.post(url, {"name": "私の鍵", "credential": '{"id": "test"}'})
+        parse.assert_called_once()
+        complete.assert_called_once()
         self.assertRedirects(
             response, reverse("mfa_view_recovery_codes"), fetch_redirect_response=False
         )
@@ -169,6 +175,34 @@ class WebAuthnManagementTests(TestCase):
         key.refresh_from_db()
         self.assertIsNotNone(key.last_used_at)
 
+    def test_webauthn_reauthentication_records_mfa_and_rejects_external_next(self):
+        key = self.make_key(self.user)
+        self.recent_login()
+        url = reverse("mfa_reauthenticate_webauthn")
+        with (
+            patch("allauth.mfa.webauthn.internal.auth.get_credentials", return_value=[]),
+            patch(
+                "allauth.mfa.webauthn.internal.auth.parse_authentication_response", autospec=True
+            ),
+            patch(
+                "allauth.mfa.webauthn.internal.auth.complete_authentication",
+                autospec=True,
+                return_value=key,
+            ),
+        ):
+            page = self.client.get(f"{url}?next=https://attacker.example/")
+            self.assertIn("no-store", page.headers["Cache-Control"])
+            response = self.client.post(
+                f"{url}?next=https://attacker.example/",
+                {"credential": '{"id": "test"}'},
+                HTTP_X_ACERVO_CLIENT_IP="198.51.100.56",
+            )
+        self.assertRedirects(response, reverse("core:home"), fetch_redirect_response=False)
+        method = self.client.session["account_authentication_methods"][-1]
+        self.assertEqual(method["method"], "mfa")
+        self.assertTrue(method["reauthenticated"])
+        self.assertNotIn("passwordless", method)
+
 
 class WebAuthnChallengeStateTests(TestCase):
     def test_registration_state_is_session_bound_and_value_errors_are_generic(self):
@@ -178,17 +212,12 @@ class WebAuthnChallengeStateTests(TestCase):
         user = User.objects.create_user(
             username="state", password="SecurePassword123!", cohort_number=31
         )
-        with (
-            context.request_context(request),
-            patch.object(
-                webauthn_auth.Fido2Server,
-                "register_begin",
-                autospec=True,
-                return_value=({}, {"challenge": "x"}),
-            ),
-        ):
-            webauthn_auth.begin_registration(user, False)
+        with context.request_context(request):
+            options = webauthn_auth.begin_registration(user, False)
             self.assertIn(webauthn_auth.STATE_SESSION_KEY, request.session)
+            selection = options["publicKey"]["authenticatorSelection"]
+            self.assertEqual(selection["residentKey"], "discouraged")
+            self.assertEqual(selection["userVerification"], "discouraged")
         with (
             context.request_context(request),
             patch.object(
@@ -200,3 +229,30 @@ class WebAuthnChallengeStateTests(TestCase):
         ):
             with self.assertRaisesMessage(Exception, "認証コード"):
                 webauthn_auth.complete_registration({"id": "test"})
+        with (
+            context.request_context(request),
+            patch.object(
+                webauthn_auth.Fido2Server,
+                "register_complete",
+                autospec=True,
+                return_value=SimpleNamespace(),
+            ) as complete,
+        ):
+            webauthn_auth.complete_registration({"id": "test"})
+            complete.assert_called_once()
+            self.assertNotIn(webauthn_auth.STATE_SESSION_KEY, request.session)
+            with self.assertRaisesMessage(Exception, "認証コード"):
+                webauthn_auth.complete_registration({"id": "test"})
+
+    def test_passwordless_registration_options_require_resident_key_and_verification(self):
+        request = RequestFactory().get("/")
+        SessionMiddleware(lambda request: None).process_request(request)
+        request.session.save()
+        user = User.objects.create_user(
+            username="passkey-state", password="SecurePassword123!", cohort_number=31
+        )
+        with context.request_context(request):
+            options = webauthn_auth.begin_registration(user, True)
+        selection = options["publicKey"]["authenticatorSelection"]
+        self.assertEqual(selection["residentKey"], "required")
+        self.assertEqual(selection["userVerification"], "required")

@@ -83,6 +83,7 @@
   - [x] Sub-step 4A: 固定公開OriginからのRP ID決定、本番設定のfail-fast検証、WebAuthn機能ゲート維持。
   - [x] Sub-step 4B: パスキー登録・一覧・名称変更・削除・再認証、およびパスワードログイン後のWebAuthn第二要素。
   - [x] 4B-R: WebAuthn管理URLの所有権、CSRF、再認証、キャッシュ、登録成功時のRecovery Codes連携、および二重送信UIの回帰テスト補完。
+  - [x] 4B-R2: challenge stateの消去・再利用拒否、WebAuthn再認証と第二要素の通常MFA認証記録を限定mock統合テストで補完。
   - [ ] Sub-step 4C: パスワードレスログイン。登録用の設定は4Bで有効だが、ログインURLと画面は引き続き非公開。
   - [ ] Sub-step 4D: 本番相当・実ブラウザ検証と最終レビュー。
 - [ ] Step 5: 全利用者へのMFA設定画面提供と管理者MFA必須化（検証済みパスキーまたはTOTP必須、セッション内MFA確認）。
