@@ -14,6 +14,7 @@ COPY pyproject.toml README.md ./
 COPY accounts ./accounts
 COPY config ./config
 COPY core ./core
+COPY management_portal ./management_portal
 COPY manage.py ./manage.py
 COPY static ./static
 COPY templates ./templates

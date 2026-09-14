@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}管理 — Acervo{% endblock %}
+
+{% block content %}
+  <section class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <p class="text-uppercase text-secondary fw-semibold mb-2">Management</p>
+        <h1 class="h2 mb-3">管理</h1>
+        <p class="mb-4">ログイン中: <strong>{{ user.username }}</strong></p>
+        <div class="border rounded bg-white p-4 mb-4">
+          <h2 class="h5">管理機能について</h2>
+          <p class="text-secondary mb-0">管理操作は今後のStepで追加します。現在、この画面から実行できる管理操作はありません。</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-dark" href="{% url 'mfa_index' %}">セキュリティ設定</a>
+          <a class="btn btn-outline-secondary" href="{% url 'core:home' %}">通常画面へ戻る</a>
+          <form method="post" action="{% url 'account_logout' %}">
+            {% csrf_token %}
+            <button class="btn btn-outline-secondary" type="submit">ログアウト</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

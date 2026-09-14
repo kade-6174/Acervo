@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "allauth.mfa",
     "accounts",
     "core",
+    "management_portal",
 ]
 
 MIDDLEWARE = [
@@ -37,6 +38,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "management_portal.middleware.ManagementAccessMiddleware",
     "accounts.middleware.InitialPasswordChangeMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

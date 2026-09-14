@@ -12,13 +12,17 @@
   </head>
   <body>
     <header class="border-bottom bg-white">
-      <nav class="container py-3 d-flex align-items-center justify-content-between" aria-label="メインナビゲーション">
+      <nav class="container py-3 d-flex flex-wrap gap-3 align-items-center justify-content-between" aria-label="メインナビゲーション">
         <a class="fs-4 fw-semibold text-decoration-none text-dark" href="{% url 'core:home' %}">Acervo</a>
         {% if user.is_authenticated %}
-          <form method="post" action="{% url 'account_logout' %}">
-            {% csrf_token %}
-            <button class="btn btn-outline-secondary" type="submit">ログアウト</button>
-          </form>
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <a class="btn btn-outline-secondary" href="{% url 'mfa_index' %}">セキュリティ設定</a>
+            {% if user.role == "admin" %}<a class="btn btn-outline-dark" href="{% url 'management:index' %}">管理</a>{% endif %}
+            <form method="post" action="{% url 'account_logout' %}">
+              {% csrf_token %}
+              <button class="btn btn-outline-secondary" type="submit">ログアウト</button>
+            </form>
+          </div>
         {% else %}
           <a class="btn btn-outline-primary" href="{% url 'account_login' %}">ログイン</a>
         {% endif %}

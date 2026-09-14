@@ -130,6 +130,7 @@ jobs:
         run: |
           docker compose -f compose.production.yaml exec -T web python - <<'PY'
           import urllib.error
+          import urllib.parse
           import urllib.request
 
           base_url = "http://proxy:8080"
@@ -153,6 +154,20 @@ jobs:
                   return None
 
           opener = urllib.request.build_opener(NoRedirect)
+          request = urllib.request.Request(f"{base_url}/management/", headers=headers)
+          try:
+              opener.open(request, timeout=10)
+          except urllib.error.HTTPError as error:
+              assert error.code == 302, error.code
+              location = urllib.parse.urlsplit(error.headers["Location"])
+              assert not location.scheme and not location.netloc, location
+              assert location.path == "/accounts/login/", location
+              assert urllib.parse.parse_qs(location.query) == {
+                  "next": ["/management/"]
+              }, location
+          else:
+              raise AssertionError("未認証の/management/がログインへ転送されませんでした。")
+
           request = urllib.request.Request(
               f"{base_url}/accounts/mfa/authenticate/", headers=headers
           )

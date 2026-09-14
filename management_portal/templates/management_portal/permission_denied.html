@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}アクセスできません — Acervo{% endblock %}
+
+{% block content %}
+  <section class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-md-8 col-lg-6">
+        <h1 class="h2 mb-3">アクセスできません</h1>
+        <p>この管理画面を利用する権限がありません。</p>
+        <a class="btn btn-outline-secondary" href="{% url 'core:home' %}">通常画面へ戻る</a>
+      </div>
+    </div>
+  </section>
+{% endblock %}

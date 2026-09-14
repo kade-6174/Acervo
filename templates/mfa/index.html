@@ -7,6 +7,9 @@
     <div class="row justify-content-center">
       <div class="col-md-9 col-lg-8">
         <h1 class="h2 mb-4">二要素認証設定</h1>
+        {% if messages %}
+          {% for message in messages %}<div class="alert alert-warning" role="status">{{ message }}</div>{% endfor %}
+        {% endif %}
         <p class="text-muted mb-4">
           ログイン時のセキュリティを強化するため、二要素認証（MFA）を設定できます。
         </p>

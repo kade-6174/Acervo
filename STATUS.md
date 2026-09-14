@@ -4,13 +4,17 @@
 
 ## Current Task
 
-Phase 1C Step 5Aの管理アクセス判定ポリシーを完了。次はStep 5Bだが未着手。Step 5全体およびPhase 1全体は未完了。
+Phase 1C Step 5Bの管理者MFAゲートと最小管理入口を完了。次はStep 5Cだが未着手。Step 5全体およびPhase 1全体は未完了。
 
 ## Completed
 
+- Step 5Bとして、`/management`、`/management/`、`/management/`配下の全HTTP methodへStep 5Aの`evaluate_management_access()`を適用する中央middlewareを追加した。許可時を含む管理応答にはキャッシュ禁止を付与し、role・active・初回パスワード・primary MFA・現在セッションのMFAをリクエストごとに再評価する。独自の管理許可フラグや拒否POSTの保存・再送は行わない。
+- 未認証は内部`next`付きログイン、member／inactiveは詳細を出さない日本語403、初回パスワード変更未完了は既存変更画面、primary MFA未設定は日本語案内付きMFA設定、セッションMFA未完了は利用可能なallauth MFA再認証へ誘導する。TOTPまたはRecovery Code入力とWebAuthnだけの構成を区別し、パスワード再認証へ落ちるループを避けた。
+- `/management/`へusername、将来追加予定の案内、MFA設定、通常画面、POSTログアウトだけを持つ最小トップを追加した。全ログイン利用者に「セキュリティ設定」、`role=admin`には利便性の「管理」リンクを追加したが、認可は中央ゲートのみが担う。Django `/admin/`へのリンクや管理操作本体は追加していない。
+- Step 5Bは中央ゲートと最小入口だけであり、role変更、無効化、最後の管理者保護、管理者MFAリセット、監査ログ、ユーザー管理は未実装。一般memberのMFAは引き続き任意で、Step 5Cは未着手。
 - Step 5Aとして、管理アクセスの許可条件（認証済み、有効、`role=admin`、初回パスワード変更済み、TOTPまたはWebAuthnのprimary MFAを保持、現在セッションでMFA認証済み）と、各拒否理由を再利用可能なサーバー側ポリシーとして実装した。`is_staff`、`is_superuser`、独自セッションフラグには依存しない。
 - primary MFAは現在のAuthenticator DBを判定ごとに参照し、Recovery Codesだけでは設定済みとしない。セッションMFAはallauth標準の認証記録を参照し、TOTP、WebAuthn第二要素、passwordlessパスキー、Recovery Code、MFA/WebAuthn再認証を受理する。パスワードのみ、不明・欠損・signup用の記録は拒否する。
-- Step 5Aは判定ポリシーのみであり、redirect、403、middleware、案内画面、`/management/`への強制適用はStep 5Bへ残した。role変更、最後の管理者保護、管理者MFAリセット、監査ログも後続作業であり、一般memberの任意MFA運用は変更していない。
+- Step 5Aは判定ポリシーだけを実装し、redirect、403、middleware、案内画面、`/management/`への強制適用をStep 5Bへ分離した。中央適用と案内は現在Step 5Bで完了しているが、role変更、最後の管理者保護、管理者MFAリセット、監査ログは後続作業であり、一般memberの任意MFA運用は変更していない。
 - Sub-step 4Dとして、Windows Hello と実ブラウザで、パスキー登録（端末内パスキー）、パスワードレスログイン、パスワード後のWebAuthn第二要素、パスキー再認証、リカバリーコード一回性・再生成・保存確認・離脱警告、端末名変更、削除確認・削除、削除済みパスキーのログイン拒否を受入確認した。リカバリーコード、credential、challenge、パスワードは記録していない。
 - 実ブラウザで `localhost` のパスキーが `127.0.0.1` から使用できず一般エラーとなること、再認証の安全な内部 `next` は `/health/` へ遷移し、外部 `next` はホームへフォールバックすることを確認した。
 - ローカル開発ではCaddyを経由しないため `ALLAUTH_TRUSTED_CLIENT_IP_HEADER` を無効化し、直接ログインPOSTが403にならないことを統合テストで固定した。本番の専用IPヘッダー信頼境界は変更していない。
@@ -134,6 +138,8 @@ Phase 1C Step 5Aの管理アクセス判定ポリシーを完了。次はStep 5B
 
 ### ローカル
 
+- Step 5B作業ツリー: `python manage.py test management_portal --settings=config.settings.test`: 成功（専用12件全成功）。`python manage.py test accounts.tests.test_management_access --settings=config.settings.test`: 成功（Step 5A専用7件全成功）。`python manage.py test accounts --settings=config.settings.test`: 成功（accounts 146件全成功）。`python manage.py test --settings=config.settings.test`: 成功（SQLite、161件全成功）。
+- Step 5B作業ツリー: `ruff check .`、`ruff format --check .`、`git diff --check`、`python manage.py check --settings=config.settings.test`: 成功。`python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（migration差分なし）。本番相当設定の`python manage.py check --deploy`: 成功（警告なし、0 silenced）。
 - Step 5A作業ツリー: `python manage.py test accounts.tests.test_management_access --settings=config.settings.test`: 成功（専用7件全成功）。`python manage.py test accounts --settings=config.settings.test`: 成功（accounts 146件全成功）。`python manage.py test --settings=config.settings.test`: 成功（SQLite、149件全成功）。
 - Step 5A作業ツリー: `ruff check .`、`ruff format --check .`、`git diff --check`、`python manage.py check --settings=config.settings.test`: 成功。`python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（migration差分なし）。本番相当設定の`python manage.py check --deploy`: 成功（警告なし、0 silenced）。
 - `ruff check .`: 成功
@@ -227,10 +233,11 @@ Phase 1C Step 5Aの管理アクセス判定ポリシーを完了。次はStep 5B
 - Phase 1Bと追加タスク0-SHの自動検証に未解決の問題はない。
 - 実ドメインでの証明書取得は、公開ドメインと本番ホスト決定後の手動確認事項として残る。
 - 既存開発DBへDjango標準Userのauthマイグレーションを適用済みの場合、Custom Userへの後付け切替は安全に継続できない。対象は開発用PostgreSQL DBと開発用Composeの `postgres_data` ボリューム（通常 `acervo_postgres_data`）。今回は接続、削除、初期化を行っていない。再作成が必要な環境では、保存データの有無を確認し、設計責任者または運用者の承認を得て別作業で行う。
-- TOTP、Recovery Codes、WebAuthn第二要素、パスキー登録・管理・パスワードレスログインと管理アクセス判定ポリシーは実装済みで、`localhost`のWindows＋Chrome＋Windows Hello実機受入も完了している。`/management/`への中央ゲート適用と案内画面、role変更・最後の管理者保護、MFAリセット、監査ログは未実装であり、実運用HTTPSドメイン等の受入も未確認のため、Step 5全体、Phase 1全体および本番準備は未完了。
+- TOTP、Recovery Codes、WebAuthn第二要素、パスキー登録・管理・パスワードレスログイン、管理アクセス判定、`/management/`中央ゲートと最小入口は実装済みで、`localhost`のWindows＋Chrome＋Windows Hello実機受入も完了している。管理操作本体、role変更・最後の管理者保護、MFAリセット、監査ログとStep 5Cは未実装であり、実運用HTTPSドメイン等の受入も未確認のため、Step 5全体、Phase 1全体および本番準備は未完了。
 
 ## Change history
 
+- `management_portal/`, `config/settings/base.py`, `config/urls.py`, `templates/base.html`, `templates/mfa/index.html`, `Dockerfile`, `pyproject.toml`, `.github/workflows/ci.yml`, `README.md`, `PLAN.md`, `STATUS.md`: Step 5Bの中央管理ゲート、最小管理トップ、ナビゲーション、理由別応答、キャッシュ禁止、専用テスト、本番Caddy経由redirect検証を追加
 - `accounts/management_access.py`, `accounts/tests/test_management_access.py`, `PLAN.md`, `STATUS.md`: Step 5を5A〜5Cへ分割し、Step 5Aの管理アクセス判定ポリシーと専用テストを追加
 - `README.md`, `STATUS.md`, `PLAN.md`: Step 4完了、Step 5未着手、実装済みMFA範囲、`localhost`実機受入、実運用HTTPS等の未確認事項を現在状態へ整合
 - `PROJECT_SPEC.md`: 白・黒・グレーを基本とする配色、意味のある状態色、フォーカス・コントラスト、Specify 7を参考に留めること、外部デザイン非複製、個人開発で保守しやすいUI方針を追加
