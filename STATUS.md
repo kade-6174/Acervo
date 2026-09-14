@@ -4,13 +4,14 @@
 
 ## Current Task
 
-Phase 1C Sub-step 4C-Test（パスワードレス・パスキーログインの専用統合テストとCI確認）を実施中。Step 4Dの実機・実ブラウザ受入確認、管理者MFAゲート、MFAリセットには未着手。
+Phase 1C Sub-step 4C（パスワードレス・パスキーログイン）の専用統合テストとCI確認を完了。Step 4Dの実機・実ブラウザ受入確認、管理者MFAゲート、MFAリセットには未着手。
 
 ## Completed
 
 - Sub-step 4Cとして、`mfa_login_webauthn`だけを明示公開。パスキー専用ログイン画面入口、標準allauth JavaScript、never-cache、passwordless credential用途確認を追加。signup／Trust browserは非公開のまま維持
 
-- Sub-step 4C-Testとして、`accounts/tests/test_mfa_passkey_login.py` を追加。固定RP ID・user verification必須のrequest options、専用IPに基づく共有レート制限、passwordless用途のTrue/False/None、userHandle・inactive user・safe next・初回パスワード変更ゲート、認証記録、TOTP/Recovery Codes/パスワードログインの回帰をHTTP統合テストで確認した。ローカルSQLite 135件は成功したが、最終CI確認前のためStep 4Cは未完了として扱う。
+- Sub-step 4C-Testとして、`accounts/tests/test_mfa_passkey_login.py` を追加。固定RP ID・user verification必須のrequest options、専用IPに基づく共有レート制限、passwordless用途のTrue/False/None、userHandle・inactive user・safe next・初回パスワード変更ゲート、認証記録、TOTP/Recovery Codes/パスワードログインの回帰をHTTP統合テストで確認した。ローカルSQLiteのaccountsテスト135件、全体138件が成功した。
+- Sub-step 4C-Testの実装コミット `1b0af8c3389aa07660cbea7e5082b51640a2510b` はGitHub Actions run 34834929920で全成功。PostgreSQL 18の全138テスト、Ruff、Django check、migration差分なし、およびproduction／Cloudflare Compose、Caddy、イメージ、healthy、UID 10001、非公開ポート、DB・写真永続化を確認した。これをもってSub-step 4Cを完了とする。
 - `AcervoLoginWebAuthnForm` の独自オーケストレーションでも、allauth標準の失敗回数消費後に返る `too_many_login_attempts` を既存の日本語 `rate_limited` へ正規化する共通ヘルパーを適用。用途外credential（False/None）は失敗回数を解除しない。
 - ログイン画面はパスキーログインPOST後の一般的な日本語エラーを表示し、credential JSONは再表示しない。パスキーボタンも既存の二重操作防止対象へ加えた。
 
