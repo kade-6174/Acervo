@@ -9,6 +9,8 @@ Phase 1C Sub-step 4B（WebAuthn登録・管理・パスワードログイン後�
 ## Completed
 
 - Sub-step 4Bとして、allauth 65.19.3の個別WebAuthn viewだけを明示的に公開し、一覧・追加・名称変更・削除・WebAuthn再認証・ログイン時第二要素を追加。passwordless login、signup、Trust browser URLは非公開のまま維持
+- 4B-Rとして`accounts/tests/test_mfa_webauthn.py`を追加（6件）。匿名・stale/CSRF・不正JSON拒否、登録成功時の現在ユーザー固定とRecovery Codes生成、IDOR 404、名称変更・削除POST、HTML escape、never-cache、二重送信JavaScript読込、ログインstage完了後の通常MFA記録と最終使用日時、challenge stateの保存と検証失敗を統合テストで確認
+- 自動テストのWebAuthn成功経路では、ブラウザ認証器が出力するattestation/assertionのparse・署名検証とFido2Server完了境界だけを`autospec`付きでmockし、allauth view・フォーム・login stage・session・Authenticator DB・Recovery Codes連携・MFA認証記録は実行。実ブラウザ実機による署名、実credentialでのOrigin/RP不一致、WebAuthn再認証は未確認として4Dの受入確認に残す
 - パスキー登録の日本語UI、標準WebAuthn JavaScript、機能検出・一般的なaria-liveエラー、二重送信防止、全WebAuthn管理画面のnever-cacheを追加。秘密鍵、生体情報、challenge、credential JSONを独自に保存・表示しない
 - `MFA_SUPPORTED_TYPES`へ`webauthn`を追加。登録用のpasswordless選択肢を有効にする設定は追加したが、パスワードレスログインURLはallowlist外のためStep 4Cまで利用できない
 
