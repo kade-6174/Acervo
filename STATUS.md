@@ -154,6 +154,7 @@ Phase 1C Step 5Aの管理アクセス判定ポリシーを完了。次はStep 5B
 
 ### GitHub Actions
 
+- Phase 1C Step 5A実装HEAD `0c05ceecf6a0b0ad78a4a317799baa2e4842c1fc`: run 34867040961（`test`、`production-container` 全成功）。PostgreSQL 18.6の全149テスト、Ruff、Django check、migration差分なし、本番Compose／Cloudflare追加Compose、Caddy、本番イメージ、全サービスhealthy、非root実行、`check --deploy`、クライアントIP境界、ポート非公開、DB・写真永続化を確認
 - Phase 1C Step 4最終HEAD `ff33741f8a3a26a097ac4069f792bba6cfe8c514`: run 34864967629（`test`、`production-container` 全成功）。PostgreSQL 18の全テスト、Ruff、Django check、migration差分なし、本番Compose／Cloudflare追加Compose、Caddy、本番イメージ、全サービスhealthy、非root実行、`check --deploy`、クライアントIP境界、ポート非公開、DB・写真永続化を確認
 - Phase 1C Sub-step 4B（HEAD: `63e8a86bec1a553621dbf72277c6ccf31c6049b5`）: run 34771093567（`test`、`production-container` 全成功）。PostgreSQL 18上の全119テスト、Ruff、Django check、migration差分なし、本番Compose／Cloudflare追加Compose、Caddy adapt・validate、本番イメージ、全サービスhealthy、UID 10001、`check --deploy`、Caddy経由確認、IP境界、ポート非公開、DB・写真永続化を確認
 
