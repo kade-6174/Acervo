@@ -1,6 +1,7 @@
 from allauth.account.adapter import get_adapter as get_account_adapter
 from allauth.account.forms import ChangePasswordForm, LoginForm
 from allauth.mfa.base.forms import AuthenticateForm
+from allauth.mfa.base.internal.flows import check_rate_limit
 from allauth.mfa.webauthn.forms import (
     AddWebAuthnForm,
     AuthenticateWebAuthnForm,
@@ -8,6 +9,7 @@ from allauth.mfa.webauthn.forms import (
     LoginWebAuthnForm,
     ReauthenticateWebAuthnForm,
 )
+from allauth.mfa.webauthn.internal import auth as webauthn_auth
 from django import forms
 from django.core.exceptions import ValidationError
 
@@ -124,7 +126,12 @@ class AcervoReauthenticateWebAuthnForm(
 
 class AcervoLoginWebAuthnForm(_AcervoWebAuthnAuthenticationForm, LoginWebAuthnForm):
     def clean_credential(self):
-        authenticator = super().clean_credential()
+        credential = self.cleaned_data["credential"]
+        webauthn_auth.parse_authentication_response(credential)
+        user = webauthn_auth.extract_user_from_response(credential)
+        clear_rate_limit = check_rate_limit(user)
+        authenticator = webauthn_auth.complete_authentication(user, credential)
         if authenticator.wrap().is_passwordless is not True:
             raise get_account_adapter().validation_error("incorrect_code")
+        clear_rate_limit()
         return authenticator

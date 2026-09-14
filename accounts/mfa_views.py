@@ -79,7 +79,7 @@ def begin_passwordless_authentication():
 
 class AcervoLoginWebAuthnView(webauthn_views.LoginWebAuthnView):
     def get(self, request, *args, **kwargs):
-        if request.headers.get("Accept") == "application/json":
+        if get_adapter().is_ajax(request):
             return JsonResponse({"request_options": begin_passwordless_authentication()})
         return super().get(request, *args, **kwargs)
 
