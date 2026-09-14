@@ -36,6 +36,7 @@
           <div id="webauthn-status" class="alert d-none" role="status" aria-live="polite"></div>
           <form id="webauthn_form" method="post" data-webauthn-form>
             {% csrf_token %}{{ webauthn_form.credential }}
+            {% if webauthn_form.credential.errors %}<div class="alert alert-danger mt-2" role="alert">{{ webauthn_form.credential.errors }}</div>{% endif %}
             <button id="mfa_webauthn_authenticate" class="btn btn-outline-primary" type="button">パスキーまたはセキュリティキーを使う</button>
           </form>
           {{ js_data|json_script:"js_data" }}

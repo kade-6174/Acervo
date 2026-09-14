@@ -1,7 +1,12 @@
 from allauth.account.adapter import get_adapter as get_account_adapter
 from allauth.account.forms import ChangePasswordForm, LoginForm
 from allauth.mfa.base.forms import AuthenticateForm
-from allauth.mfa.webauthn.forms import AddWebAuthnForm, EditWebAuthnForm
+from allauth.mfa.webauthn.forms import (
+    AddWebAuthnForm,
+    AuthenticateWebAuthnForm,
+    EditWebAuthnForm,
+    ReauthenticateWebAuthnForm,
+)
 from django import forms
 from django.core.exceptions import ValidationError
 
@@ -81,3 +86,25 @@ class AcervoEditWebAuthnForm(EditWebAuthnForm):
         super().__init__(*args, **kwargs)
         self.fields["name"].label = "端末名"
         self.fields["name"].widget.attrs["class"] = "form-control"
+
+
+class _AcervoWebAuthnAuthenticationForm:
+    """allauth標準の照合結果だけを安全な表示用エラーコードへ正規化する。"""
+
+    def clean_credential(self):
+        try:
+            return super().clean_credential()
+        except ValidationError as error:
+            if error.code == "too_many_login_attempts":
+                raise get_account_adapter().validation_error("rate_limited") from None
+            raise
+
+
+class AcervoAuthenticateWebAuthnForm(_AcervoWebAuthnAuthenticationForm, AuthenticateWebAuthnForm):
+    pass
+
+
+class AcervoReauthenticateWebAuthnForm(
+    _AcervoWebAuthnAuthenticationForm, ReauthenticateWebAuthnForm
+):
+    pass

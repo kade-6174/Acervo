@@ -98,6 +98,8 @@ MFA_FORMS = {
     "authenticate": "accounts.forms.AcervoAuthenticateForm",
     "add_webauthn": "accounts.forms.AcervoAddWebAuthnForm",
     "edit_webauthn": "accounts.forms.AcervoEditWebAuthnForm",
+    "authenticate_webauthn": "accounts.forms.AcervoAuthenticateWebAuthnForm",
+    "reauthenticate_webauthn": "accounts.forms.AcervoReauthenticateWebAuthnForm",
 }
 MFA_RECOVERY_CODE_COUNT = 10
 MFA_RECOVERY_CODES_SHOW_ONCE = True

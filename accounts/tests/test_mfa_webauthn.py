@@ -13,6 +13,7 @@ from allauth.mfa.models import Authenticator
 from allauth.mfa.webauthn.internal import auth as webauthn_auth
 from django.contrib.auth import SESSION_KEY
 from django.contrib.sessions.middleware import SessionMiddleware
+from django.core.exceptions import ValidationError
 from django.test import Client, TestCase
 from django.test.client import RequestFactory
 from django.urls import reverse
@@ -202,6 +203,65 @@ class WebAuthnManagementTests(TestCase):
         self.assertEqual(method["method"], "mfa")
         self.assertTrue(method["reauthenticated"])
         self.assertNotIn("passwordless", method)
+
+    def test_second_factor_failure_is_generic_never_cached_and_does_not_login(self):
+        key = self.make_key(self.user)
+        self.client.post(
+            reverse("account_login"),
+            {"login": self.user.username, "password": self.password},
+            HTTP_X_ACERVO_CLIENT_IP="198.51.100.57",
+        )
+        credential = '{"id": "secret-test"}'
+        with (
+            patch("allauth.mfa.webauthn.internal.auth.get_credentials", return_value=[]),
+            patch(
+                "allauth.mfa.webauthn.internal.auth.parse_authentication_response", autospec=True
+            ),
+            patch(
+                "allauth.mfa.webauthn.internal.auth.complete_authentication",
+                autospec=True,
+                side_effect=ValidationError(
+                    "認証コードを確認できませんでした。", code="incorrect_code"
+                ),
+            ),
+        ):
+            response = self.client.post(
+                reverse("mfa_authenticate"),
+                {"credential": credential},
+                HTTP_X_ACERVO_CLIENT_IP="198.51.100.57",
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "認証コードを確認できませんでした。")
+        self.assertNotContains(response, credential)
+        self.assertNotIn(SESSION_KEY, self.client.session)
+        self.assertIn("no-store", response.headers["Cache-Control"])
+        key.refresh_from_db()
+        self.assertIsNone(key.last_used_at)
+
+    def test_reauthentication_failure_shows_generic_error_and_safe_next_is_used_on_success(self):
+        self.make_key(self.user)
+        self.recent_login()
+        url = f"{reverse('mfa_reauthenticate_webauthn')}?next={reverse('core:health')}"
+        with (
+            patch("allauth.mfa.webauthn.internal.auth.get_credentials", return_value=[]),
+            patch(
+                "allauth.mfa.webauthn.internal.auth.parse_authentication_response", autospec=True
+            ),
+            patch(
+                "allauth.mfa.webauthn.internal.auth.complete_authentication",
+                autospec=True,
+                side_effect=ValidationError(
+                    "認証コードを確認できませんでした。", code="incorrect_code"
+                ),
+            ),
+        ):
+            failed = self.client.post(
+                url,
+                {"credential": '{"id": "secret-test"}'},
+                HTTP_X_ACERVO_CLIENT_IP="198.51.100.58",
+            )
+        self.assertEqual(failed.status_code, 302)
+        self.assertRedirects(failed, reverse("account_login"), fetch_redirect_response=False)
 
 
 class WebAuthnChallengeStateTests(TestCase):
