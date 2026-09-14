@@ -101,13 +101,17 @@ class AcervoEditWebAuthnForm(EditWebAuthnForm):
 class _AcervoWebAuthnAuthenticationForm:
     """allauth標準の照合結果だけを安全な表示用エラーコードへ正規化する。"""
 
+    @staticmethod
+    def _normalize_rate_limit_error(error):
+        if error.code == "too_many_login_attempts":
+            return get_account_adapter().validation_error("rate_limited")
+        return error
+
     def clean_credential(self):
         try:
             return super().clean_credential()
         except ValidationError as error:
-            if error.code == "too_many_login_attempts":
-                raise get_account_adapter().validation_error("rate_limited") from None
-            raise
+            raise self._normalize_rate_limit_error(error) from None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -126,12 +130,18 @@ class AcervoReauthenticateWebAuthnForm(
 
 class AcervoLoginWebAuthnForm(_AcervoWebAuthnAuthenticationForm, LoginWebAuthnForm):
     def clean_credential(self):
-        credential = self.cleaned_data["credential"]
-        webauthn_auth.parse_authentication_response(credential)
-        user = webauthn_auth.extract_user_from_response(credential)
-        clear_rate_limit = check_rate_limit(user)
-        authenticator = webauthn_auth.complete_authentication(user, credential)
-        if authenticator.wrap().is_passwordless is not True:
-            raise get_account_adapter().validation_error("incorrect_code")
-        clear_rate_limit()
-        return authenticator
+        try:
+            credential = self.cleaned_data["credential"]
+            try:
+                webauthn_auth.parse_authentication_response(credential)
+            except (KeyError, TypeError, ValueError):
+                raise get_account_adapter().validation_error("incorrect_code") from None
+            user = webauthn_auth.extract_user_from_response(credential)
+            clear_rate_limit = check_rate_limit(user)
+            authenticator = webauthn_auth.complete_authentication(user, credential)
+            if authenticator.wrap().is_passwordless is not True:
+                raise get_account_adapter().validation_error("incorrect_code")
+            clear_rate_limit()
+            return authenticator
+        except ValidationError as error:
+            raise self._normalize_rate_limit_error(error) from None

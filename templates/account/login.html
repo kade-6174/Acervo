@@ -7,6 +7,9 @@
     <div class="row justify-content-center">
       <div class="col-md-7 col-lg-5">
         <h1 class="h2 mb-4">ログイン</h1>
+        {% if messages %}
+          {% for message in messages %}<div class="alert alert-danger" role="alert">{{ message }}</div>{% endfor %}
+        {% endif %}
         <form method="post" action="{% url 'account_login' %}" novalidate>
           {% csrf_token %}
           {% if form.non_field_errors %}

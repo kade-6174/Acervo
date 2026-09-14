@@ -4,11 +4,15 @@
 
 ## Current Task
 
-Phase 1C Sub-step 4B（WebAuthn登録・管理・パスワードログイン後の第二要素）の実装とローカル検証を完了。パスワードレスログイン、実ブラウザ最終検証、管理者MFAゲートには未着手。
+Phase 1C Sub-step 4C-Test（パスワードレス・パスキーログインの専用統合テストとCI確認）を実施中。Step 4Dの実機・実ブラウザ受入確認、管理者MFAゲート、MFAリセットには未着手。
 
 ## Completed
 
 - Sub-step 4Cとして、`mfa_login_webauthn`だけを明示公開。パスキー専用ログイン画面入口、標準allauth JavaScript、never-cache、passwordless credential用途確認を追加。signup／Trust browserは非公開のまま維持
+
+- Sub-step 4C-Testとして、`accounts/tests/test_mfa_passkey_login.py` を追加。固定RP ID・user verification必須のrequest options、専用IPに基づく共有レート制限、passwordless用途のTrue/False/None、userHandle・inactive user・safe next・初回パスワード変更ゲート、認証記録、TOTP/Recovery Codes/パスワードログインの回帰をHTTP統合テストで確認した。ローカルSQLite 135件は成功したが、最終CI確認前のためStep 4Cは未完了として扱う。
+- `AcervoLoginWebAuthnForm` の独自オーケストレーションでも、allauth標準の失敗回数消費後に返る `too_many_login_attempts` を既存の日本語 `rate_limited` へ正規化する共通ヘルパーを適用。用途外credential（False/None）は失敗回数を解除しない。
+- ログイン画面はパスキーログインPOST後の一般的な日本語エラーを表示し、credential JSONは再表示しない。パスキーボタンも既存の二重操作防止対象へ加えた。
 
 - Sub-step 4Bとして、allauth 65.19.3の個別WebAuthn viewだけを明示的に公開し、一覧・追加・名称変更・削除・WebAuthn再認証・ログイン時第二要素を追加。passwordless login、signup、Trust browser URLは非公開のまま維持
 - 4B-R2として`accounts/tests/test_mfa_webauthn.py`を8件へ拡張。challenge stateの保存、成功時消去、再利用拒否、passwordless/第二要素のregistration option、WebAuthn再認証の通常MFA記録・外部next拒否を追加確認
