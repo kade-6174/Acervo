@@ -224,6 +224,7 @@ Phase 1C Sub-step 4DのWindows Hello／実ブラウザによるローカル受�
 
 ## Change history
 
+- `PROJECT_SPEC.md`: 白・黒・グレーを基本とする配色、意味のある状態色、フォーカス・コントラスト、Specify 7を参考に留めること、外部デザイン非複製、個人開発で保守しやすいUI方針を追加
 - `config/settings/development.py`: 直接開発サーバーではCaddy専用クライアントIPヘッダーを要求しない設定を追加
 - `accounts/forms.py`: WebAuthn失敗時だけをパスキー／セキュリティキー用の一般エラーへ正規化
 - `templates/account/login.html`, `templates/mfa/authenticate.html`, `templates/mfa/webauthn/reauthenticate.html`, `templates/mfa/webauthn/edit_form.html`, `static/js/webauthn-ui.js`: パスキーボタンのフォーム関連付け、エラー文言の統一、静的資産リビジョン指定を追加
