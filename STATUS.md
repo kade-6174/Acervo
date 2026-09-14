@@ -4,7 +4,7 @@
 
 ## Current Task
 
-Phase 1C Sub-step 4DのWindows Hello／実ブラウザによるローカル受入と最終レビューを完了。実運用HTTPSでの受入、管理者MFAゲート、MFAリセットは未着手。
+Phase 1C Step 4を完了。次はStep 5だが未着手。Phase 1全体は未完了。
 
 ## Completed
 
@@ -26,7 +26,7 @@ Phase 1C Sub-step 4DのWindows Hello／実ブラウザによるローカル受�
 - 4B-R2として`accounts/tests/test_mfa_webauthn.py`を8件へ拡張。challenge stateの保存、成功時消去、再利用拒否、passwordless/第二要素のregistration option、WebAuthn再認証の通常MFA記録・外部next拒否を追加確認
 - 4B-R3AとしてWebAuthn専用フォームを追加し、allauth標準の検証・レート制限を変更せず、認証失敗だけを既存の日本語一般エラー／`rate_limited`表示へ正規化。第二要素失敗時にcredential hidden fieldを再表示しないこと、never-cache、未ログイン維持を統合テストで確認
 - 4B-R3Bとして認証challenge stateの成功時消去・再利用拒否・現在ユーザーのAuthenticator解決を追加確認。WebAuthn第二要素の共有レート制限と専用IP境界も確認し、失敗／制限応答にcredential JSONを再表示しない`SensitiveCredentialInput`を追加
-- 自動テストのWebAuthn成功経路では、ブラウザ認証器が出力するattestation/assertionのparse・署名検証とFido2Server完了境界だけを`autospec`付きでmockし、allauth view・フォーム・login stage・session・Authenticator DB・Recovery Codes連携・MFA認証記録は実行。補助的に無効な保存credentialを解析しないため`get_credentials`と表示用`Authenticator.wrap`を限定mockする。実ブラウザ実機による署名、実credentialでのOrigin/RP不一致は4Dの受入確認に残す
+- 自動テストのWebAuthn成功経路では、ブラウザ認証器が出力するattestation/assertionのparse・署名検証とFido2Server完了境界だけを`autospec`付きでmockし、allauth view・フォーム・login stage・session・Authenticator DB・Recovery Codes連携・MFA認証記録は実行。補助的に無効な保存credentialを解析しないため`get_credentials`と表示用`Authenticator.wrap`を限定mockする。4B時点で4Dへ残した実ブラウザの署名とOrigin/RP不一致確認は、現在は`localhost`で受入済み
 - パスキー登録の日本語UI、標準WebAuthn JavaScript、機能検出・一般的なaria-liveエラー、二重送信防止、全WebAuthn管理画面のnever-cacheを追加。秘密鍵、生体情報、challenge、credential JSONを独自に保存・表示しない
 - `MFA_SUPPORTED_TYPES`へ`webauthn`を追加。登録用のpasswordless選択肢を有効にする設定は追加したが、パスワードレスログインURLはallowlist外のためStep 4Cまで利用できない
 
@@ -125,7 +125,7 @@ Phase 1C Sub-step 4DのWindows Hello／実ブラウザによるローカル受�
 ## Remaining
 
 - 実際の公開ドメイン決定後に、直接HTTPSの証明書取得を手動確認する
-- 公開環境を用意した後、実運用HTTPSブラウザでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告、端末内・同期パスキーの登録・ログイン・削除を確認する（ローカル受入は完了、実運用HTTPSは未実施）。
+- 公開環境を用意した後、実運用HTTPSドメインでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告、端末内・同期パスキーの登録・ログイン・削除を確認する。同期パスキーとChrome以外の実運用対象ブラウザも未確認（`localhost`のWindows＋Chrome＋Windows Hello受入は完了）。
 
 ## Tests
 
@@ -149,6 +149,7 @@ Phase 1C Sub-step 4DのWindows Hello／実ブラウザによるローカル受�
 
 ### GitHub Actions
 
+- Phase 1C Step 4最終HEAD `ff33741f8a3a26a097ac4069f792bba6cfe8c514`: run 34864967629（`test`、`production-container` 全成功）。PostgreSQL 18の全テスト、Ruff、Django check、migration差分なし、本番Compose／Cloudflare追加Compose、Caddy、本番イメージ、全サービスhealthy、非root実行、`check --deploy`、クライアントIP境界、ポート非公開、DB・写真永続化を確認
 - Phase 1C Sub-step 4B（HEAD: `63e8a86bec1a553621dbf72277c6ccf31c6049b5`）: run 34771093567（`test`、`production-container` 全成功）。PostgreSQL 18上の全119テスト、Ruff、Django check、migration差分なし、本番Compose／Cloudflare追加Compose、Caddy adapt・validate、本番イメージ、全サービスhealthy、UID 10001、`check --deploy`、Caddy経由確認、IP境界、ポート非公開、DB・写真永続化を確認
 
 - Phase 1C Sub-step 4A（HEAD: `dac1fd15c9e65ee8c393775cd4bf3b9a33c8b12c`）: run 34770046419（全ジョブ成功）
@@ -220,10 +221,11 @@ Phase 1C Sub-step 4DのWindows Hello／実ブラウザによるローカル受�
 - Phase 1Bと追加タスク0-SHの自動検証に未解決の問題はない。
 - 実ドメインでの証明書取得は、公開ドメインと本番ホスト決定後の手動確認事項として残る。
 - 既存開発DBへDjango標準Userのauthマイグレーションを適用済みの場合、Custom Userへの後付け切替は安全に継続できない。対象は開発用PostgreSQL DBと開発用Composeの `postgres_data` ボリューム（通常 `acervo_postgres_data`）。今回は接続、削除、初期化を行っていない。再作成が必要な環境では、保存データの有無を確認し、設計責任者または運用者の承認を得て別作業で行う。
-- TOTPとRecovery Codeによる一般利用者MFAは完成したが、WebAuthn／パスキー、管理者MFAゲート、MFAリセット、監査ログは未実装であり、Phase 1C全体および本番準備の完了を意味しない。
+- TOTP、Recovery Codes、WebAuthn第二要素、パスキー登録・管理・パスワードレスログインは実装済みで、`localhost`のWindows＋Chrome＋Windows Hello実機受入も完了している。管理者MFAゲート、MFAリセット、監査ログは未実装であり、実運用HTTPSドメイン等の受入も未確認のため、Phase 1全体および本番準備は未完了。
 
 ## Change history
 
+- `README.md`, `STATUS.md`, `PLAN.md`: Step 4完了、Step 5未着手、実装済みMFA範囲、`localhost`実機受入、実運用HTTPS等の未確認事項を現在状態へ整合
 - `PROJECT_SPEC.md`: 白・黒・グレーを基本とする配色、意味のある状態色、フォーカス・コントラスト、Specify 7を参考に留めること、外部デザイン非複製、個人開発で保守しやすいUI方針を追加
 - `config/settings/development.py`: 直接開発サーバーではCaddy専用クライアントIPヘッダーを要求しない設定を追加
 - `accounts/forms.py`: WebAuthn失敗時だけをパスキー／セキュリティキー用の一般エラーへ正規化
