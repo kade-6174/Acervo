@@ -40,6 +40,7 @@ urlpatterns = [
     ),
     path("webauthn/", never_cache(webauthn_views.list_webauthn), name="mfa_list_webauthn"),
     path("webauthn/add/", never_cache(webauthn_views.add_webauthn), name="mfa_add_webauthn"),
+    path("webauthn/login/", never_cache(mfa_views.login_webauthn), name="mfa_login_webauthn"),
     path(
         "webauthn/reauthenticate/",
         never_cache(webauthn_views.reauthenticate_webauthn),

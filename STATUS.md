@@ -8,6 +8,8 @@ Phase 1C Sub-step 4B（WebAuthn登録・管理・パスワードログイン後�
 
 ## Completed
 
+- Sub-step 4Cとして、`mfa_login_webauthn`だけを明示公開。パスキー専用ログイン画面入口、標準allauth JavaScript、never-cache、passwordless credential用途確認を追加。signup／Trust browserは非公開のまま維持
+
 - Sub-step 4Bとして、allauth 65.19.3の個別WebAuthn viewだけを明示的に公開し、一覧・追加・名称変更・削除・WebAuthn再認証・ログイン時第二要素を追加。passwordless login、signup、Trust browser URLは非公開のまま維持
 - 4B-R2として`accounts/tests/test_mfa_webauthn.py`を8件へ拡張。challenge stateの保存、成功時消去、再利用拒否、passwordless/第二要素のregistration option、WebAuthn再認証の通常MFA記録・外部next拒否を追加確認
 - 4B-R3AとしてWebAuthn専用フォームを追加し、allauth標準の検証・レート制限を変更せず、認証失敗だけを既存の日本語一般エラー／`rate_limited`表示へ正規化。第二要素失敗時にcredential hidden fieldを再表示しないこと、never-cache、未ログイン維持を統合テストで確認

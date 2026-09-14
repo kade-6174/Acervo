@@ -8,13 +8,18 @@ Recovery Codesの生成そのものはdjango-allauthへ委譲する。この薄�
 
 from allauth.account.adapter import get_adapter
 from allauth.account.internal.flows.reauthentication import did_recently_authenticate
+from allauth.account.models import Login
+from allauth.account.utils import get_next_redirect_url
 from allauth.core.internal.httpkit import add_query_params
 from allauth.mfa.base import views as base_views
 from allauth.mfa.models import Authenticator
 from allauth.mfa.recovery_codes import views as recovery_views
 from allauth.mfa.webauthn import views as webauthn_views
+from allauth.mfa.webauthn.internal import auth as webauthn_auth
+from allauth.mfa.webauthn.internal import flows as webauthn_flows
 from django.contrib.auth import REDIRECT_FIELD_NAME
-from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
+from fido2.webauthn import UserVerificationRequirement
 
 
 def _redirect_stale_post(request: HttpRequest) -> HttpResponse | None:
@@ -61,3 +66,29 @@ class AcervoRemoveWebAuthnView(webauthn_views.RemoveWebAuthnView):
 
 
 remove_webauthn = AcervoRemoveWebAuthnView.as_view()
+
+
+def begin_passwordless_authentication():
+    server = webauthn_auth.get_server()
+    options, state = server.authenticate_begin(
+        user_verification=UserVerificationRequirement.REQUIRED
+    )
+    webauthn_auth.set_state(state)
+    return dict(options)
+
+
+class AcervoLoginWebAuthnView(webauthn_views.LoginWebAuthnView):
+    def get(self, request, *args, **kwargs):
+        if request.headers.get("Accept") == "application/json":
+            return JsonResponse({"request_options": begin_passwordless_authentication()})
+        return super().get(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        authenticator = form.cleaned_data["credential"]
+        login = Login(
+            user=authenticator.user, redirect_url=get_next_redirect_url(self.request, "next")
+        )
+        return webauthn_flows.perform_passwordless_login(self.request, authenticator, login)
+
+
+login_webauthn = AcervoLoginWebAuthnView.as_view()

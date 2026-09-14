@@ -86,13 +86,17 @@ class MFAURLRoutingTests(TestCase):
             with self.subTest(name=name):
                 self.assertEqual(reverse(name), expected_path)
 
-    def test_webauthn_management_names_are_exposed_but_passwordless_names_are_not(self):
-        """Step 4Bの管理URLだけを公開し、passwordless入口は非公開に保つこと。"""
-        for name in ("mfa_list_webauthn", "mfa_add_webauthn", "mfa_reauthenticate_webauthn"):
+    def test_webauthn_management_and_passwordless_names_are_exposed(self):
+        """Step 4Cでpasswordless入口を明示公開すること。"""
+        for name in (
+            "mfa_list_webauthn",
+            "mfa_add_webauthn",
+            "mfa_reauthenticate_webauthn",
+            "mfa_login_webauthn",
+        ):
             self.assertTrue(reverse(name).startswith("/accounts/mfa/webauthn/"))
         unexposed_names = [
             "mfa_trust",
-            "mfa_login_webauthn",
             "mfa_signup_webauthn",
         ]
         for name in unexposed_names:
@@ -100,12 +104,11 @@ class MFAURLRoutingTests(TestCase):
                 with self.assertRaises(NoReverseMatch):
                     reverse(name)
 
-    def test_passwordless_and_signup_paths_return_404(self):
+    def test_signup_path_returns_404(self):
         """未公開のパスへ直接アクセスした場合は404を返すこと。"""
         self._login_with_recent_auth(self.normal_user)
         unexposed_paths = [
             "/accounts/mfa/trust/",
-            "/accounts/mfa/webauthn/login/",
             "/accounts/mfa/webauthn/signup/",
         ]
         for path in unexposed_paths:

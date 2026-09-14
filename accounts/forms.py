@@ -5,6 +5,7 @@ from allauth.mfa.webauthn.forms import (
     AddWebAuthnForm,
     AuthenticateWebAuthnForm,
     EditWebAuthnForm,
+    LoginWebAuthnForm,
     ReauthenticateWebAuthnForm,
 )
 from django import forms
@@ -119,3 +120,11 @@ class AcervoReauthenticateWebAuthnForm(
     _AcervoWebAuthnAuthenticationForm, ReauthenticateWebAuthnForm
 ):
     pass
+
+
+class AcervoLoginWebAuthnForm(_AcervoWebAuthnAuthenticationForm, LoginWebAuthnForm):
+    def clean_credential(self):
+        authenticator = super().clean_credential()
+        if authenticator.wrap().is_passwordless is not True:
+            raise get_account_adapter().validation_error("incorrect_code")
+        return authenticator

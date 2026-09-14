@@ -383,9 +383,9 @@ class TOTPUserInterfaceTests(TestCase):
                 self.assertEqual(resp.status_code, 302)
                 self.assertEqual(resp.headers["Location"], reverse("account_change_password"))
 
-    def test_passwordless_webauthn_urls_remain_unexposed(self):
-        """Step 4Bでは管理URLのみ公開し、passwordless URLは非公開であること。"""
-        for name in ("mfa_login_webauthn", "mfa_signup_webauthn"):
+    def test_webauthn_signup_url_remains_unexposed(self):
+        """Step 4Cでもpasskey signup URLは非公開であること。"""
+        for name in ("mfa_signup_webauthn",):
             with self.subTest(name=name):
                 with self.assertRaises(NoReverseMatch):
                     reverse(name)
