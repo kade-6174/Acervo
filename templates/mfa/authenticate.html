@@ -40,7 +40,7 @@
             <button id="mfa_webauthn_authenticate" class="btn btn-outline-primary" type="button">パスキーまたはセキュリティキーを使う</button>
           </form>
           {{ js_data|json_script:"js_data" }}
-          {% load static %}<script src="{% static 'mfa/js/webauthn-json.js' %}"></script><script src="{% static 'mfa/js/webauthn.js' %}"></script><script src="{% static 'account/js/onload.js' %}"></script><script src="{% static 'js/webauthn-ui.js' %}"></script>
+          {% load static %}<script src="{% static 'mfa/js/webauthn-json.js' %}"></script><script src="{% static 'mfa/js/webauthn.js' %}"></script><script src="{% static 'account/js/onload.js' %}"></script><script src="{% static 'js/webauthn-ui.js' %}?v=20260915"></script>
           <script data-allauth-onload="allauth.webauthn.forms.authenticateForm" type="application/json">{"ids":{"authenticate":"mfa_webauthn_authenticate","credential":"{{ webauthn_form.credential.auto_id }}","data":"js_data"}}</script>
         {% endif %}
 

@@ -82,6 +82,15 @@ class PasskeyLoginTests(TestCase):
         )
         return stack
 
+    def test_login_button_is_associated_with_webauthn_form(self):
+        response = self.client.get(reverse("account_login"))
+        html = response.content.decode()
+
+        self.assertRegex(
+            html,
+            r'<button(?=[^>]*id="passkey_login")(?=[^>]*form="mfa_login")[^>]*>',
+        )
+
     @override_settings(ALLOWED_HOSTS=["testserver", "attacker.example"])
     def test_request_options_use_fixed_rp_and_required_verification(self):
         url = reverse("mfa_login_webauthn")
@@ -148,7 +157,7 @@ class PasskeyLoginTests(TestCase):
                 )
             self.assertRedirects(response, reverse("account_login"), fetch_redirect_response=False)
             page = self.client.get(response["Location"])
-            self.assertContains(page, "コードが正しくありません。")
+            self.assertContains(page, "パスキーまたはセキュリティキーを確認できませんでした。")
             self.assertNotContains(page, f"secret-{passwordless}")
             self.assertNotIn(f"secret-{passwordless}", repr(dict(self.client.session)))
             self.assertNotIn(SESSION_KEY, self.client.session)
@@ -286,7 +295,8 @@ class PasskeyLoginTests(TestCase):
             after_success = self.post_login(self.credential(value="after-success"))
         self.assertRedirects(after_success, reverse("account_login"), fetch_redirect_response=False)
         self.assertContains(
-            self.client.get(after_success["Location"]), "認証コードを確認できませんでした。"
+            self.client.get(after_success["Location"]),
+            "パスキーまたはセキュリティキーを確認できませんでした。",
         )
 
     def test_existing_password_totp_recovery_and_webauthn_flows_remain_available(self):

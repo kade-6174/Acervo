@@ -1,12 +1,19 @@
 # Project Status
 
-最終更新: 2026-09-14
+最終更新: 2026-09-15
 
 ## Current Task
 
-Phase 1C Sub-step 4C（パスワードレス・パスキーログイン）の専用統合テストとCI確認を完了。Step 4Dの実機・実ブラウザ受入確認、管理者MFAゲート、MFAリセットには未着手。
+Phase 1C Sub-step 4DのWindows Hello／実ブラウザによるローカル受入と最終レビューを完了。実運用HTTPSでの受入、管理者MFAゲート、MFAリセットは未着手。
 
 ## Completed
+
+- Sub-step 4Dとして、Windows Hello と実ブラウザで、パスキー登録（端末内パスキー）、パスワードレスログイン、パスワード後のWebAuthn第二要素、パスキー再認証、リカバリーコード一回性・再生成・保存確認・離脱警告、端末名変更、削除確認・削除、削除済みパスキーのログイン拒否を受入確認した。リカバリーコード、credential、challenge、パスワードは記録していない。
+- 実ブラウザで `localhost` のパスキーが `127.0.0.1` から使用できず一般エラーとなること、再認証の安全な内部 `next` は `/health/` へ遷移し、外部 `next` はホームへフォールバックすることを確認した。
+- ローカル開発ではCaddyを経由しないため `ALLAUTH_TRUSTED_CLIENT_IP_HEADER` を無効化し、直接ログインPOSTが403にならないことを統合テストで固定した。本番の専用IPヘッダー信頼境界は変更していない。
+- パスキーログインボタンをWebAuthnフォームに関連付け、Windows Helloが起動するよう修正。WebAuthnの中止・失敗表示を「パスキーまたはセキュリティキー」に統一し、認証コード・認証器という不適切な用語を避けた。ブラウザの旧静的資産を読み込まないよう、WebAuthn UIスクリプトのURLにリビジョン指定を付与した。
+- Recovery Codes画面では、保存確認前にリンクで離脱しようとした場合も確認ダイアログを表示するよう補強した。タブを閉じる・再読み込みする場合の `beforeunload` 警告は維持している。
+- 受入後、利用者がダウンロード済みの使い捨てリカバリーコードファイルとWindows上のテスト用パスキーを削除したことを確認した。開発サーバーを停止し、使い捨てユーザーのみを含むローカルSQLite DB、受入専用ローカル設定、検証ログを削除した。既存ユーザーと既存開発DBは変更していない。
 
 - Sub-step 4Cとして、`mfa_login_webauthn`だけを明示公開。パスキー専用ログイン画面入口、標準allauth JavaScript、never-cache、passwordless credential用途確認を追加。signup／Trust browserは非公開のまま維持
 
@@ -118,8 +125,7 @@ Phase 1C Sub-step 4C（パスワードレス・パスキーログイン）の専
 ## Remaining
 
 - 実際の公開ドメイン決定後に、直接HTTPSの証明書取得を手動確認する
-- Phase 1C全体の受入前に、実運用HTTPSブラウザでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告を確認する（未実施）。
-- Phase 1C Sub-step 4C（パスワードレスログイン）、4D（本番相当・実ブラウザ検証と最終レビュー）。WebAuthn登録・端末認証の実ブラウザ確認は未実施。
+- 公開環境を用意した後、実運用HTTPSブラウザでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告、端末内・同期パスキーの登録・ログイン・削除を確認する（ローカル受入は完了、実運用HTTPSは未実施）。
 
 ## Tests
 
@@ -135,6 +141,7 @@ Phase 1C Sub-step 4C（パスワードレス・パスキーログイン）の専
 - `python manage.py test accounts.tests.test_mfa_authenticate --settings=config.settings.test`: 成功（12件全成功）
 - `python manage.py test accounts.tests --settings=config.settings.test`: 成功（112件全成功）
 - `python manage.py test --settings=config.settings.test`: 成功（SQLite、119件全成功）
+- Sub-step 4D最終作業ツリー: `python manage.py test --settings=config.settings.test`: 成功（SQLite、142件全成功）。`ruff check .`、`ruff format --check .`、`git diff --check` も成功。WebAuthn失敗表示・直接開発ログイン・パスキーボタンフォーム関連付け・Recovery Codes離脱警告の追加テストを含む。
 - Step 4B作業ツリー: `python manage.py test --settings=config.settings.test`: 成功（SQLite、119件全成功）、`ruff check .`／`ruff format --check .`／`python manage.py check --settings=config.settings.test`／`makemigrations --check --dry-run`: 成功。production設定の`check --deploy`: 警告なしで成功
 - Step 4BのPostgreSQL 18、本番Compose・Cloudflare追加Compose、Caddy、本番イメージ・コンテナ検証: このローカル環境ではDocker CLIが利用できないため未実行。push後のGitHub Actionsで確認予定
 - 本番相当設定での `python manage.py check --deploy`: 成功（警告なし、0 silenced）
@@ -216,6 +223,12 @@ Phase 1C Sub-step 4C（パスワードレス・パスキーログイン）の専
 - TOTPとRecovery Codeによる一般利用者MFAは完成したが、WebAuthn／パスキー、管理者MFAゲート、MFAリセット、監査ログは未実装であり、Phase 1C全体および本番準備の完了を意味しない。
 
 ## Change history
+
+- `config/settings/development.py`: 直接開発サーバーではCaddy専用クライアントIPヘッダーを要求しない設定を追加
+- `accounts/forms.py`: WebAuthn失敗時だけをパスキー／セキュリティキー用の一般エラーへ正規化
+- `templates/account/login.html`, `templates/mfa/authenticate.html`, `templates/mfa/webauthn/reauthenticate.html`, `templates/mfa/webauthn/edit_form.html`, `static/js/webauthn-ui.js`: パスキーボタンのフォーム関連付け、エラー文言の統一、静的資産リビジョン指定を追加
+- `templates/mfa/recovery_codes/index.html`: 保存確認前のリンク離脱にも確認ダイアログを追加
+- `accounts/tests/test_authentication.py`, `accounts/tests/test_deployment_config.py`, `accounts/tests/test_mfa_passkey_login.py`, `accounts/tests/test_mfa_recovery_codes.py`, `accounts/tests/test_mfa_webauthn.py`: Step 4Dで判明した開発直結・WebAuthn失敗表示・フォーム関連付け・離脱警告の回帰テストを追加
 
 - `accounts/mfa_urls.py`: `never_cache` を `view_recovery_codes` にも適用し、Recovery Codes表示画面の確実なキャッシュ無効化を実装
 - `accounts/tests/test_mfa_urls.py`: `view_recovery_codes` および `download_recovery_codes` の `never_cache` ヘッダーアサーションを更新

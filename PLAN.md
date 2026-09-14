@@ -87,7 +87,7 @@
   - [x] 4B-R3A: WebAuthn第二要素・再認証の検証失敗表示を日本語化し、失敗経路の統合テストを補完。
   - [x] 4B-R3B: WebAuthn認証challenge stateと第二要素の共有レート制限・credential非再表示を補完。
   - [x] Sub-step 4C: passwordless passkeyログイン入口を明示公開。signupは引き続き非公開。専用統合テストと最終CIを完了。
-  - [ ] Sub-step 4D: 本番相当・実ブラウザ検証と最終レビュー。
+  - [x] Sub-step 4D: Windows Hello と実ブラウザによるローカル受入、オリジン境界、Recovery Codes、パスキー管理、再認証、失敗表示の最終レビュー。実運用HTTPSでの受入は公開環境を用意して別途実施する。
 - [ ] Step 5: 全利用者へのMFA設定画面提供と管理者MFA必須化（検証済みパスキーまたはTOTP必須、セッション内MFA確認）。
 - [ ] Step 6: 別管理者によるMFAリセットと、最後の管理者向けサーバー管理コマンド。リセット後の再登録強制。
 - [ ] Step 7: 本番Compose・CI検証（production validation）。

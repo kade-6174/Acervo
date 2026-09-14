@@ -29,12 +29,12 @@
         </form>
         <hr class="my-4">
         <div id="webauthn-status" class="alert d-none" role="status" aria-live="polite"></div>
-        <button id="passkey_login" class="btn btn-outline-primary w-100" type="button">パスキーでログイン</button>
+        <button id="passkey_login" class="btn btn-outline-primary w-100" type="button" form="mfa_login">パスキーでログイン</button>
         <form id="mfa_login" method="post" action="{% url 'mfa_login_webauthn' %}">
           {% csrf_token %}{% if redirect_field_value %}<input type="hidden" name="next" value="{{ redirect_field_value }}">{% endif %}
           <input id="mfa_credential" type="hidden" name="credential">
         </form>
-        <script src="{% static 'mfa/js/webauthn-json.js' %}"></script><script src="{% static 'mfa/js/webauthn.js' %}"></script><script src="{% static 'account/js/onload.js' %}"></script><script src="{% static 'js/webauthn-ui.js' %}"></script>
+        <script src="{% static 'mfa/js/webauthn-json.js' %}"></script><script src="{% static 'mfa/js/webauthn.js' %}"></script><script src="{% static 'account/js/onload.js' %}"></script><script src="{% static 'js/webauthn-ui.js' %}?v=20260915"></script>
         <script data-allauth-onload="allauth.webauthn.forms.loginForm" type="application/json">{"ids":{"login":"passkey_login","credential":"mfa_credential"}}</script>
       </div>
     </div>

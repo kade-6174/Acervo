@@ -86,6 +86,9 @@ class RecoveryCodesUserInterfaceTests(TestCase):
         self.assertContains(response, "document.body.appendChild(link)")
         self.assertContains(response, "link.remove()")
         self.assertContains(response, "URL.revokeObjectURL")
+        self.assertContains(response, "window.confirm")
+        self.assertContains(response, "保存したことを確認する前に離れますか？")
+        self.assertContains(response, 'event.target.closest("a[href]")')
 
         revisit = self.client.get(reverse("mfa_view_recovery_codes"))
         self.assertEqual(revisit.status_code, 200)

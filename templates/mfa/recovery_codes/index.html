@@ -71,6 +71,15 @@
             event.preventDefault();
           }
         });
+        document.addEventListener("click", (event) => {
+          const link = event.target.closest("a[href]");
+          if (!link || link === complete || completionConfirmed) {
+            return;
+          }
+          if (!window.confirm("リカバリーコードを保存したことを確認する前に離れますか？")) {
+            event.preventDefault();
+          }
+        });
         document.getElementById("copy-recovery-codes").addEventListener("click", async () => {
           try {
             if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {

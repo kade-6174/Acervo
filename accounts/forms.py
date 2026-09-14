@@ -105,6 +105,11 @@ class _AcervoWebAuthnAuthenticationForm:
     def _normalize_rate_limit_error(error):
         if error.code == "too_many_login_attempts":
             return get_account_adapter().validation_error("rate_limited")
+        if error.code == "incorrect_code":
+            return ValidationError(
+                "パスキーまたはセキュリティキーを確認できませんでした。",
+                code="incorrect_code",
+            )
         return error
 
     def clean_credential(self):

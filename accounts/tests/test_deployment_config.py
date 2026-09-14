@@ -49,6 +49,12 @@ class Phase1ConfigurationTests(SimpleTestCase):
         self.assertEqual(app_settings.RATE_LIMITS["login"], "30/m/ip")
         self.assertEqual(app_settings.RATE_LIMITS["login_failed"], "10/m/ip,5/300s/key")
 
+    def test_development_does_not_require_caddy_client_ip_header(self):
+        from config.settings import base, development
+
+        self.assertEqual(base.ALLAUTH_TRUSTED_CLIENT_IP_HEADER, "X-Acervo-Client-IP")
+        self.assertIsNone(development.ALLAUTH_TRUSTED_CLIENT_IP_HEADER)
+
     def test_email_reset_and_login_code_urls_are_not_exposed(self):
         for view_name in ("account_reset_password", "account_request_login_code"):
             with self.subTest(view_name=view_name), self.assertRaises(NoReverseMatch):

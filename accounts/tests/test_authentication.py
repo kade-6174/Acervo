@@ -83,6 +83,24 @@ class AuthenticationTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    @override_settings(ALLAUTH_TRUSTED_CLIENT_IP_HEADER=None)
+    def test_direct_development_login_uses_remote_addr_without_csrf_rejection(self):
+        client = Client(enforce_csrf_checks=True)
+        page = client.get(reverse("account_login"))
+        token = page.cookies["csrftoken"].value
+
+        response = client.post(
+            reverse("account_login"),
+            {
+                "csrfmiddlewaretoken": token,
+                "login": self.user.username,
+                "password": "correct-password-123",
+            },
+            REMOTE_ADDR="127.0.0.1",
+        )
+
+        self.assertRedirects(response, reverse("core:home"), fetch_redirect_response=False)
+
     def test_external_next_url_is_rejected(self):
         response = self.client.post(
             f"{reverse('account_login')}?next=https://attacker.example/path",

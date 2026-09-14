@@ -5,6 +5,7 @@ form、session、所有権、Authenticator DB、Recovery Codesの処理は実行
 """
 
 import time
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -42,6 +43,14 @@ class WebAuthnManagementTests(TestCase):
 
     def make_key(self, user, name="key"):
         return Authenticator.objects.create(user=user, type="webauthn", data={"name": name})
+
+    def test_webauthn_client_error_uses_user_facing_japanese(self):
+        script = (
+            Path(__file__).resolve().parents[2] / "static" / "js" / "webauthn-ui.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("パスキーまたはセキュリティキーを利用できませんでした。", script)
+        self.assertNotIn("認証器を利用できませんでした。", script)
 
     def test_add_rejects_anonymous_stale_csrf_and_malformed_without_creating_key(self):
         url = reverse("mfa_add_webauthn")
@@ -232,7 +241,7 @@ class WebAuthnManagementTests(TestCase):
                 HTTP_X_ACERVO_CLIENT_IP="198.51.100.57",
             )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "認証コードを確認できませんでした。")
+        self.assertContains(response, "パスキーまたはセキュリティキーを確認できませんでした。")
         self.assertNotContains(response, credential)
         self.assertNotIn(SESSION_KEY, self.client.session)
         self.assertIn("no-store", response.headers["Cache-Control"])
