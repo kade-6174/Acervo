@@ -12,6 +12,7 @@ RUN groupadd --gid 10001 acervo \
 
 COPY pyproject.toml README.md ./
 COPY accounts ./accounts
+COPY audit ./audit
 COPY config ./config
 COPY core ./core
 COPY management_portal ./management_portal
