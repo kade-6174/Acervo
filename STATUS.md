@@ -4,10 +4,14 @@
 
 ## Current Task
 
-Phase 1C Step 6AのMFAリセットサービス層・最小AuditLogを完了。次はStep 6Bだが未着手。Step 6全体およびPhase 1全体は未完了。
+Phase 1C Step 6Bの別管理者MFAリセット画面を完了。Step 6C、Step 6全体およびPhase 1全体は未完了。
 
 ## Completed
 
+- Step 6Bとして、`/management/mfa-reset/`のusername完全一致検索と`/management/users/<user_id>/mfa-reset/`の確認・実行画面を追加した。中央管理MFAゲートに加え、実行POST直前にTOTPまたはWebAuthnの直近再認証を必須とし、古いPOST本文を保存・再送せず、固定した内部確認GETへ戻す。確認チェックとPOST時点のusername完全一致も必須とした。
+- UIは認証器の一般種別だけを表示し、秘密値、credential、challenge、session、パスワード等を表示・保存しない。実行はStep 6Aの`reset_user_mfa_by_admin()`だけを経由し、対象sessionの無効化、`mfa_reset_at`更新、監査ログ1件作成をサービス層のトランザクションへ委譲する。二重POSTは対象MFAなしの安全な業務エラーとなり、監査ログを増やさない。
+- Step 6B専用テスト16件を追加し、管理ゲート、完全一致検索、CSRF、確認不備、username変更、自己対象、TOTP／WebAuthn再認証、外部nextを受け取らない固定遷移、fail-closed、対象sessionだけの無効化、監査ログ一回性、対象属性、実行直前のactor状態再検査、秘密値非表示を確認した。Step 6Cのサーバー管理コマンド、role変更、無効化、最後の管理者保護、監査ログ閲覧、その他の管理操作は未着手である。
+- Step 6B実装コミット `9a699959151b4e1e3ad6d7a7da3555fd2287ed65` はGitHub Actions run 34976164456で全成功した。PostgreSQL 18の全200テスト、Ruff、Django check、migration差分なし、本番`check --deploy`、本番／Cloudflare Compose、Caddy adapt／validate、本番イメージ、`db`・`web`・`proxy` healthy、Web UID 10001、Caddy経由応答、専用クライアントIP信頼境界、Web 8000番・DB 5432番のホスト非公開、DB・写真永続化を確認した。
 - Step 6Aとして、`mfa_reset_at` nullable日時フィールドとmigration、追記専用の`audit.AuditLog`、HTTP非依存の別管理者MFAリセットサービスを追加した。サービスはactor／targetを主キー順で行ロックし、actorの有効状態・Acervo admin role・初回パスワード変更・primary MFA・本人以外を再検証してから、対象の全Authenticator削除、時刻更新、対象Django session無効化、監査記録1件を同一トランザクションで実行する。
 - AuditLogは発生日時、操作種別、実行経路、actor／target FKとusernameスナップショットだけを持ち、秘密値・credential・challenge・session／Cookie・任意本文・汎用JSONを保存しない。通常のinstance更新・削除は拒否し、Django `/admin/`へは登録していない。
 - Step 5のセッションMFA判定は`mfa_reset_at`以前の記録、欠損・bool・不正・無限大・未来の時刻をfail closedで拒否するよう補強した。リセット後に新たなprimary MFAを登録しても旧記録は再利用できず、リセット後に正当に作成されたMFA記録は許可する。session削除だけへ安全性を依存しない。
@@ -171,6 +175,7 @@ Phase 1C Step 6AのMFAリセットサービス層・最小AuditLogを完了。�
 
 ### GitHub Actions
 
+- Phase 1C Step 6B実装HEAD `9a699959151b4e1e3ad6d7a7da3555fd2287ed65`: run 34976164456（`test`、`production-container` 全成功）。PostgreSQL 18の全200テスト、Ruff、Django check、migration差分なし、本番／Cloudflare Compose、Caddy adapt／validate、本番イメージ、`db`・`web`・`proxy` healthy、Web UID 10001、`check --deploy`、Caddy経由応答、専用クライアントIP信頼境界、Web 8000番・DB 5432番のホスト非公開、DB・写真永続化を確認
 - Phase 1C Step 6A本番修正HEAD `e9e4172e76272e86bf2e6c144fc7630a1cedb6b6`: run 34974094232（`test`、`production-container` 全成功）。PostgreSQL 18の全184テスト、Ruff、Django check、migration差分なし、本番／Cloudflare Compose、Caddy adapt／validate、本番イメージ、`db`・`web`・`proxy` healthy、Web UID 10001、`check --deploy`、Caddy経由の`/health/`・静的ファイル200、`/admin/` 404、未認証`/management/`の同一Originログインredirect、専用クライアントIP信頼境界、Web 8000番・DB 5432番のホスト非公開、DB・写真永続化を確認
 - Phase 1C Step 5C実装HEAD `af7b20e908445e2839ca226b3769a8b36564642c`: run 34962199834（`test`、`production-container` 全成功）。PostgreSQL 18の全174テスト、Ruff、Django check、migration差分なし、本番／Cloudflare Compose、Caddy adapt／validate、本番イメージ、`db`・`web`・`proxy` healthy、Web UID 10001、`check --deploy`、Caddy経由の`/health/`・静的ファイル200、`/admin/` 404、未認証`/management/`の同一Originログインredirect、専用クライアントIP信頼境界、Web 8000番・DB 5432番のホスト非公開、DB・写真永続化を確認
 - Phase 1C Step 5B実装HEAD `237fbdf5bea32e5f4488403d7f3d2d7a5a7f9ce0`: run 34868855403（`test`、`production-container` 全成功）。PostgreSQL 18の全161テスト、Ruff、Django check、migration差分なし、本番／Cloudflare Compose、Caddy、本番イメージ、全サービスhealthy、UID 10001、Caddy経由の未認証`/management/`同一Originログインredirect、`/admin/` 404、非公開ポート、DB・写真永続化を確認
