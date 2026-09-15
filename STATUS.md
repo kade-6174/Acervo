@@ -4,10 +4,14 @@
 
 ## Current Task
 
-Phase 1C Step 5の管理者MFAゲートを統合・本番相当検証まで完了。次はStep 6だが未着手。Phase 1全体は未完了。
+Phase 1C Step 6AのMFAリセットサービス層・最小AuditLogを完了。次はStep 6Bだが未着手。Step 6全体およびPhase 1全体は未完了。
 
 ## Completed
 
+- Step 6Aとして、`mfa_reset_at` nullable日時フィールドとmigration、追記専用の`audit.AuditLog`、HTTP非依存の別管理者MFAリセットサービスを追加した。サービスはactor／targetを主キー順で行ロックし、actorの有効状態・Acervo admin role・初回パスワード変更・primary MFA・本人以外を再検証してから、対象の全Authenticator削除、時刻更新、対象Django session無効化、監査記録1件を同一トランザクションで実行する。
+- AuditLogは発生日時、操作種別、実行経路、actor／target FKとusernameスナップショットだけを持ち、秘密値・credential・challenge・session／Cookie・任意本文・汎用JSONを保存しない。通常のinstance更新・削除は拒否し、Django `/admin/`へは登録していない。
+- Step 5のセッションMFA判定は`mfa_reset_at`以前の記録、欠損・bool・不正・無限大・未来の時刻をfail closedで拒否するよう補強した。リセット後に新たなprimary MFAを登録しても旧記録は再利用できず、リセット後に正当に作成されたMFA記録は許可する。session削除だけへ安全性を依存しない。
+- Step 6A関連17件、SQLite全184件、PostgreSQL 18全184件、Ruff、Django check、migration差分なし、本番`check --deploy`、本番／Cloudflare Compose、Caddy、本番イメージ、全サービスhealthy、UID 10001、非公開ポート、クライアントIP信頼境界、Caddy経由応答、DB・写真永続化が成功した。Step 6Bのリセット画面と直近再認証、6Cの最後の管理者向け管理コマンドは未着手である。
 - Step 5Cとして、実際のallauthログインステージ、MFAフォーム、再認証、session、Authenticator DB、Step 5Aポリシー、Step 5B中央ゲートを通す専用統合テスト13件を追加した。TOTP、未使用Recovery Code、WebAuthn第二要素、passwordlessパスキー、TOTP／WebAuthn再認証の成功から`/management/`までを確認し、WebAuthnは既存方針どおりブラウザ認証器の暗号検証境界だけを限定mockした。
 - Recovery Codeの一回消費と再利用拒否、Recovery Codesだけのadmin拒否、パスワードのみの未完了セッション、MFA失敗・中止・レート制限、ログアウト・新規セッション・Cookie消失、role降格・無効化・初回パスワード変更要求・最後のprimary MFA削除の次リクエスト反映を統合確認した。`is_staff`／`is_superuser`のmemberと卒業生memberは拒否し、既存方針どおり卒業生adminは必要条件を満たせば許可した。
 - allauth adapterが利用可能なMFA再認証方法を返さない場合も500にせず、入力本文や外部`next`を保存・再送せず、日本語案内付きMFA設定画面へfail closedで戻すよう中央ゲートを補強した。既存の全HTTP method、未作成管理URL、内部`next`、キャッシュ禁止のテストと合わせて管理経路の迂回不能を確認した。
@@ -142,6 +146,7 @@ Phase 1C Step 5の管理者MFAゲートを統合・本番相当検証まで完�
 
 ### ローカル
 
+- Step 6A実装／本番修正後: `python manage.py test accounts.tests.test_mfa_reset accounts.tests.test_management_access --settings=config.settings.test`: 成功（関連17件全成功）。`python manage.py test --settings=config.settings.test`: 成功（SQLite、184件全成功）。`ruff check .`、`ruff format --check .`、`git diff --check`、`python manage.py check --settings=config.settings.test`、`python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功。実行用の一時本番設定による`python manage.py check --deploy`: 成功（警告なし、0 silenced）。ローカルDocker検証はDocker CLIが存在しないため実行せず、GitHub Actionsで確認した。
 - Step 5C実装コミット: `python manage.py test management_portal --settings=config.settings.test`: 成功（Step 5C専用13件を含む25件全成功）。`python manage.py test --settings=config.settings.test`: 成功（SQLite、174件全成功）。
 - Step 5C実装コミット: `ruff check .`、`ruff format --check .`、`git diff --check`、`python manage.py check --settings=config.settings.test`: 成功。`python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（migration差分なし）。本番相当設定の`python manage.py check --deploy`: 成功（警告なし、0 silenced）。ローカルDocker検証はDocker CLIが存在しないため実行せず、同一実装HEADのGitHub Actionsで完了した。
 - Step 5B作業ツリー: `python manage.py test management_portal --settings=config.settings.test`: 成功（専用12件全成功）。`python manage.py test accounts.tests.test_management_access --settings=config.settings.test`: 成功（Step 5A専用7件全成功）。`python manage.py test accounts --settings=config.settings.test`: 成功（accounts 146件全成功）。`python manage.py test --settings=config.settings.test`: 成功（SQLite、161件全成功）。
@@ -166,6 +171,7 @@ Phase 1C Step 5の管理者MFAゲートを統合・本番相当検証まで完�
 
 ### GitHub Actions
 
+- Phase 1C Step 6A本番修正HEAD `e9e4172e76272e86bf2e6c144fc7630a1cedb6b6`: run 34974094232（`test`、`production-container` 全成功）。PostgreSQL 18の全184テスト、Ruff、Django check、migration差分なし、本番／Cloudflare Compose、Caddy adapt／validate、本番イメージ、`db`・`web`・`proxy` healthy、Web UID 10001、`check --deploy`、Caddy経由の`/health/`・静的ファイル200、`/admin/` 404、未認証`/management/`の同一Originログインredirect、専用クライアントIP信頼境界、Web 8000番・DB 5432番のホスト非公開、DB・写真永続化を確認
 - Phase 1C Step 5C実装HEAD `af7b20e908445e2839ca226b3769a8b36564642c`: run 34962199834（`test`、`production-container` 全成功）。PostgreSQL 18の全174テスト、Ruff、Django check、migration差分なし、本番／Cloudflare Compose、Caddy adapt／validate、本番イメージ、`db`・`web`・`proxy` healthy、Web UID 10001、`check --deploy`、Caddy経由の`/health/`・静的ファイル200、`/admin/` 404、未認証`/management/`の同一Originログインredirect、専用クライアントIP信頼境界、Web 8000番・DB 5432番のホスト非公開、DB・写真永続化を確認
 - Phase 1C Step 5B実装HEAD `237fbdf5bea32e5f4488403d7f3d2d7a5a7f9ce0`: run 34868855403（`test`、`production-container` 全成功）。PostgreSQL 18の全161テスト、Ruff、Django check、migration差分なし、本番／Cloudflare Compose、Caddy、本番イメージ、全サービスhealthy、UID 10001、Caddy経由の未認証`/management/`同一Originログインredirect、`/admin/` 404、非公開ポート、DB・写真永続化を確認
 - Phase 1C Step 5A実装HEAD `0c05ceecf6a0b0ad78a4a317799baa2e4842c1fc`: run 34867040961（`test`、`production-container` 全成功）。PostgreSQL 18.6の全149テスト、Ruff、Django check、migration差分なし、本番Compose／Cloudflare追加Compose、Caddy、本番イメージ、全サービスhealthy、非root実行、`check --deploy`、クライアントIP境界、ポート非公開、DB・写真永続化を確認
@@ -229,6 +235,7 @@ Phase 1C Step 5の管理者MFAゲートを統合・本番相当検証まで完�
 
 ### 修正中の失敗履歴
 
+- run 34973856152: Step 6Aで追加した`audit`アプリをDockerfileへコピーしておらず、本番webが`ModuleNotFoundError`でunhealthyになった。`Dockerfile`へ`COPY audit ./audit`を追加し、run 34974094232で全ジョブ成功。
 - run 34748018570: 本番コンテナ起動時に `.env.production` のプレースホルダーがFail-Fastバリデーションで拒否されwebがunhealthy。CI内で一時Fernet鍵を動的生成・注入するよう修正。
 - run 34742173720: 直接HTTPS検証で接続先コンテナ名がTLS SNIに使われ失敗。検証用SNIを `acervo.localhost` に固定して修正。
 - run 34682467963: Webがunhealthy。HTTPS転送ヘッダー不足と読み取り専用環境のGunicorn設定を修正。
@@ -241,10 +248,11 @@ Phase 1C Step 5の管理者MFAゲートを統合・本番相当検証まで完�
 - Phase 1Bと追加タスク0-SHの自動検証に未解決の問題はない。
 - 実ドメインでの証明書取得は、公開ドメインと本番ホスト決定後の手動確認事項として残る。
 - 既存開発DBへDjango標準Userのauthマイグレーションを適用済みの場合、Custom Userへの後付け切替は安全に継続できない。対象は開発用PostgreSQL DBと開発用Composeの `postgres_data` ボリューム（通常 `acervo_postgres_data`）。今回は接続、削除、初期化を行っていない。再作成が必要な環境では、保存データの有無を確認し、設計責任者または運用者の承認を得て別作業で行う。
-- TOTP、Recovery Codes、WebAuthn第二要素、パスキー登録・管理・パスワードレスログイン、管理アクセス判定、`/management/`中央ゲートと統合・本番相当検証は完了し、`localhost`のWindows＋Chrome＋Windows Hello実機受入も完了している。管理操作本体、role変更・最後の管理者保護、MFAリセット、監査ログとStep 6は未実装・未着手であり、実運用HTTPSドメイン等の受入も未確認のため、Phase 1全体および本番準備は未完了。
+- TOTP、Recovery Codes、WebAuthn第二要素、パスキー登録・管理・パスワードレスログイン、管理アクセス判定、`/management/`中央ゲートと統合・本番相当検証、MFAリセットのサービス層・最小AuditLogは完了し、`localhost`のWindows＋Chrome＋Windows Hello実機受入も完了している。リセット画面・直近再認証、最後の管理者向け管理コマンド、管理操作本体、role変更・最後の管理者保護は未実装・未着手であり、実運用HTTPSドメイン等の受入も未確認のため、Step 6全体、Phase 1全体および本番準備は未完了。
 
 ## Change history
 
+- `accounts/mfa_reset.py`, `accounts/models.py`, `accounts/management_access.py`, `accounts/migrations/0002_user_mfa_reset_at.py`, `audit/`, `Dockerfile`, `accounts/tests/test_mfa_reset.py`, `accounts/tests/test_management_access.py`, `PROJECT_SPEC.md`, `README.md`, `PLAN.md`, `STATUS.md`: Step 6AのMFAリセットサービス、追記専用AuditLog、旧MFA記録失効、本番イメージへの監査アプリ追加、文書整合を追加
 - `management_portal/middleware.py`, `management_portal/tests/test_integration.py`, `README.md`, `PLAN.md`, `STATUS.md`: Step 5Cのallauth実フロー統合テスト、再認証方法欠落時のfail-closed補強、Step 5完了実績を追加
 - `management_portal/`, `config/settings/base.py`, `config/urls.py`, `templates/base.html`, `templates/mfa/index.html`, `Dockerfile`, `pyproject.toml`, `.github/workflows/ci.yml`, `README.md`, `PLAN.md`, `STATUS.md`: Step 5Bの中央管理ゲート、最小管理トップ、ナビゲーション、理由別応答、キャッシュ禁止、専用テスト、本番Caddy経由redirect検証を追加
 - `accounts/management_access.py`, `accounts/tests/test_management_access.py`, `PLAN.md`, `STATUS.md`: Step 5を5A〜5Cへ分割し、Step 5Aの管理アクセス判定ポリシーと専用テストを追加
