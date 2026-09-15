@@ -88,10 +88,10 @@
   - [x] 4B-R3B: WebAuthn認証challenge stateと第二要素の共有レート制限・credential非再表示を補完。
   - [x] Sub-step 4C: passwordless passkeyログイン入口を明示公開。signupは引き続き非公開。専用統合テストと最終CIを完了。
   - [x] Sub-step 4D: Windows Hello と実ブラウザによるローカル受入、オリジン境界、Recovery Codes、パスキー管理、再認証、失敗表示の最終レビュー。実運用HTTPSでの受入は公開環境を用意して別途実施する。
-- [ ] Step 5: 管理者MFA必須化。
+- [x] Step 5: 管理者MFA必須化。
   - [x] 5A: 管理アクセス判定ポリシー。認証・有効状態・Acervoのadmin role・初回パスワード変更・検証済みprimary MFA・現在セッションのMFA記録を、再利用可能なサーバー側処理で判定する。
   - [x] 5B: `/management/`への中央ゲート適用と日本語案内画面。最小管理トップ、共通ナビゲーション、理由別の安全なredirect／403、キャッシュ禁止を実装。
-  - [ ] 5C: 管理者MFAゲートの統合・本番相当検証。
+  - [x] 5C: 管理者MFAゲートの統合・本番相当検証。
 - [ ] Step 6: 別管理者によるMFAリセットと、最後の管理者向けサーバー管理コマンド。リセット後の再登録強制。
 - [ ] Step 7: 本番Compose・CI検証（production validation）。
   - [ ] 公開環境の確定後、実運用HTTPSドメインでRecovery Codes、端末内・同期パスキーの登録・ログイン・削除を確認し、Chrome以外の実運用対象ブラウザでも受入を行う。
