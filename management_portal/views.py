@@ -72,8 +72,7 @@ def _mfa_reauthentication_redirect(request, confirmation_url: str):
         (
             item
             for item in methods
-            if item.get("id") in {"mfa_reauthenticate", "mfa_reauthenticate_webauthn"}
-            and item.get("url")
+            if item.get("id", "").startswith("mfa_reauthenticate") and item.get("url")
         ),
         None,
     )

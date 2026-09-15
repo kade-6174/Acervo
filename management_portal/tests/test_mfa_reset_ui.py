@@ -1,23 +1,35 @@
 """Phase 1C Step 6Bの別管理者MFAリセット画面テスト。"""
 
 import time
+from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from allauth.account.authentication import AUTHENTICATION_METHODS_SESSION_KEY
 from allauth.mfa.models import Authenticator
+from allauth.mfa.totp.internal.auth import (
+    TOTP,
+    format_hotp_value,
+    hotp_value,
+    yield_hotp_counters_from_time,
+)
 from django.contrib.sessions.models import Session
+from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.test import Client, TestCase
 from django.urls import reverse
 
 from accounts.models import User
 from audit.models import AuditLog
 
+CLIENT_IP_HEADER = {"HTTP_X_ACERVO_CLIENT_IP": "198.51.100.250"}
+
 
 class MFAResetUITests(TestCase):
     password = "SecurePassword123!"
 
     def setUp(self):
+        cache.clear()
         self.actor = self.create_user("actor", role=User.Role.ADMIN)
         self.target = self.create_user("target")
         self.add_authenticator(self.actor, Authenticator.Type.TOTP)
@@ -230,4 +242,178 @@ class MFAResetUITests(TestCase):
         response = self.valid_post()
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.headers["Location"].startswith(reverse("mfa_index")))
+        self.assert_unchanged()
+
+    def test_success_message_is_escaped_consumed_once_and_refresh_does_not_repeat_reset(self):
+        self.target.username = '<img src=x onerror="alert(1)">'
+        self.target.save(update_fields=["username"])
+        response = self.valid_post(username=self.target.username)
+        self.assertRedirects(response, self.confirm_url, fetch_redirect_response=False)
+        confirmation = self.client.get(self.confirm_url)
+        self.assertContains(confirmation, "MFAをリセットしました")
+        self.assertContains(confirmation, "&lt;img", html=False)
+        self.assertNotContains(confirmation, '<img src=x onerror="alert(1)">', html=False)
+        self.assertNotContains(confirmation, "test")
+        self.assertNotContains(confirmation, "credential")
+        self.assertNotContains(confirmation, "session_key")
+        self.assertEqual(AuditLog.objects.count(), 1)
+        refreshed = self.client.get(self.confirm_url)
+        self.assertNotContains(refreshed, "MFAをリセットしました")
+        self.assertEqual(AuditLog.objects.count(), 1)
+
+    def test_fail_closed_error_message_is_shown_on_search_page(self):
+        self.login_as_recently_reauthenticated_mfa_admin(self.actor, age=10_000)
+        adapter = SimpleNamespace(get_reauthentication_methods=lambda _user: [])
+        with patch("management_portal.views.get_adapter", return_value=adapter):
+            response = self.valid_post()
+        self.assertRedirects(response, self.search_url, fetch_redirect_response=False)
+        page = self.client.get(self.search_url)
+        self.assertContains(page, "MFA再認証方法を確認できないため、リセットを実行できません。")
+        self.assertNotContains(page, "attacker")
+        self.assertNotContains(page, "credential")
+        self.assert_unchanged()
+
+    @staticmethod
+    def valid_totp(secret):
+        return format_hotp_value(hotp_value(secret, next(yield_hotp_counters_from_time())))
+
+    def make_stale_totp_actor(self):
+        Authenticator.objects.filter(user=self.actor).delete()
+        secret = "JBSWY3DPEHPK3PXP"
+        TOTP.activate(self.actor, secret)
+        self.login_as_recently_reauthenticated_mfa_admin(self.actor, age=10_000)
+        return secret
+
+    def test_real_totp_reauthentication_returns_to_confirm_get_without_replaying_post(self):
+        secret = self.make_stale_totp_actor()
+        stale = self.client.post(
+            self.confirm_url,
+            {"confirmed": "on", "username": self.target.username},
+            **CLIENT_IP_HEADER,
+        )
+        self.assertTrue(stale.headers["Location"].startswith(reverse("mfa_reauthenticate")))
+        self.assert_unchanged()
+        completed = self.client.post(
+            stale.headers["Location"], {"code": self.valid_totp(secret)}, **CLIENT_IP_HEADER
+        )
+        self.assertRedirects(
+            completed,
+            self.confirm_url,
+            fetch_redirect_response=False,
+            msg_prefix=completed.content.decode(),
+        )
+        returned = self.client.get(self.confirm_url)
+        self.assertEqual(returned.status_code, 200)
+        self.assertNotIn("username", self.client.session)
+        self.assertNotIn("confirmed", self.client.session)
+        self.assert_unchanged()
+        success = self.client.post(
+            self.confirm_url,
+            {"confirmed": "on", "username": self.target.username},
+            **CLIENT_IP_HEADER,
+        )
+        self.assertRedirects(success, self.confirm_url, fetch_redirect_response=False)
+        self.assertEqual(AuditLog.objects.count(), 1)
+        self.assertContains(self.client.get(self.confirm_url), "MFAをリセットしました")
+
+    def test_real_totp_reauthentication_failure_does_not_reset(self):
+        self.make_stale_totp_actor()
+        stale = self.client.post(
+            self.confirm_url,
+            {"confirmed": "on", "username": self.target.username},
+            **CLIENT_IP_HEADER,
+        )
+        failed = self.client.post(stale.headers["Location"], {"code": "000000"}, **CLIENT_IP_HEADER)
+        self.assertEqual(failed.status_code, 200, failed.content.decode())
+        self.assert_unchanged()
+
+    def test_reauthentication_webauthn_returns_to_confirm_get_without_replaying_post(self):
+        Authenticator.objects.filter(user=self.actor).delete()
+        key = Authenticator.objects.create(
+            user=self.actor, type=Authenticator.Type.WEBAUTHN, data={"name": "re-auth"}
+        )
+        self.login_as_recently_reauthenticated_mfa_admin(self.actor, age=10_000)
+        session = self.client.session
+        session[AUTHENTICATION_METHODS_SESSION_KEY][-1]["type"] = Authenticator.Type.WEBAUTHN
+        session.save()
+        stale = self.client.post(
+            self.confirm_url,
+            {"confirmed": "on", "username": self.target.username},
+            **CLIENT_IP_HEADER,
+        )
+        self.assertTrue(
+            stale.headers["Location"].startswith(reverse("mfa_reauthenticate_webauthn")),
+            stale.headers["Location"],
+        )
+        self.assert_unchanged()
+        with ExitStack() as stack:
+            stack.enter_context(
+                patch("allauth.mfa.webauthn.internal.auth.get_credentials", return_value=[])
+            )
+            stack.enter_context(
+                patch(
+                    "allauth.mfa.webauthn.internal.auth.parse_authentication_response",
+                    autospec=True,
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "allauth.mfa.webauthn.internal.auth.complete_authentication",
+                    autospec=True,
+                    return_value=key,
+                )
+            )
+            stack.enter_context(
+                patch.object(
+                    Authenticator, "wrap", return_value=SimpleNamespace(is_passwordless=False)
+                )
+            )
+            completed = self.client.post(
+                stale.headers["Location"], {"credential": '{"id":"key"}'}, **CLIENT_IP_HEADER
+            )
+        self.assertRedirects(completed, self.confirm_url, fetch_redirect_response=False)
+        self.assertEqual(self.client.get(self.confirm_url).status_code, 200)
+        self.assert_unchanged()
+        self.assertNotIn("username", self.client.session)
+        success = self.client.post(
+            self.confirm_url,
+            {"confirmed": "on", "username": self.target.username},
+            **CLIENT_IP_HEADER,
+        )
+        self.assertRedirects(success, self.confirm_url, fetch_redirect_response=False)
+        self.assertEqual(AuditLog.objects.count(), 1)
+
+    def test_reauthentication_webauthn_failure_leaves_target_unchanged(self):
+        Authenticator.objects.filter(user=self.actor).delete()
+        Authenticator.objects.create(
+            user=self.actor, type=Authenticator.Type.WEBAUTHN, data={"name": "re-auth"}
+        )
+        self.login_as_recently_reauthenticated_mfa_admin(self.actor, age=10_000)
+        session = self.client.session
+        session[AUTHENTICATION_METHODS_SESSION_KEY][-1]["type"] = Authenticator.Type.WEBAUTHN
+        session.save()
+        stale = self.client.post(
+            self.confirm_url,
+            {"confirmed": "on", "username": self.target.username},
+            **CLIENT_IP_HEADER,
+        )
+        with (
+            patch("allauth.mfa.webauthn.internal.auth.get_credentials", return_value=[]),
+            patch(
+                "allauth.mfa.webauthn.internal.auth.parse_authentication_response", autospec=True
+            ),
+            patch(
+                "allauth.mfa.webauthn.internal.auth.complete_authentication",
+                autospec=True,
+                side_effect=ValidationError("invalid"),
+            ),
+            patch.object(
+                Authenticator, "wrap", return_value=SimpleNamespace(is_passwordless=False)
+            ),
+        ):
+            failed = self.client.post(
+                stale.headers["Location"], {"credential": '{"id":"key"}'}, **CLIENT_IP_HEADER
+            )
+        self.assertEqual(failed.status_code, 302)
+        self.assertTrue(failed.headers["Location"].startswith(reverse("account_login")))
         self.assert_unchanged()

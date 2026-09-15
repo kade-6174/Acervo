@@ -8,6 +8,9 @@ Phase 1C Step 6Bの別管理者MFAリセット画面を完了。Step 6C、Step 6
 
 ## Completed
 
+- Step 6B-Rとして、MFAリセット検索・確認画面専用の共通messages partialを追加し、成功・fail-closedエラーを日本語で一回だけ表示するよう補正した。`aria-live`、HTML escape、既存の白・黒・グレー中心の表示を維持し、base全体や他のMFA画面には波及させていない。
+- Step 6B-Rではallauthの実TOTP再認証view・フォーム・session・認証記録を通す成功／失敗テストと、WebAuthn再認証view・form・session・redirectを通す限定mock成功／失敗テストを追加した。再認証後は確認GETへ戻るだけで本文を再送せず、改めてPOSTした場合だけサービス層を実行する。実フローで判明したallauthのWebAuthn再認証method ID（`mfa_reauthenticate:webauthn`）を許可するよう補正した。
+- Step 6B関連テストは22件、SQLite全206件が成功。Ruff、Django check、migration差分なし、本番相当`check --deploy`も成功した。PostgreSQL 18および本番Compose等の最終確認はpush後のGitHub Actionsで実施する。Step 6Cのサーバー管理コマンド、role変更、無効化、最後の管理者保護、監査ログ閲覧、その他の管理操作は未着手である。
 - Step 6Bとして、`/management/mfa-reset/`のusername完全一致検索と`/management/users/<user_id>/mfa-reset/`の確認・実行画面を追加した。中央管理MFAゲートに加え、実行POST直前にTOTPまたはWebAuthnの直近再認証を必須とし、古いPOST本文を保存・再送せず、固定した内部確認GETへ戻す。確認チェックとPOST時点のusername完全一致も必須とした。
 - UIは認証器の一般種別だけを表示し、秘密値、credential、challenge、session、パスワード等を表示・保存しない。実行はStep 6Aの`reset_user_mfa_by_admin()`だけを経由し、対象sessionの無効化、`mfa_reset_at`更新、監査ログ1件作成をサービス層のトランザクションへ委譲する。二重POSTは対象MFAなしの安全な業務エラーとなり、監査ログを増やさない。
 - Step 6B専用テスト16件を追加し、管理ゲート、完全一致検索、CSRF、確認不備、username変更、自己対象、TOTP／WebAuthn再認証、外部nextを受け取らない固定遷移、fail-closed、対象sessionだけの無効化、監査ログ一回性、対象属性、実行直前のactor状態再検査、秘密値非表示を確認した。Step 6Cのサーバー管理コマンド、role変更、無効化、最後の管理者保護、監査ログ閲覧、その他の管理操作は未着手である。
