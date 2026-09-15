@@ -277,7 +277,7 @@ class ManagementPortalTests(TestCase):
                 self.assertContains(response, reverse("mfa_index"))
                 self.assertContains(response, reverse("core:home"))
                 self.assertContains(response, reverse("account_logout"))
-                self.assertContains(response, "現在、この画面から実行できる管理操作はありません。")
+                self.assertContains(response, "MFAリセット")
                 self.assertNotContains(response, "/admin/")
                 self.assert_never_cached(response)
                 self.client.logout()

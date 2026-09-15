@@ -11,10 +11,11 @@
         <p class="mb-4">ログイン中: <strong>{{ user.username }}</strong></p>
         <div class="border rounded bg-white p-4 mb-4">
           <h2 class="h5">管理機能について</h2>
-          <p class="text-secondary mb-0">管理操作は今後のStepで追加します。現在、この画面から実行できる管理操作はありません。</p>
+          <p class="text-secondary mb-0">別管理者のMFAを、本人確認と直近MFA再認証の後にリセットできます。</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
           <a class="btn btn-outline-dark" href="{% url 'mfa_index' %}">セキュリティ設定</a>
+          <a class="btn btn-dark" href="{% url 'management:mfa_reset_search' %}">MFAリセット</a>
           <a class="btn btn-outline-secondary" href="{% url 'core:home' %}">通常画面へ戻る</a>
           <form method="post" action="{% url 'account_logout' %}">
             {% csrf_token %}

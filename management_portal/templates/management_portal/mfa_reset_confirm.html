@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}MFAリセットの確認 — Acervo{% endblock %}
+{% block content %}
+  <section class="container py-5"><div class="row justify-content-center"><div class="col-lg-8">
+    <p class="text-uppercase text-secondary fw-semibold mb-2">Management</p>
+    <h1 class="h2 mb-3">MFAリセットの確認</h1>
+    <div class="border rounded bg-white p-4 mb-4"><dl class="row mb-0"><dt class="col-sm-4">対象ユーザー名</dt><dd class="col-sm-8">{{ target.username }}</dd><dt class="col-sm-4">role</dt><dd class="col-sm-8">{{ target.role }}</dd><dt class="col-sm-4">状態</dt><dd class="col-sm-8">{% if target.is_active %}有効{% else %}無効{% endif %}</dd><dt class="col-sm-4">回生</dt><dd class="col-sm-8">{{ target.cohort_number }}回生</dd><dt class="col-sm-4">MFA</dt><dd class="col-sm-8">{% if authenticator_types %}登録済み（{{ authenticator_types|join:"、" }}）{% else %}未登録{% endif %}</dd></dl></div>
+    <div class="alert alert-warning" role="alert"><p class="mb-2">登録済みMFAはすべて削除されます。対象の既存ログインセッションも無効になります。</p><p class="mb-2">対象は再ログイン後にMFAを再登録する必要があります。</p><p class="mb-0 fw-semibold">この操作は取り消せません。</p></div>
+    <form method="post" class="border rounded bg-white p-4">{% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="form-check mb-3">{{ form.confirmed }}<label class="form-check-label" for="{{ form.confirmed.id_for_label }}">本人確認済み</label>{% if form.confirmed.errors %}<div class="text-danger" role="alert">{{ form.confirmed.errors }}</div>{% endif %}</div>
+      <label class="form-label" for="{{ form.username.id_for_label }}">対象のユーザー名を完全に再入力してください</label>{{ form.username }}{% if form.username.errors %}<div class="text-danger" role="alert">{{ form.username.errors }}</div>{% endif %}
+      <button class="btn btn-danger mt-3" type="submit">MFAをリセットする</button>
+    </form>
+    <a class="btn btn-link mt-3" href="{% url 'management:mfa_reset_search' %}">検索へ戻る</a>
+  </div></div></section>
+{% endblock %}
