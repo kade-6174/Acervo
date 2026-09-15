@@ -63,7 +63,18 @@ class ManagementAccessMiddleware:
     def _redirect_to_mfa_reauthentication(request):
         methods = get_adapter(request).get_reauthentication_methods(request.user)
         mfa_method = next(
-            method for method in methods if method["id"].startswith("mfa_reauthenticate")
+            (
+                method
+                for method in methods
+                if method.get("id", "").startswith("mfa_reauthenticate") and method.get("url")
+            ),
+            None,
         )
+        if mfa_method is None:
+            messages.warning(
+                request,
+                "管理機能を利用するには、パスキーまたはTOTPで再認証してください。",
+            )
+            return redirect("mfa_index")
         query = urlencode({"next": request.get_full_path()})
         return HttpResponseRedirect(f"{mfa_method['url']}?{query}")
