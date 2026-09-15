@@ -6,10 +6,12 @@
 
 from dataclasses import dataclass
 from enum import Enum
+from math import isfinite
 
 from allauth.account.authentication import get_authentication_records
 from allauth.mfa.models import Authenticator
 from django.http import HttpRequest
+from django.utils import timezone
 
 from accounts.models import User
 
@@ -53,7 +55,7 @@ def has_primary_mfa(user: User) -> bool:
     return Authenticator.objects.filter(user_id=user.pk, type__in=PRIMARY_MFA_TYPES).exists()
 
 
-def has_session_mfa(request: HttpRequest) -> bool:
+def has_session_mfa(request: HttpRequest, *, mfa_reset_at=None) -> bool:
     """現在のセッションにallauth標準のMFA認証記録があるか返す。"""
 
     records = get_authentication_records(request)
@@ -65,6 +67,10 @@ def has_session_mfa(request: HttpRequest) -> bool:
             continue
         authenticated_at = record.get("at")
         if isinstance(authenticated_at, bool) or not isinstance(authenticated_at, (int, float)):
+            continue
+        if not isfinite(authenticated_at) or authenticated_at > timezone.now().timestamp():
+            continue
+        if mfa_reset_at is not None and authenticated_at <= mfa_reset_at.timestamp():
             continue
         if record.get("method") == "mfa" and record.get("type") in SESSION_MFA_TYPES:
             return True
@@ -80,7 +86,7 @@ def evaluate_management_access(request: HttpRequest) -> ManagementAccessDecision
 
     user_state = (
         User.objects.filter(pk=request_user.pk)
-        .values("is_active", "role", "must_change_password")
+        .values("is_active", "role", "must_change_password", "mfa_reset_at")
         .first()
     )
     if user_state is None:
@@ -93,6 +99,6 @@ def evaluate_management_access(request: HttpRequest) -> ManagementAccessDecision
         return ManagementAccessDecision(ManagementAccessReason.PASSWORD_CHANGE_REQUIRED)
     if not has_primary_mfa(request_user):
         return ManagementAccessDecision(ManagementAccessReason.PRIMARY_MFA_REQUIRED)
-    if not has_session_mfa(request):
+    if not has_session_mfa(request, mfa_reset_at=user_state["mfa_reset_at"]):
         return ManagementAccessDecision(ManagementAccessReason.SESSION_MFA_REQUIRED)
     return ManagementAccessDecision(ManagementAccessReason.ALLOWED)

@@ -32,6 +32,7 @@ class User(AbstractUser):
     role = models.CharField(max_length=10, choices=Role, default=Role.MEMBER)
     cohort_number = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     must_change_password = models.BooleanField(default=False)
+    mfa_reset_at = models.DateTimeField(null=True, blank=True)
 
     objects = UserManager()
 

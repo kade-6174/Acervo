@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "allauth.account",
     "allauth.mfa",
     "accounts",
+    "audit",
     "core",
     "management_portal",
 ]

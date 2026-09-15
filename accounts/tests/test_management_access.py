@@ -6,6 +6,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.test import RequestFactory, TestCase
+from django.utils import timezone
 
 from accounts.management_access import (
     ManagementAccessReason,
@@ -208,3 +209,65 @@ class ManagementAccessPolicyTests(TestCase):
         new_session = self.make_request(other_admin)
         self.assertFalse(has_session_mfa(new_session))
         self.assert_reason(new_session, ManagementAccessReason.SESSION_MFA_REQUIRED)
+
+    def test_mfa_reset_rejects_old_records_for_all_supported_mfa_types(self):
+        self.add_authenticator(self.admin, Authenticator.Type.TOTP)
+        self.admin.mfa_reset_at = timezone.now()
+        self.admin.save(update_fields=["mfa_reset_at"])
+        old_timestamp = self.admin.mfa_reset_at.timestamp() - 1
+
+        for authenticator_type, extra_data in (
+            (Authenticator.Type.TOTP, {}),
+            (Authenticator.Type.WEBAUTHN, {}),
+            (Authenticator.Type.WEBAUTHN, {"passwordless": True}),
+            (Authenticator.Type.RECOVERY_CODES, {}),
+            (Authenticator.Type.TOTP, {"reauthenticated": True}),
+        ):
+            with self.subTest(authenticator_type=authenticator_type, extra_data=extra_data):
+                request = self.make_request(self.admin)
+                request.session["account_authentication_methods"] = [
+                    {
+                        "method": "mfa",
+                        "type": authenticator_type,
+                        "at": old_timestamp,
+                        **extra_data,
+                    }
+                ]
+                self.assertFalse(has_session_mfa(request, mfa_reset_at=self.admin.mfa_reset_at))
+                self.assert_reason(request, ManagementAccessReason.SESSION_MFA_REQUIRED)
+
+    def test_new_mfa_record_after_reset_is_allowed_and_future_record_is_rejected(self):
+        self.add_authenticator(self.admin, Authenticator.Type.TOTP)
+        self.admin.mfa_reset_at = timezone.now()
+        self.admin.save(update_fields=["mfa_reset_at"])
+        request = self.make_request(self.admin)
+        record_authentication(request, self.admin, "mfa", type=Authenticator.Type.TOTP)
+        self.assertTrue(has_session_mfa(request, mfa_reset_at=self.admin.mfa_reset_at))
+        self.assert_reason(request, ManagementAccessReason.ALLOWED)
+
+        request.session["account_authentication_methods"] = [
+            {
+                "method": "mfa",
+                "type": Authenticator.Type.TOTP,
+                "at": timezone.now().timestamp() + 60,
+            }
+        ]
+        self.assertFalse(has_session_mfa(request, mfa_reset_at=self.admin.mfa_reset_at))
+        self.assert_reason(request, ManagementAccessReason.SESSION_MFA_REQUIRED)
+
+    def test_invalid_mfa_record_timestamps_are_rejected_after_reset(self):
+        self.add_authenticator(self.admin, Authenticator.Type.TOTP)
+        self.admin.mfa_reset_at = timezone.now()
+        self.admin.save(update_fields=["mfa_reset_at"])
+        for timestamp in (True, None, "not-a-timestamp", float("nan"), float("inf")):
+            with self.subTest(timestamp=timestamp):
+                request = self.make_request(self.admin)
+                request.session["account_authentication_methods"] = [
+                    {
+                        "method": "mfa",
+                        "type": Authenticator.Type.TOTP,
+                        "at": timestamp,
+                    }
+                ]
+                self.assertFalse(has_session_mfa(request, mfa_reset_at=self.admin.mfa_reset_at))
+                self.assert_reason(request, ManagementAccessReason.SESSION_MFA_REQUIRED)
