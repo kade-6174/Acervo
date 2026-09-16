@@ -26,7 +26,7 @@ def _generate_temporary_password(user: User) -> str:
 
 @transaction.atomic
 def create_user_with_temporary_password(
-    *, username: str, cohort_number: int, role: str = User.Role.MEMBER
+    *, username: str, cohort_number: int | None = None, role: str = User.Role.MEMBER
 ) -> TemporaryPasswordResult:
     candidate = User(username=username, cohort_number=cohort_number, role=role)
     temporary_password = _generate_temporary_password(candidate)

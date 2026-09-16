@@ -11,7 +11,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--username", required=True)
-        parser.add_argument("--cohort-number", required=True, type=int)
+        parser.add_argument("--cohort-number", type=int)
 
     def handle(self, *args, **options):
         username = options["username"]

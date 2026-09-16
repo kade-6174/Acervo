@@ -31,6 +31,14 @@ class Phase1ConfigurationTests(SimpleTestCase):
         self.assertEqual(settings.MFA_TOTP_ISSUER, "Acervo")
         self.assertFalse(settings.MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN)
 
+    @override_settings(ACERVO_SITE_NAME="導入先サイト", MFA_TOTP_ISSUER="導入先サイト")
+    def test_site_name_drives_totp_issuer_and_webauthn_display_name(self):
+        self.assertEqual(settings.MFA_TOTP_ISSUER, "導入先サイト")
+        self.assertEqual(
+            AcervoMFAAdapter().get_public_key_credential_rp_entity()["name"],
+            "導入先サイト",
+        )
+
     def test_authentication_policy_is_explicit(self):
         self.assertEqual(settings.ACCOUNT_LOGIN_METHODS, {"username"})
         self.assertEqual(settings.ACCOUNT_SIGNUP_FIELDS, ["username*", "password1*"])
@@ -192,6 +200,7 @@ class ProductionMFASettingsTests(SimpleTestCase):
                 "DJANGO_CSRF_TRUSTED_ORIGINS": "https://acervo.example.org",
                 "ACERVO_PUBLIC_BASE_URL": "https://acervo.example.org",
                 "ACERVO_MFA_FERNET_KEYS": self.VALID_KEY,
+                "ACERVO_ENROLLMENT_POLICY": "none",
             }
         )
         if extra_env:
@@ -218,6 +227,13 @@ class ProductionMFASettingsTests(SimpleTestCase):
         self.assertIn("不正なFernet鍵", result.stderr)
         self.assertNotIn(invalid_key, result.stderr)
 
+    def test_production_requires_a_valid_enrollment_policy(self):
+        for value in ("", "invalid"):
+            with self.subTest(value=value):
+                result = self._run_production_setup({"ACERVO_ENROLLMENT_POLICY": value})
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("ACERVO_ENROLLMENT_POLICY", result.stderr)
+
     def test_production_fails_when_insecure_origin_allowed(self):
         import os
         import subprocess
@@ -234,6 +250,7 @@ class ProductionMFASettingsTests(SimpleTestCase):
                 "DJANGO_CSRF_TRUSTED_ORIGINS": "https://acervo.example.org",
                 "ACERVO_PUBLIC_BASE_URL": "https://acervo.example.org",
                 "ACERVO_MFA_FERNET_KEYS": self.VALID_KEY,
+                "ACERVO_ENROLLMENT_POLICY": "none",
             }
         )
         script = (

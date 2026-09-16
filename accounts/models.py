@@ -26,11 +26,13 @@ class UserManager(DjangoUserManager):
 
 class User(AbstractUser):
     class Role(models.TextChoices):
-        MEMBER = "member", "部員"
+        MEMBER = "member", "利用者"
         ADMIN = "admin", "管理者"
 
     role = models.CharField(max_length=10, choices=Role, default=Role.MEMBER)
-    cohort_number = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    cohort_number = models.PositiveIntegerField(
+        null=True, blank=True, validators=[MinValueValidator(1)]
+    )
     must_change_password = models.BooleanField(default=False)
     mfa_reset_at = models.DateTimeField(null=True, blank=True)
 
@@ -39,7 +41,7 @@ class User(AbstractUser):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(cohort_number__gt=0),
+                condition=models.Q(cohort_number__isnull=True) | models.Q(cohort_number__gt=0),
                 name="accounts_user_cohort_number_positive",
             ),
             models.CheckConstraint(
@@ -50,8 +52,7 @@ class User(AbstractUser):
 
     def clean(self):
         super().clean()
-        if self.cohort_number is not None:
-            validate_cohort_for_date(self.cohort_number, timezone.localdate())
+        validate_cohort_for_date(self.cohort_number, timezone.localdate())
 
     def cohort_standing_on(self, on_date: date) -> CohortStanding:
         return cohort_standing_on(self.cohort_number, on_date)

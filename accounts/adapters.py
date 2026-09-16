@@ -38,7 +38,7 @@ class AcervoMFAAdapter(DefaultMFAAdapter):
             settings.ACERVO_PUBLIC_BASE_URL,
             allow_localhost_http=True,
         )
-        return {"id": rp_id, "name": "Acervo"}
+        return {"id": rp_id, "name": settings.ACERVO_SITE_NAME}
 
     def get_multi_fernet(self):
         return get_mfa_multi_fernet()

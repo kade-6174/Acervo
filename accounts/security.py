@@ -4,6 +4,7 @@ import binascii
 import ipaddress
 import re
 from collections.abc import Sequence
+from datetime import date
 from urllib.parse import urlsplit
 
 from cryptography.fernet import Fernet, MultiFernet
@@ -13,6 +14,26 @@ _DNS_HOSTNAME_RE = re.compile(
     r"(?=.{1,253}\Z)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*"
     r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\Z"
 )
+
+
+def validate_enrollment_settings(
+    policy: str,
+    start_month: int,
+    start_day: int,
+    base_school_year: int,
+    base_third_year_cohort: int,
+) -> None:
+    """在籍ポリシーと学校方式の基準を起動時にfail-fastで検証する。"""
+    if policy not in {"none", "school_cohort"}:
+        raise ImproperlyConfigured("ACERVO_ENROLLMENT_POLICYはnoneまたはschool_cohortです。")
+    if policy == "none":
+        return
+    try:
+        date(base_school_year, start_month, start_day)
+    except (TypeError, ValueError):
+        raise ImproperlyConfigured("学校年度開始日の設定が不正です。") from None
+    if base_third_year_cohort <= 0:
+        raise ImproperlyConfigured("基準回生は正の整数で設定する必要があります。")
 
 
 def get_public_origin_and_rp_id(

@@ -56,6 +56,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "core.context_processors.site_identity",
             ],
         },
     }
@@ -108,10 +109,17 @@ MFA_FORMS = {
 MFA_RECOVERY_CODE_COUNT = 10
 MFA_RECOVERY_CODES_SHOW_ONCE = True
 MFA_TRUST_ENABLED = False
-MFA_TOTP_ISSUER = "Acervo"
 MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = False
 
 ACERVO_MFA_FERNET_KEYS = env.list("ACERVO_MFA_FERNET_KEYS", default=[])
+ACERVO_SITE_NAME = env("ACERVO_SITE_NAME", default="Acervo")
+ACERVO_ORGANIZATION_NAME = env("ACERVO_ORGANIZATION_NAME", default="")
+ACERVO_ENROLLMENT_POLICY = env("ACERVO_ENROLLMENT_POLICY", default="school_cohort")
+ACERVO_SCHOOL_YEAR_START_MONTH = env.int("ACERVO_SCHOOL_YEAR_START_MONTH", default=4)
+ACERVO_SCHOOL_YEAR_START_DAY = env.int("ACERVO_SCHOOL_YEAR_START_DAY", default=1)
+ACERVO_BASE_SCHOOL_YEAR = env.int("ACERVO_BASE_SCHOOL_YEAR", default=2026)
+ACERVO_BASE_THIRD_YEAR_COHORT = env.int("ACERVO_BASE_THIRD_YEAR_COHORT", default=31)
+MFA_TOTP_ISSUER = ACERVO_SITE_NAME
 
 DATABASES = {
     "default": {

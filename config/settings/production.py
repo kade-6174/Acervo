@@ -1,8 +1,14 @@
 """本番用設定。秘密値が不足している場合は起動させない。"""
 
+import os
+
 from django.core.exceptions import ImproperlyConfigured
 
-from accounts.security import validate_mfa_fernet_keys, validate_production_public_origin
+from accounts.security import (
+    validate_enrollment_settings,
+    validate_mfa_fernet_keys,
+    validate_production_public_origin,
+)
 
 from .base import *  # noqa: F403
 
@@ -14,6 +20,15 @@ if not DATABASES["default"]["PASSWORD"]:  # noqa: F405
     raise ImproperlyConfigured("POSTGRES_PASSWORDの設定が必要です。")
 
 validate_mfa_fernet_keys(ACERVO_MFA_FERNET_KEYS)  # noqa: F405
+if not os.environ.get("ACERVO_ENROLLMENT_POLICY"):
+    raise ImproperlyConfigured("ACERVO_ENROLLMENT_POLICYの設定が必要です。")
+validate_enrollment_settings(  # noqa: F405
+    ACERVO_ENROLLMENT_POLICY,
+    ACERVO_SCHOOL_YEAR_START_MONTH,
+    ACERVO_SCHOOL_YEAR_START_DAY,
+    ACERVO_BASE_SCHOOL_YEAR,
+    ACERVO_BASE_THIRD_YEAR_COHORT,
+)
 
 if MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN:  # noqa: F405
     raise ImproperlyConfigured("本番環境ではMFA_WEBAUTHN_ALLOW_INSECURE_ORIGINを有効にできません。")
