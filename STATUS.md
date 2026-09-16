@@ -8,6 +8,9 @@ Phase 1C Step 6Bの別管理者MFAリセット画面を完了。Step 6C、Step 6
 
 ## Completed
 
+- Step 6Cとして、緊急復旧専用の`python manage.py reset_admin_mfa <username>`とHTTP非依存サービスを追加した。対象は有効なadminかつAuthenticator保持者に限り、別の有効・初回変更済み・primary MFA保持adminがいる場合は通常の管理画面を案内して拒否する。確認文字列`RESET <username>`の一致、空入力・EOF拒否を必須とし、無確認実行経路は提供しない。
+- コマンド用サービスはadmin行を主キー順でロックし、対象Authenticator・対象session削除、`mfa_reset_at`更新、actor NULL／`server-operator`スナップショットのコマンド用AuditLog一件作成を同一トランザクションで実行する。パスワード、role、有効状態、初回変更フラグ、新しい秘密・Recovery Codesは変更・出力・監査しない。AuditLog actionは`command_mfa_reset`へ正式化した。
+- Step 6C専用6件を追加し、最後のadminの成功、全Authenticator・session削除、確認不一致・EOF、対象拒否、別admin条件、二重実行、監査失敗ロールバックを確認した。SQLite全212件、PostgreSQL 18全212件、Ruff、Django check、migration差分なし、本番相当`check --deploy`、本番／Cloudflare Compose、Caddy adapt／validate、本番イメージ、全サービスhealthy、UID 10001、非公開ポート、IP信頼境界、Caddy経由`/health/`・静的ファイル、`/admin/`遮断、DB・写真永続化がGitHub Actions run 35086332954で成功した。Step 7、role変更、無効化、最後の管理者の降格・無効化保護、監査ログ閲覧は未着手である。
 - Step 6B-Rとして、MFAリセット検索・確認画面専用の共通messages partialを追加し、成功・fail-closedエラーを日本語で一回だけ表示するよう補正した。`aria-live`、HTML escape、既存の白・黒・グレー中心の表示を維持し、base全体や他のMFA画面には波及させていない。
 - Step 6B-Rではallauthの実TOTP再認証view・フォーム・session・認証記録を通す成功／失敗テストと、WebAuthn再認証view・form・session・redirectを通す限定mock成功／失敗テストを追加した。再認証後は確認GETへ戻るだけで本文を再送せず、改めてPOSTした場合だけサービス層を実行する。実フローで判明したallauthのWebAuthn再認証method ID（`mfa_reauthenticate:webauthn`）を許可するよう補正した。
 - Step 6B関連テストは22件、SQLite全206件、PostgreSQL 18全206件が成功。Ruff、Django check、migration差分なし、本番相当`check --deploy`、本番／Cloudflare Compose、Caddy、本番イメージ、全サービスhealthy、UID 10001、非公開ポート、クライアントIP信頼境界、DB・写真永続化をGitHub Actionsで確認した。Step 6Cのサーバー管理コマンド、role変更、無効化、最後の管理者保護、監査ログ閲覧、その他の管理操作は未着手である。

@@ -4,7 +4,7 @@
 
 学校の部活動、研究室、小規模博物館、個人コレクション等で、標本や資料の登録・検索・保管・履歴管理を継続できることを目指します。生物標本を最初の対象としますが、組織名や標本番号の接頭辞は設定で変更できます。
 
-> **開発中** — TOTP、Recovery Codes、WebAuthn第二要素、パスキーの登録・管理・パスワードレスログイン、および管理者MFAゲートは実装・統合検証済みです。別管理者によるMFAリセット画面（確認操作・直近MFA再認証を含む）まで実装済みです。最後の管理者向け管理コマンドは未着手です。Windows＋Chrome＋Windows Hello＋`localhost`で実機受入を完了しています。実運用HTTPSドメイン、同期パスキー、Chrome以外の実運用対象ブラウザは未確認です。正確な現在地は [STATUS.md](STATUS.md) を参照してください。
+> **開発中** — TOTP、Recovery Codes、WebAuthn第二要素、パスキーの登録・管理・パスワードレスログイン、管理者MFAゲート、別管理者によるMFAリセット画面、最後の管理者向け緊急MFAリセットコマンドは実装・統合検証済みです。Windows＋Chrome＋Windows Hello＋`localhost`で実機受入を完了しています。実運用HTTPSドメイン、同期パスキー、Chrome以外の実運用対象ブラウザは未確認です。正確な現在地は [STATUS.md](STATUS.md) を参照してください。
 
 ## 主な機能（MVP）
 
@@ -74,6 +74,18 @@ Tunnel tokenは秘密情報です。リポジトリやログへ記録しない�
 - [STATUS.md](STATUS.md) — 実装状況、テスト結果、問題点
 
 現在はパスキー／セキュリティキーの登録・管理、パスワードログイン後の第二要素認証、passwordless passkeyログインを提供します。パスキーsignupは公開していません。
+
+## 緊急時の最後の管理者MFA復旧
+
+通常のMFA喪失は、別の復旧可能な管理者が `/management/` のMFAリセット画面から対応します。`reset_admin_mfa` は、他にその操作を実行できる管理者がいない最後の有効adminだけの緊急復旧用です。
+
+本番コンテナでは、対象usernameを指定して実行します。実行前に `RESET <username>` の完全一致確認が必要です。
+
+```bash
+docker compose -f compose.production.yaml exec web python manage.py reset_admin_mfa <username>
+```
+
+このコマンドは対象の既存MFAとログインsessionを無効化しますが、パスワード、role、有効状態は変更せず、新しい秘密やRecovery Codesも出力しません。対象者は既存パスワードで再ログイン後、MFAを再登録する必要があります。
 
 ## 開発環境
 
