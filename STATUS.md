@@ -4,10 +4,14 @@
 
 ## Current Task
 
-Phase 1C Step 6を完了。Step 7A-SPEC（仕様整合レビュー）を完了し、次はUserモデル・在籍判定の汎用化を含むStep 7Aだが未着手。Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7Aを完了。次はTunnel専用インフラ準備のStep 7Bだが未着手であり、Phase 1全体は未完了。
 
 ## Completed
 
+- Step 7Aとして、Userの保存値`member`／`admin`を維持しつつ表示名を「利用者」へ変更し、`cohort_number`をNULL・blank許可へ移行した。DB制約はNULLまたは正数とし、既存の非NULL回生値を変更しないmigrationと、NULLがある場合の逆migration拒否（バックアップ復元または全回生設定を要求）を追加した。
+- `ACERVO_ENROLLMENT_POLICY`は`none`／`school_cohort`だけを許可し、本番では明示必須とした。`school_cohort`は年度開始月・日、基準年度、基準回生を環境変数から読み、回生欠損・未来回生を拒否する。`none`は回生を要求せず、保存済み回生も認可へ使わない。`school_cohort`から`none`への切替は卒業済み利用者の書込み可否を変え得るため、運用上の権限変更として事前確認が必要である。
+- Step 7Aで`ACERVO_SITE_NAME`、`ACERVO_ORGANIZATION_NAME`を追加し、導入先サイト名をヘッダー、WebAuthn RP表示名、TOTP issuerへ適用した。RP IDは従来どおり`ACERVO_PUBLIC_BASE_URL`のhostnameだけから安全に導出し、別RP ID設定は追加していない。hostname変更時は既存パスキーの再登録が必要だが、サイト表示名変更だけでは不要である。
+- 変更ファイルは`.env.production.example`、`accounts/adapters.py`、`accounts/enrollment.py`、`accounts/models.py`、`accounts/security.py`、`accounts/services.py`、`accounts/management/commands/bootstrap_admin.py`、migration、設定、表示context、テスト、文書。Compose、Caddy、DNS、Cloudflare Tunnel、本番公開は変更していない。実装コミットは`c399eee`。
 - Step 7A-SPECとして、Acervoを1インスタンス＝1組織の汎用セルフホスト型標本管理システムとして文書上明確化した。学校・生物班の回生／年度方式、`kdf-biology.org`、Cloudflare Tunnel、Tailscaleは導入例へ分離し、マルチテナント、Symbiota連携、公式サイト・Wiki・メール運用を現在要件から除外した。コード、migration、設定、Compose、Caddy、CI、認証処理は変更していない。
 - Step 7A-SPECの文書コミットは`8eededc122661b98de352cc7ac2145841380fd84`。ローカルでRuff、Django check、migration差分なし、SQLite全214件、Markdownリンク、`git diff --check`が成功し、GitHub Actions run 35099967154でPostgreSQL 18全214件と既存の本番／Cloudflare Compose・Caddy・イメージ・healthy・UID 10001・信頼境界・非公開ポート・永続化検証が全成功した。実ドメイン、Tunnel専用構成、同期パスキー、Chrome以外の実運用対象ブラウザは未確認のまま維持する。
 - Step 7A-SPECで、現行Userの`cohort_number` NULL不可・正数DB制約、2026年度／31回生／4月1日固定の在籍判定、作成サービス・`bootstrap_admin`・関連テストへの依存を確認した。これらを在籍判定なしと学校回生方式から選べるようにする実装は、既存データ移行・後方互換性・管理者影響を伴う未着手のStep 7Aへ分離した。
@@ -155,16 +159,16 @@ Phase 1C Step 6を完了。Step 7A-SPEC（仕様整合レビュー）を完了�
 
 ## Remaining
 
-- Step 7Aで、Userモデルと在籍判定を汎用化する設計承認・migration計画・実装・検証が必要。現行の回生必須制約と2026年度／31回生／4月1日固定は、回生を使わない導入先要件と未整合である。
 - Step 7Bで、Tunnel専用構成ではホストの80/443を公開しないCompose・Caddy・CI構成を実装・検証する。現行本番Composeは直接HTTPS用に80/443（UDP 443を含む）を公開し、Tunnel追加Composeを重ねても公開を残す。
 - Acervo本番ホスト名は候補の`acervo.kdf-biology.org`であり、最終確定後にDNS変更、実Tunnel接続または直接HTTPSの証明書取得を手動確認する。現時点で公開サービス用DNSレコードはない。
 - 公開環境を用意した後、実運用HTTPSドメインでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告、端末内・同期パスキーの登録・ログイン・削除を確認する。同期パスキーとChrome以外の実運用対象ブラウザも未確認（`localhost`のWindows＋Chrome＋Windows Hello受入は完了）。
-- 後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。7A実装以降の実装・DNS変更・Tunnel作成・本番公開も未着手。
+- 後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。7B以降の実装・DNS変更・Tunnel作成・本番公開も未着手。
 
 ## Tests
 
 ### ローカル
 
+- Step 7A実装後: `python manage.py test --settings=config.settings.test`: 成功（SQLite、225件全成功）。在籍ポリシー（none／school_cohort）、同期・非同期manager、作成サービス、`bootstrap_admin`、設定fail-fast、既存回生保持とNULLデータがある逆migration拒否を追加確認した。Ruff lint／format、Django check、migration差分なし、`git diff --check`、ランダムな一時設定値を用いる本番相当`check --deploy`は成功。ローカルDocker CLIはないためCompose・Caddy・コンテナ検証は未実行で、push後の既存CIで確認する。
 - Step 6A実装／本番修正後: `python manage.py test accounts.tests.test_mfa_reset accounts.tests.test_management_access --settings=config.settings.test`: 成功（関連17件全成功）。`python manage.py test --settings=config.settings.test`: 成功（SQLite、184件全成功）。`ruff check .`、`ruff format --check .`、`git diff --check`、`python manage.py check --settings=config.settings.test`、`python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功。実行用の一時本番設定による`python manage.py check --deploy`: 成功（警告なし、0 silenced）。ローカルDocker検証はDocker CLIが存在しないため実行せず、GitHub Actionsで確認した。
 - Step 5C実装コミット: `python manage.py test management_portal --settings=config.settings.test`: 成功（Step 5C専用13件を含む25件全成功）。`python manage.py test --settings=config.settings.test`: 成功（SQLite、174件全成功）。
 - Step 5C実装コミット: `ruff check .`、`ruff format --check .`、`git diff --check`、`python manage.py check --settings=config.settings.test`: 成功。`python manage.py makemigrations --check --dry-run --settings=config.settings.test`: 成功（migration差分なし）。本番相当設定の`python manage.py check --deploy`: 成功（警告なし、0 silenced）。ローカルDocker検証はDocker CLIが存在しないため実行せず、同一実装HEADのGitHub Actionsで完了した。
