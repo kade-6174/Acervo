@@ -3,11 +3,20 @@
 from io import StringIO
 from unittest.mock import patch
 
+from allauth.account.authentication import AUTHENTICATION_METHODS_SESSION_KEY
 from allauth.mfa.models import Authenticator
+from allauth.mfa.totp.internal.auth import (
+    TOTP,
+    format_hotp_value,
+    hotp_value,
+    yield_hotp_counters_from_time,
+)
 from django.contrib.sessions.models import Session
+from django.core.cache import cache
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import Client, TestCase
+from django.urls import reverse
 
 from accounts.mfa_reset import reset_admin_mfa_by_command
 from accounts.models import User
@@ -16,8 +25,11 @@ from audit.models import AuditLog
 
 class ResetAdminMFACommandTests(TestCase):
     password = "SecurePassword123!"
+    totp_secret = "JBSWY3DPEHPK3PXP"
+    client_ip = {"HTTP_X_ACERVO_CLIENT_IP": "198.51.100.249"}
 
     def setUp(self):
+        cache.clear()
         self.target = self.create_user("last-admin", role=User.Role.ADMIN)
         self.add_authenticator(self.target, Authenticator.Type.TOTP)
 
@@ -39,6 +51,10 @@ class ResetAdminMFACommandTests(TestCase):
         with patch("sys.stdin", stdin):
             call_command("reset_admin_mfa", username or self.target.username, stdout=output)
         return output.getvalue()
+
+    @staticmethod
+    def valid_totp(secret):
+        return format_hotp_value(hotp_value(secret, next(yield_hotp_counters_from_time())))
 
     def assert_unchanged(self):
         self.assertTrue(Authenticator.objects.filter(user=self.target).exists())
@@ -123,6 +139,9 @@ class ResetAdminMFACommandTests(TestCase):
 
         target = self.create_user("rollback", role=User.Role.ADMIN)
         self.add_authenticator(target, Authenticator.Type.TOTP)
+        rollback_client = Client()
+        rollback_client.force_login(target)
+        rollback_session_key = rollback_client.session.session_key
         with (
             patch(
                 "accounts.mfa_reset.AuditLog.objects.create", side_effect=RuntimeError("failure")
@@ -133,3 +152,57 @@ class ResetAdminMFACommandTests(TestCase):
         self.assertTrue(Authenticator.objects.filter(user=target).exists())
         target.refresh_from_db()
         self.assertIsNone(target.mfa_reset_at)
+        self.assertTrue(Session.objects.filter(session_key=rollback_session_key).exists())
+
+    def test_reset_admin_can_login_but_requires_new_mfa_before_management_access(self):
+        previous_password = self.target.password
+        old_client = Client()
+        old_client.force_login(self.target)
+        old_session = old_client.session
+        old_session[AUTHENTICATION_METHODS_SESSION_KEY] = [
+            {"method": "mfa", "type": Authenticator.Type.TOTP, "at": 1}
+        ]
+        old_session.save()
+        old_session_key = old_session.session_key
+
+        self.run_command(confirmation=f"RESET {self.target.username}")
+        self.target.refresh_from_db()
+        self.assertEqual(self.target.password, previous_password)
+        self.assertFalse(Session.objects.filter(session_key=old_session_key).exists())
+        self.assertFalse(Authenticator.objects.filter(user=self.target).exists())
+
+        client = Client()
+        login = client.post(
+            reverse("account_login"),
+            {"login": self.target.username, "password": self.password},
+            **self.client_ip,
+        )
+        self.assertEqual(login.status_code, 302)
+        denied = client.get(reverse("management:index"), **self.client_ip)
+        self.assertRedirects(denied, reverse("mfa_index"), fetch_redirect_response=False)
+
+        TOTP.activate(self.target, self.totp_secret)
+        reauthentication = client.get(reverse("management:index"), **self.client_ip)
+        self.assertTrue(
+            reauthentication.headers["Location"].startswith(reverse("mfa_reauthenticate"))
+        )
+        completed = client.post(
+            reauthentication.headers["Location"],
+            {"code": self.valid_totp(self.totp_secret)},
+            **self.client_ip,
+        )
+        self.assertRedirects(completed, reverse("management:index"), fetch_redirect_response=False)
+        self.assertEqual(client.get(reverse("management:index"), **self.client_ip).status_code, 200)
+
+    def test_command_preserves_required_password_change_and_non_secret_outputs(self):
+        original_password = self.target.password
+        self.target.must_change_password = True
+        self.target.save(update_fields=["must_change_password"])
+        output = self.run_command(confirmation=f"RESET {self.target.username}")
+        self.target.refresh_from_db()
+        self.assertTrue(self.target.must_change_password)
+        self.assertEqual(self.target.password, original_password)
+        self.assertNotIn("test", output)
+        audit = AuditLog.objects.get()
+        self.assertNotIn("test", audit.actor_username)
+        self.assertNotIn("test", audit.target_username)

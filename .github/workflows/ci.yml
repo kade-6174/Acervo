@@ -124,6 +124,7 @@ jobs:
         run: |
           test "$(docker compose -f compose.production.yaml exec -T web id -u)" = "10001"
           docker compose -f compose.production.yaml exec -T web python manage.py check --deploy
+          docker compose -f compose.production.yaml exec -T web python manage.py help reset_admin_mfa | grep -q "最後の有効な管理者"
           docker compose -f compose.production.yaml exec -T web python manage.py shell -c "from django.conf import settings; cache = settings.CACHES['default']; assert cache['BACKEND'] == 'django.core.cache.backends.db.DatabaseCache'; assert cache['LOCATION'] == 'acervo_rate_limit_cache'"
 
       - name: Caddy経由のHTTP応答を確認
