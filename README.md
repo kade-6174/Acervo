@@ -16,7 +16,7 @@
 - 標本の検索、編集、保管場所、状態、貸出・返却等の履歴
 - 和名・学名・分類情報のローカル管理と任意の外部候補検索
 - 標本ラベル・QRラベルのPDF出力
-- 部員・卒業生・管理者の権限、管理者MFA、監査ログ
+- 利用者・管理者の権限、管理者MFA、監査ログ（学校回生方式では在校生・卒業生の区分も扱う）
 - スマートフォンのホーム画面へ追加できるPWA
 - バックアップ・復元を含むセルフホスト運用
 
@@ -54,7 +54,7 @@ docker compose -f compose.production.yaml ps
 
 ### Cloudflare Tunnelを使う場合（任意）
 
-Tunnelは本体から分離した追加Composeとして提供します。Cloudflare側でリモート管理Tunnelを作り、公開ホスト名のオリジンを `http://proxy:8080` に設定します。
+Tunnelは本体から分離した追加Composeとして提供します。ただし現行のコマンドは直接HTTPS用の本番Composeへoverlayを重ねるため、ホストの80/443公開を残します。7B完了まではTunnel専用構成の正式手順として案内しません。Cloudflare側でリモート管理Tunnelを作り、公開ホスト名のオリジンを `http://proxy:8080` に設定する作業も、7Cの実ドメイン受入まで実施しません。
 
 ```bash
 cp .env.cloudflare.example .env.cloudflare

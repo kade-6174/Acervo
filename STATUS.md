@@ -9,6 +9,7 @@ Phase 1C Step 6を完了。Step 7A-SPEC（仕様整合レビュー）を完了�
 ## Completed
 
 - Step 7A-SPECとして、Acervoを1インスタンス＝1組織の汎用セルフホスト型標本管理システムとして文書上明確化した。学校・生物班の回生／年度方式、`kdf-biology.org`、Cloudflare Tunnel、Tailscaleは導入例へ分離し、マルチテナント、Symbiota連携、公式サイト・Wiki・メール運用を現在要件から除外した。コード、migration、設定、Compose、Caddy、CI、認証処理は変更していない。
+- Step 7A-SPECの文書コミットは`8eededc122661b98de352cc7ac2145841380fd84`。ローカルでRuff、Django check、migration差分なし、SQLite全214件、Markdownリンク、`git diff --check`が成功し、GitHub Actions run 35099967154でPostgreSQL 18全214件と既存の本番／Cloudflare Compose・Caddy・イメージ・healthy・UID 10001・信頼境界・非公開ポート・永続化検証が全成功した。実ドメイン、Tunnel専用構成、同期パスキー、Chrome以外の実運用対象ブラウザは未確認のまま維持する。
 - Step 7A-SPECで、現行Userの`cohort_number` NULL不可・正数DB制約、2026年度／31回生／4月1日固定の在籍判定、作成サービス・`bootstrap_admin`・関連テストへの依存を確認した。これらを在籍判定なしと学校回生方式から選べるようにする実装は、既存データ移行・後方互換性・管理者影響を伴う未着手のStep 7Aへ分離した。
 - 生物班環境の確定事実として、`kdf-biology.org`はXserverドメインで登録しCloudflare Free DNSはActiveだが、公開サービス用DNSレコードは未設定。Dell Precision 3630（Xeon E-2186G）上のProxmox VEをTailscale経由で管理しており、Acervoの候補URLは`https://acervo.kdf-biology.org`だが最終確定・公開は未実施。SymbiotaはDebian 12／Apache／MariaDB／PHPで管理者ログインまで確認した非稼働検証環境で、Acervoと共有DB・認証・session・ファイル領域を持たない。
 - Step 6C-Rとして、`STATUS.md`の現在状態と過去時点の履歴を整合し、READMEの緊急コマンド例をシェル安全な`ADMIN_USERNAME`プレースホルダーへ変更した。コマンド後に既存パスワードでログインし、MFA未登録では管理画面を拒否し、新TOTP再認証後だけ管理画面を許可する実フローを追加した。監査失敗時のsessionロールバック、`must_change_password`・password hash等の不変性、秘密値非混入も補強した。
@@ -158,7 +159,7 @@ Phase 1C Step 6を完了。Step 7A-SPEC（仕様整合レビュー）を完了�
 - Step 7Bで、Tunnel専用構成ではホストの80/443を公開しないCompose・Caddy・CI構成を実装・検証する。現行本番Composeは直接HTTPS用に80/443（UDP 443を含む）を公開し、Tunnel追加Composeを重ねても公開を残す。
 - Acervo本番ホスト名は候補の`acervo.kdf-biology.org`であり、最終確定後にDNS変更、実Tunnel接続または直接HTTPSの証明書取得を手動確認する。現時点で公開サービス用DNSレコードはない。
 - 公開環境を用意した後、実運用HTTPSドメインでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告、端末内・同期パスキーの登録・ログイン・削除を確認する。同期パスキーとChrome以外の実運用対象ブラウザも未確認（`localhost`のWindows＋Chrome＋Windows Hello受入は完了）。
-- 後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。Step 7以降の実装・DNS変更・Tunnel作成・本番公開も未着手。
+- 後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。7A実装以降の実装・DNS変更・Tunnel作成・本番公開も未着手。
 
 ## Tests
 
