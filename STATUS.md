@@ -4,10 +4,13 @@
 
 ## Current Task
 
-Phase 1C Step 6を完了。次はStep 7だが未着手であり、Phase 1全体は未完了。
+Phase 1C Step 6を完了。Step 7A-SPEC（仕様整合レビュー）を完了し、次はUserモデル・在籍判定の汎用化を含むStep 7Aだが未着手。Phase 1全体は未完了。
 
 ## Completed
 
+- Step 7A-SPECとして、Acervoを1インスタンス＝1組織の汎用セルフホスト型標本管理システムとして文書上明確化した。学校・生物班の回生／年度方式、`kdf-biology.org`、Cloudflare Tunnel、Tailscaleは導入例へ分離し、マルチテナント、Symbiota連携、公式サイト・Wiki・メール運用を現在要件から除外した。コード、migration、設定、Compose、Caddy、CI、認証処理は変更していない。
+- Step 7A-SPECで、現行Userの`cohort_number` NULL不可・正数DB制約、2026年度／31回生／4月1日固定の在籍判定、作成サービス・`bootstrap_admin`・関連テストへの依存を確認した。これらを在籍判定なしと学校回生方式から選べるようにする実装は、既存データ移行・後方互換性・管理者影響を伴う未着手のStep 7Aへ分離した。
+- 生物班環境の確定事実として、`kdf-biology.org`はXserverドメインで登録しCloudflare Free DNSはActiveだが、公開サービス用DNSレコードは未設定。Dell Precision 3630（Xeon E-2186G）上のProxmox VEをTailscale経由で管理しており、Acervoの候補URLは`https://acervo.kdf-biology.org`だが最終確定・公開は未実施。SymbiotaはDebian 12／Apache／MariaDB／PHPで管理者ログインまで確認した非稼働検証環境で、Acervoと共有DB・認証・session・ファイル領域を持たない。
 - Step 6C-Rとして、`STATUS.md`の現在状態と過去時点の履歴を整合し、READMEの緊急コマンド例をシェル安全な`ADMIN_USERNAME`プレースホルダーへ変更した。コマンド後に既存パスワードでログインし、MFA未登録では管理画面を拒否し、新TOTP再認証後だけ管理画面を許可する実フローを追加した。監査失敗時のsessionロールバック、`must_change_password`・password hash等の不変性、秘密値非混入も補強した。
 - Step 6C-Rでコマンド専用テストを8件へ拡張し、Step 6関連62件、SQLite全214件、PostgreSQL 18全214件が成功した。GitHub Actions run 35089008341では、本番イメージ内の`python manage.py help reset_admin_mfa`が非破壊で成功し、username位置引数と緊急用途を確認した。本番／Cloudflare Compose、Caddy、本番イメージ、全サービスhealthy、UID 10001、非公開ポート、IP信頼境界、`/health/`・静的ファイル、`/admin/`遮断、DB・写真永続化も成功した。
 - Step 6Cとして、緊急復旧専用の`python manage.py reset_admin_mfa <username>`とHTTP非依存サービスを追加した。対象は有効なadminかつAuthenticator保持者に限り、別の有効・初回変更済み・primary MFA保持adminがいる場合は通常の管理画面を案内して拒否する。確認文字列`RESET <username>`の一致、空入力・EOF拒否を必須とし、無確認実行経路は提供しない。
@@ -151,9 +154,11 @@ Phase 1C Step 6を完了。次はStep 7だが未着手であり、Phase 1全体�
 
 ## Remaining
 
-- 実際の公開ドメイン決定後に、直接HTTPSの証明書取得を手動確認する
+- Step 7Aで、Userモデルと在籍判定を汎用化する設計承認・migration計画・実装・検証が必要。現行の回生必須制約と2026年度／31回生／4月1日固定は、回生を使わない導入先要件と未整合である。
+- Step 7Bで、Tunnel専用構成ではホストの80/443を公開しないCompose・Caddy・CI構成を実装・検証する。現行本番Composeは直接HTTPS用に80/443（UDP 443を含む）を公開し、Tunnel追加Composeを重ねても公開を残す。
+- Acervo本番ホスト名は候補の`acervo.kdf-biology.org`であり、最終確定後にDNS変更、実Tunnel接続または直接HTTPSの証明書取得を手動確認する。現時点で公開サービス用DNSレコードはない。
 - 公開環境を用意した後、実運用HTTPSドメインでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告、端末内・同期パスキーの登録・ログイン・削除を確認する。同期パスキーとChrome以外の実運用対象ブラウザも未確認（`localhost`のWindows＋Chrome＋Windows Hello受入は完了）。
-- Step 7、後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。
+- 後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。Step 7以降の実装・DNS変更・Tunnel作成・本番公開も未着手。
 
 ## Tests
 
