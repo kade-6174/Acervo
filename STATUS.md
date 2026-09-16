@@ -1,27 +1,29 @@
 # Project Status
 
-最終更新: 2026-09-15
+最終更新: 2026-09-16
 
 ## Current Task
 
-Phase 1C Step 6Bの別管理者MFAリセット画面を完了。Step 6C、Step 6全体およびPhase 1全体は未完了。
+Phase 1C Step 6を完了。次はStep 7だが未着手であり、Phase 1全体は未完了。
 
 ## Completed
 
+- Step 6C-Rとして、`STATUS.md`の現在状態と過去時点の履歴を整合し、READMEの緊急コマンド例をシェル安全な`ADMIN_USERNAME`プレースホルダーへ変更した。コマンド後に既存パスワードでログインし、MFA未登録では管理画面を拒否し、新TOTP再認証後だけ管理画面を許可する実フローを追加した。監査失敗時のsessionロールバック、`must_change_password`・password hash等の不変性、秘密値非混入も補強した。
+- Step 6C-Rでコマンド専用テストを8件へ拡張し、Step 6関連62件、SQLite全214件、PostgreSQL 18全214件が成功した。GitHub Actions run 35089008341では、本番イメージ内の`python manage.py help reset_admin_mfa`が非破壊で成功し、username位置引数と緊急用途を確認した。本番／Cloudflare Compose、Caddy、本番イメージ、全サービスhealthy、UID 10001、非公開ポート、IP信頼境界、`/health/`・静的ファイル、`/admin/`遮断、DB・写真永続化も成功した。
 - Step 6Cとして、緊急復旧専用の`python manage.py reset_admin_mfa <username>`とHTTP非依存サービスを追加した。対象は有効なadminかつAuthenticator保持者に限り、別の有効・初回変更済み・primary MFA保持adminがいる場合は通常の管理画面を案内して拒否する。確認文字列`RESET <username>`の一致、空入力・EOF拒否を必須とし、無確認実行経路は提供しない。
 - コマンド用サービスはadmin行を主キー順でロックし、対象Authenticator・対象session削除、`mfa_reset_at`更新、actor NULL／`server-operator`スナップショットのコマンド用AuditLog一件作成を同一トランザクションで実行する。パスワード、role、有効状態、初回変更フラグ、新しい秘密・Recovery Codesは変更・出力・監査しない。AuditLog actionは`command_mfa_reset`へ正式化した。
 - Step 6C専用6件を追加し、最後のadminの成功、全Authenticator・session削除、確認不一致・EOF、対象拒否、別admin条件、二重実行、監査失敗ロールバックを確認した。SQLite全212件、PostgreSQL 18全212件、Ruff、Django check、migration差分なし、本番相当`check --deploy`、本番／Cloudflare Compose、Caddy adapt／validate、本番イメージ、全サービスhealthy、UID 10001、非公開ポート、IP信頼境界、Caddy経由`/health/`・静的ファイル、`/admin/`遮断、DB・写真永続化がGitHub Actions run 35086332954で成功した。Step 7、role変更、無効化、最後の管理者の降格・無効化保護、監査ログ閲覧は未着手である。
 - Step 6B-Rとして、MFAリセット検索・確認画面専用の共通messages partialを追加し、成功・fail-closedエラーを日本語で一回だけ表示するよう補正した。`aria-live`、HTML escape、既存の白・黒・グレー中心の表示を維持し、base全体や他のMFA画面には波及させていない。
 - Step 6B-Rではallauthの実TOTP再認証view・フォーム・session・認証記録を通す成功／失敗テストと、WebAuthn再認証view・form・session・redirectを通す限定mock成功／失敗テストを追加した。再認証後は確認GETへ戻るだけで本文を再送せず、改めてPOSTした場合だけサービス層を実行する。実フローで判明したallauthのWebAuthn再認証method ID（`mfa_reauthenticate:webauthn`）を許可するよう補正した。
-- Step 6B関連テストは22件、SQLite全206件、PostgreSQL 18全206件が成功。Ruff、Django check、migration差分なし、本番相当`check --deploy`、本番／Cloudflare Compose、Caddy、本番イメージ、全サービスhealthy、UID 10001、非公開ポート、クライアントIP信頼境界、DB・写真永続化をGitHub Actionsで確認した。Step 6Cのサーバー管理コマンド、role変更、無効化、最後の管理者保護、監査ログ閲覧、その他の管理操作は未着手である。
+- Step 6B関連テストは22件、SQLite全206件、PostgreSQL 18全206件が成功。Ruff、Django check、migration差分なし、本番相当`check --deploy`、本番／Cloudflare Compose、Caddy、本番イメージ、全サービスhealthy、UID 10001、非公開ポート、クライアントIP信頼境界、DB・写真永続化をGitHub Actionsで確認した。当時はStep 6Cのサーバー管理コマンドが未着手だったが、現在はStep 6Cまで完了している。role変更、無効化、最後の管理者保護、監査ログ閲覧、その他の管理操作は引き続き未着手である。
 - Step 6Bとして、`/management/mfa-reset/`のusername完全一致検索と`/management/users/<user_id>/mfa-reset/`の確認・実行画面を追加した。中央管理MFAゲートに加え、実行POST直前にTOTPまたはWebAuthnの直近再認証を必須とし、古いPOST本文を保存・再送せず、固定した内部確認GETへ戻す。確認チェックとPOST時点のusername完全一致も必須とした。
 - UIは認証器の一般種別だけを表示し、秘密値、credential、challenge、session、パスワード等を表示・保存しない。実行はStep 6Aの`reset_user_mfa_by_admin()`だけを経由し、対象sessionの無効化、`mfa_reset_at`更新、監査ログ1件作成をサービス層のトランザクションへ委譲する。二重POSTは対象MFAなしの安全な業務エラーとなり、監査ログを増やさない。
-- Step 6B専用テスト16件を追加し、管理ゲート、完全一致検索、CSRF、確認不備、username変更、自己対象、TOTP／WebAuthn再認証、外部nextを受け取らない固定遷移、fail-closed、対象sessionだけの無効化、監査ログ一回性、対象属性、実行直前のactor状態再検査、秘密値非表示を確認した。Step 6Cのサーバー管理コマンド、role変更、無効化、最後の管理者保護、監査ログ閲覧、その他の管理操作は未着手である。
+- Step 6B専用テスト16件を追加し、管理ゲート、完全一致検索、CSRF、確認不備、username変更、自己対象、TOTP／WebAuthn再認証、外部nextを受け取らない固定遷移、fail-closed、対象sessionだけの無効化、監査ログ一回性、対象属性、実行直前のactor状態再検査、秘密値非表示を確認した。当時はStep 6Cのサーバー管理コマンドが未着手だったが、現在はStep 6Cまで完了している。role変更、無効化、最後の管理者保護、監査ログ閲覧、その他の管理操作は引き続き未着手である。
 - Step 6B実装コミット `9a699959151b4e1e3ad6d7a7da3555fd2287ed65` はGitHub Actions run 34976164456で全成功した。PostgreSQL 18の全200テスト、Ruff、Django check、migration差分なし、本番`check --deploy`、本番／Cloudflare Compose、Caddy adapt／validate、本番イメージ、`db`・`web`・`proxy` healthy、Web UID 10001、Caddy経由応答、専用クライアントIP信頼境界、Web 8000番・DB 5432番のホスト非公開、DB・写真永続化を確認した。
 - Step 6Aとして、`mfa_reset_at` nullable日時フィールドとmigration、追記専用の`audit.AuditLog`、HTTP非依存の別管理者MFAリセットサービスを追加した。サービスはactor／targetを主キー順で行ロックし、actorの有効状態・Acervo admin role・初回パスワード変更・primary MFA・本人以外を再検証してから、対象の全Authenticator削除、時刻更新、対象Django session無効化、監査記録1件を同一トランザクションで実行する。
 - AuditLogは発生日時、操作種別、実行経路、actor／target FKとusernameスナップショットだけを持ち、秘密値・credential・challenge・session／Cookie・任意本文・汎用JSONを保存しない。通常のinstance更新・削除は拒否し、Django `/admin/`へは登録していない。
 - Step 5のセッションMFA判定は`mfa_reset_at`以前の記録、欠損・bool・不正・無限大・未来の時刻をfail closedで拒否するよう補強した。リセット後に新たなprimary MFAを登録しても旧記録は再利用できず、リセット後に正当に作成されたMFA記録は許可する。session削除だけへ安全性を依存しない。
-- Step 6A関連17件、SQLite全184件、PostgreSQL 18全184件、Ruff、Django check、migration差分なし、本番`check --deploy`、本番／Cloudflare Compose、Caddy、本番イメージ、全サービスhealthy、UID 10001、非公開ポート、クライアントIP信頼境界、Caddy経由応答、DB・写真永続化が成功した。Step 6Bのリセット画面と直近再認証、6Cの最後の管理者向け管理コマンドは未着手である。
+- Step 6A関連17件、SQLite全184件、PostgreSQL 18全184件、Ruff、Django check、migration差分なし、本番`check --deploy`、本番／Cloudflare Compose、Caddy、本番イメージ、全サービスhealthy、UID 10001、非公開ポート、クライアントIP信頼境界、Caddy経由応答、DB・写真永続化が成功した。当時はStep 6Bのリセット画面・直近再認証および6Cの最後の管理者向け管理コマンドは未着手だったが、現在はStep 6まで完了している。
 - Step 5Cとして、実際のallauthログインステージ、MFAフォーム、再認証、session、Authenticator DB、Step 5Aポリシー、Step 5B中央ゲートを通す専用統合テスト13件を追加した。TOTP、未使用Recovery Code、WebAuthn第二要素、passwordlessパスキー、TOTP／WebAuthn再認証の成功から`/management/`までを確認し、WebAuthnは既存方針どおりブラウザ認証器の暗号検証境界だけを限定mockした。
 - Recovery Codeの一回消費と再利用拒否、Recovery Codesだけのadmin拒否、パスワードのみの未完了セッション、MFA失敗・中止・レート制限、ログアウト・新規セッション・Cookie消失、role降格・無効化・初回パスワード変更要求・最後のprimary MFA削除の次リクエスト反映を統合確認した。`is_staff`／`is_superuser`のmemberと卒業生memberは拒否し、既存方針どおり卒業生adminは必要条件を満たせば許可した。
 - allauth adapterが利用可能なMFA再認証方法を返さない場合も500にせず、入力本文や外部`next`を保存・再送せず、日本語案内付きMFA設定画面へfail closedで戻すよう中央ゲートを補強した。既存の全HTTP method、未作成管理URL、内部`next`、キャッシュ禁止のテストと合わせて管理経路の迂回不能を確認した。
@@ -151,6 +153,7 @@ Phase 1C Step 6Bの別管理者MFAリセット画面を完了。Step 6C、Step 6
 
 - 実際の公開ドメイン決定後に、直接HTTPSの証明書取得を手動確認する
 - 公開環境を用意した後、実運用HTTPSドメインでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告、端末内・同期パスキーの登録・ログイン・削除を確認する。同期パスキーとChrome以外の実運用対象ブラウザも未確認（`localhost`のWindows＋Chrome＋Windows Hello受入は完了）。
+- Step 7、後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。
 
 ## Tests
 
@@ -259,7 +262,7 @@ Phase 1C Step 6Bの別管理者MFAリセット画面を完了。Step 6C、Step 6
 - Phase 1Bと追加タスク0-SHの自動検証に未解決の問題はない。
 - 実ドメインでの証明書取得は、公開ドメインと本番ホスト決定後の手動確認事項として残る。
 - 既存開発DBへDjango標準Userのauthマイグレーションを適用済みの場合、Custom Userへの後付け切替は安全に継続できない。対象は開発用PostgreSQL DBと開発用Composeの `postgres_data` ボリューム（通常 `acervo_postgres_data`）。今回は接続、削除、初期化を行っていない。再作成が必要な環境では、保存データの有無を確認し、設計責任者または運用者の承認を得て別作業で行う。
-- TOTP、Recovery Codes、WebAuthn第二要素、パスキー登録・管理・パスワードレスログイン、管理アクセス判定、`/management/`中央ゲートと統合・本番相当検証、MFAリセットのサービス層・最小AuditLogは完了し、`localhost`のWindows＋Chrome＋Windows Hello実機受入も完了している。リセット画面・直近再認証、最後の管理者向け管理コマンド、管理操作本体、role変更・最後の管理者保護は未実装・未着手であり、実運用HTTPSドメイン等の受入も未確認のため、Step 6全体、Phase 1全体および本番準備は未完了。
+- TOTP、Recovery Codes、WebAuthn第二要素、パスキー登録・管理・パスワードレスログイン、管理アクセス判定、`/management/`中央ゲートと統合・本番相当検証、MFAリセットのサービス層・最小AuditLog、リセット画面・直近再認証、最後の管理者向け管理コマンドは現在すべて完了し、`localhost`のWindows＋Chrome＋Windows Hello実機受入も完了している。実運用HTTPSドメイン等の受入、Step 7、管理操作本体、role変更・最後の管理者保護は未完了。
 
 ## Change history
 

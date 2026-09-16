@@ -82,8 +82,10 @@ Tunnel tokenは秘密情報です。リポジトリやログへ記録しない�
 本番コンテナでは、対象usernameを指定して実行します。実行前に `RESET <username>` の完全一致確認が必要です。
 
 ```bash
-docker compose -f compose.production.yaml exec web python manage.py reset_admin_mfa <username>
+docker compose -f compose.production.yaml exec web python manage.py reset_admin_mfa ADMIN_USERNAME
 ```
+
+`ADMIN_USERNAME` は実際に復旧する対象usernameへ置き換えてください。確認では `RESET 実際のusername` の完全一致入力が必要です。パスワードが不明な場合、このコマンドだけでは復旧できません。
 
 このコマンドは対象の既存MFAとログインsessionを無効化しますが、パスワード、role、有効状態は変更せず、新しい秘密やRecovery Codesも出力しません。対象者は既存パスワードで再ログイン後、MFAを再登録する必要があります。
 
