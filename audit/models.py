@@ -8,7 +8,7 @@ class AuditLog(models.Model):
 
     class Action(models.TextChoices):
         ADMIN_MFA_RESET = "admin_mfa_reset", "別管理者によるMFAリセット"
-        COMMAND_MFA_RESET_RESERVED = "command_mfa_reset_reserved", "管理コマンドMFAリセット予約"
+        COMMAND_MFA_RESET = "command_mfa_reset", "サーバー管理コマンドによるMFAリセット"
 
     class Channel(models.TextChoices):
         MANAGEMENT_UI = "management_ui", "管理画面"

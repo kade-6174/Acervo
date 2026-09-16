@@ -10,7 +10,7 @@ from django.contrib.sessions.models import Session
 from django.db import transaction
 from django.utils import timezone
 
-from accounts.management_access import has_primary_mfa
+from accounts.management_access import PRIMARY_MFA_TYPES, has_primary_mfa
 from accounts.models import User
 from audit.models import AuditLog
 
@@ -24,6 +24,9 @@ class MFAResetErrorCode(StrEnum):
     ACTOR_PRIMARY_MFA_REQUIRED = "actor_primary_mfa_required"
     SELF_RESET_NOT_ALLOWED = "self_reset_not_allowed"
     TARGET_HAS_NO_AUTHENTICATORS = "target_has_no_authenticators"
+    COMMAND_TARGET_NOT_ADMIN = "command_target_not_admin"
+    COMMAND_TARGET_INACTIVE = "command_target_inactive"
+    COMMAND_OTHER_ADMIN_AVAILABLE = "command_other_admin_available"
 
 
 class MFAResetError(Exception):
@@ -95,6 +98,59 @@ def reset_user_mfa_by_admin(*, actor_id: int, target_user_id: int) -> MFAResetRe
         channel=AuditLog.Channel.MANAGEMENT_UI,
         actor=actor,
         actor_username=actor.username,
+        target=target,
+        target_username=target.username,
+    )
+    return MFAResetResult(
+        target_user_id=target.pk,
+        deleted_authenticator_count=deleted_authenticator_count,
+        reset_at=reset_at,
+    )
+
+
+@transaction.atomic
+def reset_admin_mfa_by_command(*, target_username: str) -> MFAResetResult:
+    """最後の復旧不能な有効adminだけをサーバー管理者が緊急復旧する。"""
+    target_id = User.objects.filter(username=target_username).values_list("pk", flat=True).first()
+    if target_id is None:
+        raise MFAResetError(MFAResetErrorCode.TARGET_NOT_FOUND)
+
+    admin_ids = list(User.objects.filter(role=User.Role.ADMIN).values_list("pk", flat=True))
+    locked_users = {
+        user.pk: user
+        for user in User.objects.select_for_update().filter(pk__in=admin_ids).order_by("pk")
+    }
+    target = locked_users.get(target_id)
+    if target is None:
+        raise MFAResetError(MFAResetErrorCode.COMMAND_TARGET_NOT_ADMIN)
+    if not target.is_active:
+        raise MFAResetError(MFAResetErrorCode.COMMAND_TARGET_INACTIVE)
+
+    authenticators = Authenticator.objects.filter(user_id=target.pk)
+    deleted_authenticator_count = authenticators.count()
+    if deleted_authenticator_count == 0:
+        raise MFAResetError(MFAResetErrorCode.TARGET_HAS_NO_AUTHENTICATORS)
+
+    other_admin_ids = [user_id for user_id in locked_users if user_id != target.pk]
+    if Authenticator.objects.filter(
+        user_id__in=other_admin_ids,
+        user__is_active=True,
+        user__role=User.Role.ADMIN,
+        user__must_change_password=False,
+        type__in=PRIMARY_MFA_TYPES,
+    ).exists():
+        raise MFAResetError(MFAResetErrorCode.COMMAND_OTHER_ADMIN_AVAILABLE)
+
+    reset_at = timezone.now()
+    authenticators.delete()
+    target.mfa_reset_at = reset_at
+    target.save(update_fields=["mfa_reset_at"])
+    _delete_target_sessions(target.pk)
+    AuditLog.objects.create(
+        action=AuditLog.Action.COMMAND_MFA_RESET,
+        channel=AuditLog.Channel.MANAGEMENT_COMMAND,
+        actor=None,
+        actor_username="server-operator",
         target=target,
         target_username=target.username,
     )
