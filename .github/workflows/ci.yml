@@ -96,6 +96,7 @@ jobs:
           with open(".env.production", "w", encoding="utf-8") as f:
               f.write(content)
           PY
+          echo 'ACERVO_CI_CSRF_DIAGNOSTICS=1' >> .env.production
 
 
       - name: 直接HTTPS構成を検証

@@ -78,3 +78,25 @@ STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"},
 }
+
+if os.environ.get("ACERVO_CI_CSRF_DIAGNOSTICS") == "1":
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "handlers": {
+            "csrf_diagnostics": {
+                "class": "logging.StreamHandler",
+                "formatter": "csrf_diagnostics",
+            },
+        },
+        "formatters": {
+            "csrf_diagnostics": {"format": "%(levelname)s %(message)s"},
+        },
+        "loggers": {
+            "django.security.csrf": {
+                "handlers": ["csrf_diagnostics"],
+                "level": "WARNING",
+                "propagate": False,
+            },
+        },
+    }
