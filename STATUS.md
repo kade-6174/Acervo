@@ -8,6 +8,8 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7Aを完了。次はTunnel専用インフ�
 
 ## Completed
 
+- Step 7A-Rとして、`school_cohort`を選ぶ本番では年度開始月・日、基準年度、基準回生をすべて明示必須にし、欠落・空値・非整数・不正日付・範囲外年度・0以下回生を秘密値を含めずfail-fastで拒否するよう補強した。`none`は学校方式の4変数なしで成立し、空白だけの`ACERVO_SITE_NAME`も本番で拒否する。`.env.example`と`.env.production.example`へ一致する設定例と学校方式の説明を追加した。Compose、Caddy、Cloudflare、DNS、Tunnel、本番環境は変更していない。
+- Step 7A-Rのローカル検証では、SQLite全228件、Ruff lint／format、Django check、migration差分なし、`git diff --check`、ランダムな一時設定値を用いる本番相当`check --deploy`が成功した。既存のnone／school_cohort、nullable migration、同期・非同期manager、`bootstrap_admin`、管理MFA、MFAリセット、認証、パスキー回帰を含む。ローカルDocker CLIがないためコンテナ検証は未実行で、最終HEADのGitHub ActionsでPostgreSQL 18と既存本番コンテナ検証を確認する。
 - Step 7Aとして、Userの保存値`member`／`admin`を維持しつつ表示名を「利用者」へ変更し、`cohort_number`をNULL・blank許可へ移行した。DB制約はNULLまたは正数とし、既存の非NULL回生値を変更しないmigrationと、NULLがある場合の逆migration拒否（バックアップ復元または全回生設定を要求）を追加した。
 - `ACERVO_ENROLLMENT_POLICY`は`none`／`school_cohort`だけを許可し、本番では明示必須とした。`school_cohort`は年度開始月・日、基準年度、基準回生を環境変数から読み、回生欠損・未来回生を拒否する。`none`は回生を要求せず、保存済み回生も認可へ使わない。`school_cohort`から`none`への切替は卒業済み利用者の書込み可否を変え得るため、運用上の権限変更として事前確認が必要である。
 - Step 7Aで`ACERVO_SITE_NAME`、`ACERVO_ORGANIZATION_NAME`を追加し、導入先サイト名をヘッダー、WebAuthn RP表示名、TOTP issuerへ適用した。RP IDは従来どおり`ACERVO_PUBLIC_BASE_URL`のhostnameだけから安全に導出し、別RP ID設定は追加していない。hostname変更時は既存パスキーの再登録が必要だが、サイト表示名変更だけでは不要である。
