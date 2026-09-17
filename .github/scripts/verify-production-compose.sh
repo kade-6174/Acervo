@@ -176,7 +176,10 @@ def login_attempt(connection, headers, scheme):
     data = urllib.parse.urlencode({"csrfmiddlewaretoken": csrf_token, "login": "missing-user", "password": "wrong-password"}).encode()
     connection.request("POST", "/accounts/login/", body=data, headers={**headers, "Cookie": cookies, "Content-Type": "application/x-www-form-urlencoded", "Referer": f"{scheme}://acervo.localhost/accounts/login/"})
     response = connection.getresponse()
-    assert response.status == 200, response.status
+    if response.status != 200:
+        body = response.read().decode(errors="replace")
+        reason = re.search(r"<pre>\s*(.*?)\s*</pre>", body, re.DOTALL)
+        raise AssertionError(reason.group(1) if reason else response.status)
     response.read()
     connection.close()
 
