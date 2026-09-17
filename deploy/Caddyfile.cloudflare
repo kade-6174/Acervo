@@ -15,6 +15,7 @@ import Caddyfile.common
 
 	handle {
 		reverse_proxy web:8000 {
+			header_up Host {host}
 			header_up X-Forwarded-Proto https
 			header_up -X-Acervo-Client-IP
 			header_up X-Acervo-Client-IP {client_ip}
