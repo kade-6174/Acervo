@@ -28,6 +28,13 @@ def validate_enrollment_settings(
         raise ImproperlyConfigured("ACERVO_ENROLLMENT_POLICYはnoneまたはschool_cohortです。")
     if policy == "none":
         return
+    if not all(
+        isinstance(value, int)
+        for value in (start_month, start_day, base_school_year, base_third_year_cohort)
+    ):
+        raise ImproperlyConfigured("学校方式の基準設定は整数で指定する必要があります。")
+    if not 1 <= base_school_year <= 9999:
+        raise ImproperlyConfigured("基準年度の範囲が不正です。")
     try:
         date(base_school_year, start_month, start_day)
     except (TypeError, ValueError):

@@ -11,6 +11,16 @@ env_file = BASE_DIR / ".env"
 if env_file.exists():
     environ.Env.read_env(env_file)
 
+
+def _int_or_raw(name: str, default: int):
+    """開発既定値を保ちつつ、本番では後段で安全に不正値を拒否する。"""
+    value = env(name, default=str(default))
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return value
+
+
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="")
 DEBUG = False
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
@@ -115,10 +125,10 @@ ACERVO_MFA_FERNET_KEYS = env.list("ACERVO_MFA_FERNET_KEYS", default=[])
 ACERVO_SITE_NAME = env("ACERVO_SITE_NAME", default="Acervo")
 ACERVO_ORGANIZATION_NAME = env("ACERVO_ORGANIZATION_NAME", default="")
 ACERVO_ENROLLMENT_POLICY = env("ACERVO_ENROLLMENT_POLICY", default="school_cohort")
-ACERVO_SCHOOL_YEAR_START_MONTH = env.int("ACERVO_SCHOOL_YEAR_START_MONTH", default=4)
-ACERVO_SCHOOL_YEAR_START_DAY = env.int("ACERVO_SCHOOL_YEAR_START_DAY", default=1)
-ACERVO_BASE_SCHOOL_YEAR = env.int("ACERVO_BASE_SCHOOL_YEAR", default=2026)
-ACERVO_BASE_THIRD_YEAR_COHORT = env.int("ACERVO_BASE_THIRD_YEAR_COHORT", default=31)
+ACERVO_SCHOOL_YEAR_START_MONTH = _int_or_raw("ACERVO_SCHOOL_YEAR_START_MONTH", 4)
+ACERVO_SCHOOL_YEAR_START_DAY = _int_or_raw("ACERVO_SCHOOL_YEAR_START_DAY", 1)
+ACERVO_BASE_SCHOOL_YEAR = _int_or_raw("ACERVO_BASE_SCHOOL_YEAR", 2026)
+ACERVO_BASE_THIRD_YEAR_COHORT = _int_or_raw("ACERVO_BASE_THIRD_YEAR_COHORT", 31)
 MFA_TOTP_ISSUER = ACERVO_SITE_NAME
 
 DATABASES = {

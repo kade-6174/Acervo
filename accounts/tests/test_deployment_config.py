@@ -184,7 +184,7 @@ class WebAuthnRPConfigurationTests(SimpleTestCase):
 class ProductionMFASettingsTests(SimpleTestCase):
     VALID_KEY = "0YFsuKhANUHwqSsmdjDwiT5GUQXzE7d1c5bUpFPJgy4="
 
-    def _run_production_setup(self, extra_env=None):
+    def _run_production_setup(self, extra_env=None, remove_env=()):
         import os
         import subprocess
         import sys
@@ -205,6 +205,8 @@ class ProductionMFASettingsTests(SimpleTestCase):
         )
         if extra_env:
             env.update(extra_env)
+        for variable_name in remove_env:
+            env.pop(variable_name, None)
 
         return subprocess.run(
             [sys.executable, "-c", "import django; django.setup()"],
@@ -233,6 +235,69 @@ class ProductionMFASettingsTests(SimpleTestCase):
                 result = self._run_production_setup({"ACERVO_ENROLLMENT_POLICY": value})
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("ACERVO_ENROLLMENT_POLICY", result.stderr)
+
+    def test_school_cohort_requires_each_explicit_baseline_setting(self):
+        school_settings = {
+            "ACERVO_ENROLLMENT_POLICY": "school_cohort",
+            "ACERVO_SCHOOL_YEAR_START_MONTH": "4",
+            "ACERVO_SCHOOL_YEAR_START_DAY": "1",
+            "ACERVO_BASE_SCHOOL_YEAR": "2026",
+            "ACERVO_BASE_THIRD_YEAR_COHORT": "31",
+        }
+        for variable_name in tuple(school_settings)[1:]:
+            with self.subTest(variable_name=variable_name):
+                result = self._run_production_setup(school_settings, remove_env=(variable_name,))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(variable_name, result.stderr)
+
+    def test_school_cohort_rejects_blank_non_integer_and_invalid_baselines(self):
+        school_settings = {
+            "ACERVO_ENROLLMENT_POLICY": "school_cohort",
+            "ACERVO_SCHOOL_YEAR_START_MONTH": "4",
+            "ACERVO_SCHOOL_YEAR_START_DAY": "1",
+            "ACERVO_BASE_SCHOOL_YEAR": "2026",
+            "ACERVO_BASE_THIRD_YEAR_COHORT": "31",
+        }
+        invalid_cases = {
+            "ACERVO_SCHOOL_YEAR_START_MONTH": "",
+            "ACERVO_SCHOOL_YEAR_START_DAY": "not-an-integer",
+            "ACERVO_BASE_SCHOOL_YEAR": "0",
+            "ACERVO_BASE_THIRD_YEAR_COHORT": "0",
+        }
+        for variable_name, value in invalid_cases.items():
+            with self.subTest(variable_name=variable_name):
+                result = self._run_production_setup({**school_settings, variable_name: value})
+                self.assertNotEqual(result.returncode, 0)
+                if value:
+                    self.assertNotIn(
+                        value,
+                        result.stderr.rsplit("ImproperlyConfigured: ", maxsplit=1)[-1],
+                    )
+
+        invalid_date = self._run_production_setup(
+            {
+                **school_settings,
+                "ACERVO_SCHOOL_YEAR_START_MONTH": "2",
+                "ACERVO_SCHOOL_YEAR_START_DAY": "30",
+            }
+        )
+        self.assertNotEqual(invalid_date.returncode, 0)
+        self.assertIn("学校年度開始日", invalid_date.stderr)
+
+    def test_none_needs_no_school_settings_and_site_name_cannot_be_blank(self):
+        school_variables = (
+            "ACERVO_SCHOOL_YEAR_START_MONTH",
+            "ACERVO_SCHOOL_YEAR_START_DAY",
+            "ACERVO_BASE_SCHOOL_YEAR",
+            "ACERVO_BASE_THIRD_YEAR_COHORT",
+        )
+        result = self._run_production_setup(remove_env=school_variables)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for site_name in ("", "   "):
+            with self.subTest(site_name=site_name):
+                result = self._run_production_setup({"ACERVO_SITE_NAME": site_name})
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("ACERVO_SITE_NAME", result.stderr)
 
     def test_production_fails_when_insecure_origin_allowed(self):
         import os
