@@ -1,11 +1,17 @@
+import ipaddress
+import logging
+import os
+
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.mfa.adapter import DefaultMFAAdapter
 from cryptography.fernet import InvalidToken
-from django.core.exceptions import SuspiciousOperation
+from django.core.exceptions import PermissionDenied, SuspiciousOperation
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from .security import get_mfa_multi_fernet, get_public_origin_and_rp_id
+
+csrf_diagnostics_logger = logging.getLogger("accounts.ci_csrf_diagnostics")
 
 
 class AcervoAccountAdapter(DefaultAccountAdapter):
@@ -22,6 +28,26 @@ class AcervoAccountAdapter(DefaultAccountAdapter):
 
     def get_password_change_redirect_url(self, request):
         return reverse("core:home")
+
+    def get_client_ip(self, request):
+        try:
+            return super().get_client_ip(request)
+        except PermissionDenied:
+            if os.environ.get("ACERVO_CI_CSRF_DIAGNOSTICS") == "1":
+                header = request.headers.get("X-Acervo-Client-IP", "")
+                try:
+                    ipaddress.ip_address(header)
+                except ValueError:
+                    header_is_ip_address = False
+                else:
+                    header_is_ip_address = True
+                csrf_diagnostics_logger.warning(
+                    "client IP unavailable: path=%s header_present=%s header_is_ip_address=%s",
+                    request.path,
+                    bool(header),
+                    header_is_ip_address,
+                )
+            raise
 
 
 class AcervoMFAAdapter(DefaultMFAAdapter):
