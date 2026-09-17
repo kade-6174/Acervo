@@ -1,12 +1,19 @@
 # Project Status
 
-最終更新: 2026-09-16
+最終更新: 2026-09-17
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7Aを完了。次はTunnel専用インフラ準備のStep 7Bだが未着手であり、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7Bを完了。次は実ドメイン受入のStep 7Cだが未着手であり、Phase 1全体は未完了。
 
 ## Completed
+
+- Step 7BのCSRF 403診断・補正として、Caddy経由ログインPOSTにCookieとform tokenをSimpleCookieで正しく組み合わせ、公開Origin https://acervo.localhost のOriginとRefererを送るCI検証へ更新した。Cookie、token、パスワード等の値はログへ出さず、名前の有無、token長、HTTP status、Location有無だけを確認する。django.security.csrfには拒否記録がなく、CI限定の安全なサーバーログで実際の原因がallauthのUnable to determine client IP addressであることを確認した。
+- 原因はCaddyの専用IPヘッダーを削除してから再設定する経路で、Djangoへヘッダーが届かなかったことだった。直接HTTPSではCaddy接続元、Tunnel専用では信頼済みCF-Connecting-IPからのIPを、いずれも単一の上書き設定でDjangoへ渡すよう修正した。外部入力のX-Acervo-Client-IP、X-Forwarded-For、CF-Connecting-IPは直接HTTPSで採用されず、Tunnel専用では正規化済みCF-Connecting-IPだけが採用される。CSRF、Secure Cookie、Origin検証、レート制限を緩和していない。
+- CI失敗時だけweb・proxyの直近ログを出し、終了コードを保ったまま必ずComposeを後片付けする。CI専用の診断設定は、CSRF理由または専用IPヘッダーの有無・IP形式だけを記録し、Cookie、CSRF token、パスワード、秘密鍵、Tunnel token、環境変数値を出力しない。通常の本番環境では無効である。
+- Step 7B最終HEAD 1ebf6f8 はGitHub Actions run 35221822741で全成功。PostgreSQL 18の全228件、Ruff lint／format、Django check、migration差分なしが成功した。直接HTTPSとTunnel専用を別々に、Compose設定、Caddy adapt／validate、本番イメージ、db・web・proxy healthy、UID 10001、check --deploy、ログインPOSTのCSRF／同一Origin、health、静的ファイル、admin 404、管理画面redirect、IP信頼境界、公開ポート、DB・写真永続化まで確認した。Tunnel専用ではproxy・web・db・tunnelのホスト公開ポートなし、直接HTTPSではproxyだけが80/tcp・443/tcp・443/udpを公開し、web:8000・db:5432は非公開である。
+- ローカルDocker CLIとPython開発依存はこのWindows環境で利用できないため、今回のローカルSQLite全テスト、Ruff、Django check、Compose起動は未実行である。CIのPostgreSQL 18全228件と本番コンテナ検証で確認した。migrationは追加・変更していない。
+- 変更ファイル: .github/scripts/verify-production-compose.sh、.github/workflows/ci.yml、accounts/adapters.py、accounts/tests/test_deployment_config.py、config/settings/production.py、deploy/Caddyfile.direct、deploy/Caddyfile.cloudflare、PLAN.md、STATUS.md。
 
 - Step 7A-Rとして、`school_cohort`を選ぶ本番では年度開始月・日、基準年度、基準回生をすべて明示必須にし、欠落・空値・非整数・不正日付・範囲外年度・0以下回生を秘密値を含めずfail-fastで拒否するよう補強した。`none`は学校方式の4変数なしで成立し、空白だけの`ACERVO_SITE_NAME`も本番で拒否する。`.env.example`と`.env.production.example`へ一致する設定例と学校方式の説明を追加した。Compose、Caddy、Cloudflare、DNS、Tunnel、本番環境は変更していない。
 - Step 7A-Rのローカル検証では、SQLite全228件、Ruff lint／format、Django check、migration差分なし、`git diff --check`、ランダムな一時設定値を用いる本番相当`check --deploy`が成功した。既存のnone／school_cohort、nullable migration、同期・非同期manager、`bootstrap_admin`、管理MFA、MFAリセット、認証、パスキー回帰を含む。ローカルDocker CLIがないためコンテナ検証は未実行で、最終HEADのGitHub ActionsでPostgreSQL 18と既存本番コンテナ検証を確認する。
@@ -163,10 +170,9 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7Aを完了。次はTunnel専用インフ�
 
 ## Remaining
 
-- Step 7Bで、Tunnel専用構成ではホストの80/443を公開しないCompose・Caddy・CI構成を実装・検証する。現行本番Composeは直接HTTPS用に80/443（UDP 443を含む）を公開し、Tunnel追加Composeを重ねても公開を残す。
 - Acervo本番ホスト名は候補の`acervo.kdf-biology.org`であり、最終確定後にDNS変更、実Tunnel接続または直接HTTPSの証明書取得を手動確認する。現時点で公開サービス用DNSレコードはない。
 - 公開環境を用意した後、実運用HTTPSドメインでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告、端末内・同期パスキーの登録・ログイン・削除を確認する。同期パスキーとChrome以外の実運用対象ブラウザも未確認（`localhost`のWindows＋Chrome＋Windows Hello受入は完了）。
-- 後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。7B以降の実装・DNS変更・Tunnel作成・本番公開も未着手。
+- 後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。Step 7CのDNS変更、実Tunnel作成・token投入、実ドメイン公開、実証明書・実HTTPS受入も未着手。
 
 ## Tests
 
