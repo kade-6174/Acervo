@@ -98,5 +98,10 @@ if os.environ.get("ACERVO_CI_CSRF_DIAGNOSTICS") == "1":
                 "level": "WARNING",
                 "propagate": False,
             },
+            "django.request": {
+                "handlers": ["csrf_diagnostics"],
+                "level": "WARNING",
+                "propagate": False,
+            },
         },
     }

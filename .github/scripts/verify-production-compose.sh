@@ -66,6 +66,8 @@ fi
 
 "${compose[@]}" up --detach --wait db web proxy
 
+"${compose[@]}" exec -T web python -c "from django.conf import settings; assert settings.LOGGING['loggers']['django.security.csrf']['level'] == 'WARNING'"
+
 test "$("${compose[@]}" exec -T web id -u)" = "10001"
 "${compose[@]}" exec -T web python manage.py check --deploy
 "${compose[@]}" exec -T web python manage.py help reset_admin_mfa | grep -q "最後の有効な管理者"
