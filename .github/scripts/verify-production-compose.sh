@@ -20,7 +20,12 @@ esac
 export COMPOSE_PROJECT_NAME="acervo-ci-${mode}"
 
 cleanup() {
+  local status=$?
+  if [[ "$status" -ne 0 ]]; then
+    "${compose[@]}" logs --no-color --tail=100 web proxy || true
+  fi
   "${compose[@]}" down --volumes --remove-orphans
+  return "$status"
 }
 trap cleanup EXIT
 
@@ -148,6 +153,7 @@ fi
 
 "${compose[@]}" exec -T -e ACERVO_CI_MODE="$mode" web python manage.py shell <<'PY'
 import http.client
+from http.cookies import SimpleCookie
 import os
 import re
 import socket
@@ -171,15 +177,25 @@ def login_attempt(connection, headers, scheme):
     response = connection.getresponse()
     assert response.status == 200, response.status
     body = response.read().decode()
-    cookies = "; ".join(value.split(";", 1)[0] for name, value in response.getheaders() if name.lower() == "set-cookie")
+    cookie_jar = SimpleCookie()
+    for name, value in response.getheaders():
+        if name.lower() == "set-cookie":
+            cookie_jar.load(value)
+    assert "csrftoken" in cookie_jar
+    cookies = "; ".join(f"{name}={morsel.value}" for name, morsel in cookie_jar.items())
     csrf_token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', body).group(1)
+    assert cookies and csrf_token and len(csrf_token) >= 32
     data = urllib.parse.urlencode({"csrfmiddlewaretoken": csrf_token, "login": "missing-user", "password": "wrong-password"}).encode()
-    connection.request("POST", "/accounts/login/", body=data, headers={**headers, "Cookie": cookies, "Content-Type": "application/x-www-form-urlencoded", "Referer": f"{scheme}://acervo.localhost/accounts/login/"})
+    public_origin = f"{scheme}://acervo.localhost"
+    connection.request("POST", "/accounts/login/", body=data, headers={**headers, "Cookie": cookies, "Content-Type": "application/x-www-form-urlencoded", "Origin": public_origin, "Referer": f"{public_origin}/accounts/login/"})
     response = connection.getresponse()
     if response.status != 200:
-        body = response.read().decode(errors="replace")
-        reason = re.search(r"<pre>\s*(.*?)\s*</pre>", body, re.DOTALL)
-        raise AssertionError(reason.group(1) if reason else response.status)
+        raise AssertionError(
+            f"login POST status={response.status} "
+            f"location_present={bool(response.getheader('Location'))} "
+            f"csrf_cookie_present=True csrf_token_length={len(csrf_token)} "
+            "origin_matches=True"
+        )
     response.read()
     connection.close()
 
