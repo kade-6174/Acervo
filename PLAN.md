@@ -100,7 +100,6 @@
   - [x] 7A-SPEC: 汎用化・インフラ仕様整合レビュー。特定学校・回生・ドメイン・Cloudflare依存を文書上分離し、Userモデル・在籍判定・公開境界の実装課題を調査する。
   - [x] 7A: Userモデルと在籍判定の汎用化。`cohort_number`をNULL許可し、`none`と`school_cohort`の環境変数ポリシーから選択する。既存データを変更しないmigration、逆変換ガード、manager・サービス・`bootstrap_admin`、設定fail-fast、既存認証・管理MFA・MFAリセット回帰テストを完了した。`school_cohort`から`none`への切替は権限変更になり得るため、運用者が事前に確認する。
   - [x] 7A-R: `school_cohort`の4基準環境変数とサイト表示名の本番fail-fast、開発・本番の環境変数例、ポリシー切替手順を補完する。`none`では学校方式の基準を要求しない。
- - [ ] 7B: インフラ準備。直接HTTPS共通構成とTunnel専用構成を分け、Tunnel専用時はCaddyを含むアプリ側の80/443をホストへ公開しない。Compose、Caddy、CI、IP信頼境界、ヘルスチェック、永続化を実装・検証する。Cloudflareは任意のまま維持する。
   - [x] 7B: インフラ準備。直接HTTPS共通構成とTunnel専用構成を分け、Tunnel専用時はCaddyを含むアプリ側の80/443をホストへ公開しない。Compose、Caddy、CI、IP信頼境界、ヘルスチェック、永続化を実装・検証した。Cloudflareは任意のまま維持する。
   - [ ] 7C: 実ドメイン受入。最終公開ホスト名の確定後にDNS変更、実Tunnel接続または直接HTTPS、実証明書、Recovery Codes、端末内・同期パスキー、Chrome以外の実運用対象ブラウザを受入確認する。
 
