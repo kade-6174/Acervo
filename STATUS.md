@@ -12,7 +12,7 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7Bを完了。次は実ドメイ
 - 原因はCaddyの専用IPヘッダーを削除してから再設定する経路で、Djangoへヘッダーが届かなかったことだった。直接HTTPSではCaddy接続元、Tunnel専用では信頼済みCF-Connecting-IPからのIPを、いずれも単一の上書き設定でDjangoへ渡すよう修正した。外部入力のX-Acervo-Client-IP、X-Forwarded-For、CF-Connecting-IPは直接HTTPSで採用されず、Tunnel専用では正規化済みCF-Connecting-IPだけが採用される。CSRF、Secure Cookie、Origin検証、レート制限を緩和していない。
 - CI失敗時だけweb・proxyの直近ログを出し、終了コードを保ったまま必ずComposeを後片付けする。CI専用の診断設定は、CSRF理由または専用IPヘッダーの有無・IP形式だけを記録し、Cookie、CSRF token、パスワード、秘密鍵、Tunnel token、環境変数値を出力しない。通常の本番環境では無効である。
 - Step 7B実装検証HEAD `1ebf6f8` はGitHub Actions run 35221822741で全成功。PostgreSQL 18の全228件、Ruff lint／format、Django check、migration差分なしが成功した。直接HTTPSとTunnel専用を別々に、Compose設定、Caddy adapt／validate、本番イメージ、db・web・proxy healthy、UID 10001、check --deploy、ログインPOSTのCSRF／同一Origin、health、静的ファイル、admin 404、管理画面redirect、IP信頼境界、公開ポート、DB・写真永続化まで確認した。Tunnel専用ではproxy・web・db・tunnelのホスト公開ポートなし、直接HTTPSではproxyだけが80/tcp・443/tcp・443/udpを公開し、web:8000・db:5432は非公開である。
-- 最終整理HEAD `f9556e9` はGitHub Actions run 35222634638で全成功。現在の実HEADは `f9556e9cff0426cd41ed9f902ebfbeb9dea52268` である。
+- 最終整理HEAD `f9556e9` はGitHub Actions run 35222634638で全成功。本整合修正の開始時の実HEADは `f9556e9cff0426cd41ed9f902ebfbeb9dea52268` である。
 - ローカルDocker CLIとPython開発依存はこのWindows環境で利用できないため、今回のローカルSQLite全テスト、Ruff、Django check、Compose起動は未実行である。CIのPostgreSQL 18全228件と本番コンテナ検証で確認した。migrationは追加・変更していない。
 - Step 7Bの変更ファイル: compose.production.yaml、compose.direct.yaml、compose.cloudflare.yaml、deploy/Caddyfile.direct、deploy/Caddyfile.cloudflare、deploy/Caddyfile.common、削除した旧deploy/Caddyfile、.github/scripts/verify-production-compose.sh、.github/workflows/ci.yml、PROJECT_SPEC.md、README.md、PLAN.md、STATUS.md、accounts/adapters.py、accounts/tests/test_deployment_config.py、config/settings/production.py。
 
