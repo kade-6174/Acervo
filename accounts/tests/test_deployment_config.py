@@ -90,9 +90,7 @@ class Phase1ConfigurationTests(SimpleTestCase):
         self.assertNotIn("CF-Connecting-IP", direct)
         self.assertIn("header_up Host {host}", direct)
         self.assertIn("header_up X-Forwarded-Proto https", direct)
-        self.assertIn(
-            "header_up X-Acervo-Client-IP {http.request.remote.host}", direct
-        )
+        self.assertIn("header_up X-Acervo-Client-IP {http.request.remote.host}", direct)
         self.assertNotIn("header_up +X-Acervo-Client-IP", direct)
         self.assertIn("servers :8080", cloudflare)
         self.assertIn("trusted_proxies static private_ranges", cloudflare)
