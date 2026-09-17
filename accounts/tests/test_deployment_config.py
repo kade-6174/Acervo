@@ -80,21 +80,42 @@ class Phase1ConfigurationTests(SimpleTestCase):
         self.assertLess(authentication_index, allauth_index)
         self.assertLess(allauth_index, gate_index)
 
-    def test_caddy_uses_listener_specific_client_ip_trust(self):
-        caddyfile = (PROJECT_ROOT / "deploy" / "Caddyfile").read_text(encoding="utf-8")
+    def test_caddy_separates_direct_and_tunnel_client_ip_trust(self):
+        direct = (PROJECT_ROOT / "deploy" / "Caddyfile.direct").read_text(encoding="utf-8")
+        cloudflare = (PROJECT_ROOT / "deploy" / "Caddyfile.cloudflare").read_text(encoding="utf-8")
+        common = (PROJECT_ROOT / "deploy" / "Caddyfile.common").read_text(encoding="utf-8")
 
-        self.assertIn("servers :8080", caddyfile)
-        self.assertIn("trusted_proxies static private_ranges", caddyfile)
-        self.assertIn("trusted_proxies_strict", caddyfile)
-        self.assertIn("client_ip_headers CF-Connecting-IP", caddyfile)
-        self.assertEqual(caddyfile.count("header_up X-Acervo-Client-IP {client_ip}"), 2)
+        self.assertIn("{$ACERVO_DOMAIN}", direct)
+        self.assertNotIn(":8080", direct)
+        self.assertNotIn("CF-Connecting-IP", direct)
+        self.assertIn("header_up -X-Acervo-Client-IP", direct)
+        self.assertIn("header_up X-Acervo-Client-IP {client_ip}", direct)
+        self.assertIn("servers :8080", cloudflare)
+        self.assertIn("trusted_proxies static private_ranges", cloudflare)
+        self.assertIn("trusted_proxies_strict", cloudflare)
+        self.assertIn("client_ip_headers CF-Connecting-IP", cloudflare)
+        self.assertIn("header_up X-Forwarded-Proto https", cloudflare)
+        self.assertIn("header_up -X-Acervo-Client-IP", cloudflare)
+        self.assertIn("header_up X-Acervo-Client-IP {client_ip}", cloudflare)
+        self.assertNotIn("{$ACERVO_DOMAIN}", cloudflare)
+        self.assertIn("handle /admin*", common)
+        self.assertIn("handle_path /static/*", common)
+        self.assertNotIn("media", common.lower())
 
-    def test_tunnel_listener_is_not_published_to_host(self):
+    def test_production_compose_requires_exactly_one_publication_overlay(self):
         production_compose = (PROJECT_ROOT / "compose.production.yaml").read_text(encoding="utf-8")
+        direct_compose = (PROJECT_ROOT / "compose.direct.yaml").read_text(encoding="utf-8")
         cloudflare_compose = (PROJECT_ROOT / "compose.cloudflare.yaml").read_text(encoding="utf-8")
 
-        self.assertNotIn('"8080:8080"', production_compose)
-        self.assertNotIn('"8080:8080"', cloudflare_compose)
+        self.assertNotIn("ports:", production_compose)
+        self.assertIn('"80:80"', direct_compose)
+        self.assertIn('"443:443"', direct_compose)
+        self.assertIn('"443:443/udp"', direct_compose)
+        self.assertNotIn("ports:", cloudflare_compose)
+        self.assertIn("cloudflare/cloudflared:2026.9.0", cloudflare_compose)
+        self.assertIn("tunnel --no-autoupdate run", cloudflare_compose)
+        self.assertIn("no-new-privileges:true", cloudflare_compose)
+        self.assertIn("read_only: true", cloudflare_compose)
 
 
 class MFAKeyValidationTests(SimpleTestCase):

@@ -1,0 +1,17 @@
+{
+	email {$CADDY_EMAIL}
+	admin off
+}
+
+import Caddyfile.common
+
+{$ACERVO_DOMAIN} {
+	import acervo_common
+
+	handle {
+		reverse_proxy web:8000 {
+			header_up -X-Acervo-Client-IP
+			header_up X-Acervo-Client-IP {client_ip}
+		}
+	}
+}

@@ -36,16 +36,21 @@
 - Cloudflare、S3、外部CDNがなくても主要機能を利用できます。
 - DBと写真を毎日バックアップし、サーバーとは別の保存先へ複製します。
 
-`compose.yaml` は開発専用、`compose.production.yaml` は本番専用です。本番では次の手順で準備します。
+`compose.yaml` は開発専用です。本番の `compose.production.yaml` は、公開ポートを持たない共通基盤です。単独では起動せず、直接HTTPSまたはCloudflare Tunnelの公開方式overlayを**どちらか一方だけ**組み合わせます。
+
+### 直接HTTPS（標準）
+
+直接HTTPSではCaddyだけが80/tcp、443/tcp、443/udpをホストへ公開します。GunicornとPostgreSQLはCompose内部ネットワークだけで利用します。
 
 ```bash
 cp .env.production.example .env.production
 chmod 600 .env.production
 # .env.productionのドメイン、許可ホスト、CSRFオリジン、秘密値を変更する
-docker compose -f compose.production.yaml config --quiet
-docker compose -f compose.production.yaml build
-docker compose -f compose.production.yaml up -d
-docker compose -f compose.production.yaml ps
+docker compose -f compose.production.yaml -f compose.direct.yaml config --quiet
+docker compose -f compose.production.yaml -f compose.direct.yaml build
+docker compose -f compose.production.yaml -f compose.direct.yaml up -d
+docker compose -f compose.production.yaml -f compose.direct.yaml ps
+docker compose -f compose.production.yaml -f compose.direct.yaml down
 ```
 
 `DJANGO_SECRET_KEY` と `POSTGRES_PASSWORD` には、インスタンスごとに生成した長いランダム値を設定してください。直接HTTPSでは、設定したドメインのA/AAAAレコードをサーバーへ向け、外部から80/443番へ到達できる必要があります。Caddyが証明書を取得・更新します。
@@ -54,7 +59,7 @@ docker compose -f compose.production.yaml ps
 
 ### Cloudflare Tunnelを使う場合（任意）
 
-Tunnelは本体から分離した追加Composeとして提供します。ただし現行のコマンドは直接HTTPS用の本番Composeへoverlayを重ねるため、ホストの80/443公開を残します。7B完了まではTunnel専用構成の正式手順として案内しません。Cloudflare側でリモート管理Tunnelを作り、公開ホスト名のオリジンを `http://proxy:8080` に設定する作業も、7Cの実ドメイン受入まで実施しません。
+Tunnel専用構成では、`proxy`、`web`、`db`、`tunnel`のいずれもホストポートを公開しません。受信ポート開放は不要です。Cloudflare側でリモート管理Tunnelを作り、公開ホスト名のオリジンを `http://proxy:8080` に設定する作業、DNS、実token、実接続はStep 7Cで行います。
 
 ```bash
 cp .env.cloudflare.example .env.cloudflare
@@ -66,7 +71,16 @@ docker compose \
   up -d
 ```
 
-Tunnel tokenは秘密情報です。リポジトリやログへ記録しないでください。Tunnelを使わない通常構成では、`.env.cloudflare`も追加Composeも不要です。
+状態確認、停止、管理コマンドにも、選んだ公開方式と同じComposeファイルの組合せを使います。
+
+```bash
+# Tunnel専用構成の例
+docker compose -f compose.production.yaml -f compose.cloudflare.yaml ps
+docker compose -f compose.production.yaml -f compose.cloudflare.yaml down
+docker compose -f compose.production.yaml -f compose.cloudflare.yaml exec web python manage.py reset_admin_mfa ADMIN_USERNAME
+```
+
+Tunnel tokenは秘密情報です。リポジトリ、コマンド文字列、ログへ記録しないでください。Tunnelを使わない直接HTTPS構成では、`.env.cloudflare`もTunnel overlayも不要です。厳格なホストファイアウォールを使う場合だけ、`cloudflared` からCloudflareへ7844/TCPおよび7844/UDPの送信を許可してください。Cloudflare AccessはAcervoのログインや管理者MFAの必須要件ではありません。
 
 ## 設計文書
 
@@ -84,7 +98,8 @@ Tunnel tokenは秘密情報です。リポジトリやログへ記録しない�
 本番コンテナでは、対象usernameを指定して実行します。実行前に `RESET <username>` の完全一致確認が必要です。
 
 ```bash
-docker compose -f compose.production.yaml exec web python manage.py reset_admin_mfa ADMIN_USERNAME
+# 直接HTTPS構成
+docker compose -f compose.production.yaml -f compose.direct.yaml exec web python manage.py reset_admin_mfa ADMIN_USERNAME
 ```
 
 `ADMIN_USERNAME` は実際に復旧する対象usernameへ置き換えてください。確認では `RESET 実際のusername` の完全一致入力が必要です。パスワードが不明な場合、このコマンドだけでは復旧できません。

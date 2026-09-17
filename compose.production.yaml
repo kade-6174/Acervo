@@ -9,12 +9,7 @@ services:
       - no-new-privileges:true
     env_file:
       - .env.production
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - static_data:/srv/static:ro
       - caddy_data:/data
       - caddy_config:/config

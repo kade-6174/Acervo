@@ -1,0 +1,9 @@
+services:
+  proxy:
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile.direct:/etc/caddy/Caddyfile:ro
+      - ./deploy/Caddyfile.common:/etc/caddy/Caddyfile.common:ro

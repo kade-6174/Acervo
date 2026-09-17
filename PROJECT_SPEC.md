@@ -73,14 +73,14 @@ React、Redis、Celery、Kubernetesは、実際に必要となる要件が生じ
        └── 毎日、サーバー外の保存先にも複製
 ```
 
-本番Composeは少なくとも `proxy`、`web`、`db` を持つ。直接HTTPS構成ではホストへ公開するのはCaddyの80/443番だけとし、GunicornとPostgreSQLのポートはCompose内部ネットワークだけで利用する。Tunnel専用構成では、Caddyを含むアプリ側のホストポートを公開せず、outboundのTunnel接続だけを使う。コンテナは再起動ポリシーとヘルスチェックを持つ。
+本番Composeは少なくとも `proxy`、`web`、`db` を持つ。`compose.production.yaml` はホスト公開ポートを持たない共通基盤であり、単独起動しない。直接HTTPSでは `compose.direct.yaml` を重ね、Caddyだけが80/tcp、443/tcp、443/udpを公開する。Tunnel専用では `compose.cloudflare.yaml` を重ね、Caddyを含むアプリ側のホストポートを公開せず、outboundのTunnel接続だけを使う。GunicornとPostgreSQLのポートはCompose内部ネットワークだけで利用する。公開方式のoverlayは同時に指定しない。コンテナは再起動ポリシーとヘルスチェックを持つ。
 
 ### 4.2 公開方式
 
 次の方式をサポートする。アプリケーション、DB、写真の保存場所はいずれの方式でも運営者のサーバー上である。
 
 1. **直接HTTPS（標準）**: 独自ドメインのA/AAAAレコードをサーバーへ向け、80/443番をCaddyへ到達可能にする。Caddyが公開証明書を取得・更新する。第三者トンネルサービスを必要としない。
-2. **Cloudflare Tunnel（任意）**: ルーターのポート開放ができない環境向け。`cloudflared` は任意の追加構成とし、Acervo本体の必須依存にしない。
+2. **Cloudflare Tunnel（任意）**: ルーターのポート開放ができない環境向け。`cloudflared` は任意の追加構成とし、Acervo本体の必須依存にしない。Tunnel専用構成はCompose内部の `http://proxy:8080` をオリジンとし、Caddyの自動HTTPS・ACMEは起動しない。Cloudflare AccessはAcervoの認証・管理者MFAの必須要件にしない。
 3. **閉域利用（任意）**: VPNまたは組織LAN内だけで利用する。スマートフォンのカメラ利用には安全なコンテキストが必要なため、端末が信頼するHTTPS証明書を用意する。単純な平文HTTP運用は正式サポートしない。
 
 公開方式の違いをアプリのドメイン設定以外へ持ち込まない。QR URLの基底URLは導入先設定で与え、公開方式を変えてもDB移行を不要にする。ただしWebAuthnのパスキーは登録時のドメイン（RP ID）へ結び付くため、パスキー運用開始後のドメイン変更では既存パスキーの再登録が必要になる。本番ドメインは最初のパスキー登録前に確定する。

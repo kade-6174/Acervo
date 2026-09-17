@@ -1,4 +1,9 @@
 services:
+  proxy:
+    volumes:
+      - ./deploy/Caddyfile.cloudflare:/etc/caddy/Caddyfile:ro
+      - ./deploy/Caddyfile.common:/etc/caddy/Caddyfile.common:ro
+
   tunnel:
     image: cloudflare/cloudflared:2026.9.0
     restart: unless-stopped
