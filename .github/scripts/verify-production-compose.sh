@@ -33,22 +33,27 @@ if [[ "$mode" == "direct" ]]; then
   "${compose[@]}" config --format json | python3 -c '
 import json, sys
 services = json.load(sys.stdin)["services"]
-assert set(services["proxy"].get("ports", [])) == {"80:80", "443:443", "443:443/udp"}
-assert "ports" not in services["web"]
-assert "ports" not in services["db"]
+ports = services["proxy"].get("ports", [])
+assert {(str(port["published"]), str(port["target"]), port.get("protocol", "tcp")) for port in ports} == {
+    ("80", "80", "tcp"),
+    ("443", "443", "tcp"),
+    ("443", "443", "udp"),
+}
+assert not services["web"].get("ports")
+assert not services["db"].get("ports")
 '
 else
   "${compose[@]}" config --format json | python3 -c '
 import json, sys
 services = json.load(sys.stdin)["services"]
 for name in ("proxy", "web", "db", "tunnel"):
-    assert "ports" not in services[name], name
+    assert not services[name].get("ports"), name
 tunnel = services["tunnel"]
 assert tunnel["image"] == "cloudflare/cloudflared:2026.9.0"
 assert tunnel["command"] == ["tunnel", "--no-autoupdate", "run"]
 assert tunnel["read_only"] is True
 assert "no-new-privileges:true" in tunnel["security_opt"]
-assert tunnel["networks"] == {"frontend": None}
+assert set(tunnel["networks"]) == {"frontend"}
 assert not tunnel.get("privileged", False)
 assert not tunnel.get("network_mode")
 '
