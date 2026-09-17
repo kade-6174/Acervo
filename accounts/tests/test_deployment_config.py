@@ -88,6 +88,7 @@ class Phase1ConfigurationTests(SimpleTestCase):
         self.assertIn("{$ACERVO_DOMAIN}", direct)
         self.assertNotIn(":8080", direct)
         self.assertNotIn("CF-Connecting-IP", direct)
+        self.assertIn("header_up X-Forwarded-Proto https", direct)
         self.assertIn("header_up -X-Acervo-Client-IP", direct)
         self.assertIn("header_up X-Acervo-Client-IP {client_ip}", direct)
         self.assertIn("servers :8080", cloudflare)
