@@ -24,10 +24,14 @@ sudo chown -R 10001:10001 "$work_directory/archives" "$work_directory/keys" "$wo
 "${source_compose[@]}" up --detach --wait db web proxy
 "${source_compose[@]}" exec -T web sh -c 'printf %s restored-photo > /app/media/backup-restore-check.txt'
 
-"${source_compose[@]}" run --rm --no-deps -v "$work_directory/keys:/keys" --entrypoint age-keygen backup -o /keys/first.txt > "$work_directory/first.public"
-"${source_compose[@]}" run --rm --no-deps -v "$work_directory/keys:/keys" --entrypoint age-keygen backup -o /keys/second.txt > "$work_directory/second.public"
+"${source_compose[@]}" run --rm --no-deps -v "$work_directory/keys:/keys" --entrypoint age-keygen backup -o /keys/first.txt 2> "$work_directory/first.public"
+"${source_compose[@]}" run --rm --no-deps -v "$work_directory/keys:/keys" --entrypoint age-keygen backup -o /keys/second.txt 2> "$work_directory/second.public"
 sudo chown -R 10001:10001 "$work_directory/keys"
-recipients="$(tr -d '\n' < "$work_directory/first.public"),$(tr -d '\n' < "$work_directory/second.public")"
+first_recipient="$(sed -n 's/^Public key: //p' "$work_directory/first.public")"
+second_recipient="$(sed -n 's/^Public key: //p' "$work_directory/second.public")"
+test -n "$first_recipient"
+test -n "$second_recipient"
+recipients="$first_recipient,$second_recipient"
 
 "${source_compose[@]}" run --rm --no-deps \
   -v "$work_directory/archives:/backups" \
