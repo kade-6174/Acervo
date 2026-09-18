@@ -40,11 +40,12 @@ recipients="$first_recipient,$second_recipient"
 
 backup_id="$(find "$work_directory/archives" -mindepth 1 -maxdepth 1 -type d -name 'acervo-*' -printf '%f\n')"
 test -n "$backup_id"
-test -f "$work_directory/archives/$backup_id/payload.tar.gz.age"
-test -f "$work_directory/archives/$backup_id/metadata.json"
-test -f "$work_directory/archives/$backup_id/checksums.sha256"
-test ! -e "$work_directory/archives/$backup_id/database.dump"
-test ! -e "$work_directory/archives/$backup_id/photos.tar"
+# 成果物はバックアップ用UIDだけが読める。CIではsudoで存在だけを検査し、内容は出力しない。
+sudo test -f "$work_directory/archives/$backup_id/payload.tar.gz.age"
+sudo test -f "$work_directory/archives/$backup_id/metadata.json"
+sudo test -f "$work_directory/archives/$backup_id/checksums.sha256"
+sudo test ! -e "$work_directory/archives/$backup_id/database.dump"
+sudo test ! -e "$work_directory/archives/$backup_id/photos.tar"
 
 "${source_compose[@]}" down --volumes --remove-orphans
 "${target_compose[@]}" up --detach --wait db
@@ -55,7 +56,7 @@ test ! -e "$work_directory/archives/$backup_id/photos.tar"
   restore restore --backup-id "$backup_id" --identity-file /run/identity/identity.txt \
   --confirm RESTORE_EMPTY_TARGET
 
-cmp --silent .env.production "$work_directory/restored-settings/.env.production"
+sudo cmp --silent .env.production "$work_directory/restored-settings/.env.production"
 "${target_compose[@]}" run --rm --no-deps --entrypoint sh restore -c 'test "$(cat /target-media/backup-restore-check.txt)" = restored-photo'
 "${target_compose[@]}" up --detach --wait web proxy
 "${target_compose[@]}" exec -T web python manage.py check --deploy
