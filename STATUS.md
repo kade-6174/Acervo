@@ -1,12 +1,16 @@
 # Project Status
 
-最終更新: 2026-09-17
+最終更新: 2026-09-18
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7Bを完了。次は実ドメイン受入のStep 7Cだが未着手であり、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7Bを完了。次は実ドメイン受入のStep 7Cだが未着手であり、Phase 1全体は未完了。
 
 ## Completed
+
+- Step 7A-R2として、学校回生方式の基準を「基準年度の1年生回生」へ変更した。`ACERVO_BASE_SCHOOL_YEAR=2026`と`ACERVO_BASE_FIRST_YEAR_COHORT=33`では、2026年度に33・32・31回生を順に1・2・3年生、2027年度に34・33・32回生を順に1・2・3年生として扱う。既存の`cohort_number`、DB schema、管理MFA、ログイン、MFAリセット、session、AuditLogは変更していない。
+- 本番で旧`ACERVO_BASE_THIRD_YEAR_COHORT`を検出した場合は、値を表示せず新しい`ACERVO_BASE_FIRST_YEAR_COHORT`への移行を案内してfail-fastで拒否する。旧変数だけでも新旧同時指定でも拒否し、`none`ポリシーの動作は維持する。当時のStep 7A／7A-Rは3年生基準だったが、現在はStep 7A-R2の1年生基準が正とする。migrationは追加していない。
+- ローカルでは在籍判定・ポリシー・本番設定の専用42件、およびSQLite全231件が成功した。Ruff lint／format、Django check、migration差分なし、`git diff --check`、ランダムな一時設定値を用いる本番相当`check --deploy`も成功した。GitHub Actions run 35304262014は全成功し、PostgreSQL 18全231件、Ruff、Django check、migration差分なし、直接HTTPS／Tunnel専用のCompose・Caddy・本番イメージ・healthy・UID 10001・`check --deploy`・IP信頼境界・公開ポート・DB／写真永続化の既存回帰を確認した。このWindows環境ではDocker CLIが利用できないため、コンテナ起動はローカル未実行である。
 
 - Step 7BのCSRF 403診断・補正として、Caddy経由ログインPOSTにCookieとform tokenをSimpleCookieで正しく組み合わせ、公開Origin https://acervo.localhost のOriginとRefererを送るCI検証へ更新した。Cookie、token、パスワード等の値はログへ出さず、名前の有無、token長、HTTP status、Location有無だけを確認する。django.security.csrfには拒否記録がなく、CI限定の安全なサーバーログで実際の原因がallauthのUnable to determine client IP addressであることを確認した。
 - 原因はCaddyの専用IPヘッダーを削除してから再設定する経路で、Djangoへヘッダーが届かなかったことだった。直接HTTPSではCaddy接続元、Tunnel専用では信頼済みCF-Connecting-IPからのIPを、いずれも単一の上書き設定でDjangoへ渡すよう修正した。外部入力のX-Acervo-Client-IP、X-Forwarded-For、CF-Connecting-IPは直接HTTPSで採用されず、Tunnel専用では正規化済みCF-Connecting-IPだけが採用される。CSRF、Secure Cookie、Origin検証、レート制限を緩和していない。
