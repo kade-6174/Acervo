@@ -1,12 +1,15 @@
 # Project Status
 
-最終更新: 2026-09-18
+最終更新: 2026-09-19
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。Step 7C-LIVEのリポジトリ内事前確認は完了したが、実ドメイン受入は未着手であり、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。Step 7C-LIVEは承認パッケージ確定待ちであり、外部操作・実ドメイン受入は未着手。Phase 1全体は未完了。
 
 ## Completed
+
+- Phase 10Aの実装・検証結果を受入れた。`age`の各秘密鍵は単独で復号できる完全な鍵であり、複数recipientは二者承認ではなく管理者喪失に備えた可用性対策として扱う。最低2本を2名以上の担当者または相互に独立した保管場所へ分離し、秘密鍵と暗号化バックアップを同一障害領域へ置かない。鍵紛失・漏えい・担当者交代時は新recipient群で新規バックアップを作成し、既存成果物の再暗号化または安全な廃棄を別途判断する。秘密分散、Shamir方式、二者承認機構はMVPに追加しない。
+- Step 7C-LIVEの承認パッケージを`docs/LIVE_PREFLIGHT.md`へ確定待ちとして明記した。公開設定、責任者、バックアップ運用、受入端末の全項目が人によって確定するまで、DNS、Cloudflare、Tunnel token、本番ホスト、実アカウント、秘密鍵、実データを操作しない。承認後は、一般公開前の第1段階と、初期管理者だけの限定運用後に実データ復元を確認する第2段階を分離する。第1・第2段階が成功し、秘密値なしで結果を記録するまでStep 7C-LIVEを完了扱いにしない。
 
 - Step 7C-LIVE事前確認として、汎用設定と生物班の導入例が分離され、`acervo.kdf-biology.org`、`school_cohort`、4月1日、2026年度、33回生、運用責任者がアプリコードや汎用の本番例へ固定されていないことを静的確認した。直接HTTPSは`proxy`だけが80/tcp・443/tcp・443/udpを公開し、Tunnel専用は`proxy`、`web`、`db`、`tunnel`にホスト公開ポートがなく、Compose内部の`http://proxy:8080`をTunnelオリジンとする。両方式を同時に指定せず、直接HTTPSはTunnel資格情報を必要としない。CaddyはTunnel専用でACMEを起動せず、Gunicorn・PostgreSQL・保護写真を公開しない。
 - `docs/LIVE_PREFLIGHT.md`へ、秘密値を含まない承認前の確定チェックリスト、承認後の実行順序と期待結果、中止条件を追加した。公開hostnameとWebAuthn RP ID、Host／CSRF Origin一致、Django秘密鍵とMFA Fernet鍵の別管理、担当者・バックアップ暗号化・復元試験先・対象端末の確定を必須にした。外部環境の操作は行っていない。
