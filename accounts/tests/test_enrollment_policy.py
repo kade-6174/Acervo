@@ -29,15 +29,13 @@ class EnrollmentSettingsTests(SimpleTestCase):
         ACERVO_SCHOOL_YEAR_START_MONTH=9,
         ACERVO_SCHOOL_YEAR_START_DAY=1,
         ACERVO_BASE_SCHOOL_YEAR=2030,
-        ACERVO_BASE_THIRD_YEAR_COHORT=50,
+        ACERVO_BASE_FIRST_YEAR_COHORT=50,
     )
     def test_school_policy_uses_configured_boundary_and_baseline(self):
         self.assertEqual(school_year_on(date(2031, 8, 31)), 2030)
         self.assertEqual(school_year_on(date(2031, 9, 1)), 2031)
-        self.assertEqual(cohort_standing_on(50, date(2031, 8, 31)).grade, 3)
-        self.assertEqual(
-            cohort_standing_on(50, date(2031, 9, 1)).status, EnrollmentStatus.GRADUATED
-        )
+        self.assertEqual(cohort_standing_on(50, date(2031, 8, 31)).grade, 1)
+        self.assertEqual(cohort_standing_on(50, date(2031, 9, 1)).grade, 2)
 
     @override_settings(ACERVO_ENROLLMENT_POLICY="none")
     def test_none_policy_does_not_require_or_apply_cohort(self):

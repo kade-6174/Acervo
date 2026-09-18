@@ -21,7 +21,7 @@ def validate_enrollment_settings(
     start_month: int,
     start_day: int,
     base_school_year: int,
-    base_third_year_cohort: int,
+    base_first_year_cohort: int,
 ) -> None:
     """在籍ポリシーと学校方式の基準を起動時にfail-fastで検証する。"""
     if policy not in {"none", "school_cohort"}:
@@ -30,7 +30,7 @@ def validate_enrollment_settings(
         return
     if not all(
         isinstance(value, int)
-        for value in (start_month, start_day, base_school_year, base_third_year_cohort)
+        for value in (start_month, start_day, base_school_year, base_first_year_cohort)
     ):
         raise ImproperlyConfigured("学校方式の基準設定は整数で指定する必要があります。")
     if not 1 <= base_school_year <= 9999:
@@ -39,7 +39,7 @@ def validate_enrollment_settings(
         date(base_school_year, start_month, start_day)
     except (TypeError, ValueError):
         raise ImproperlyConfigured("学校年度開始日の設定が不正です。") from None
-    if base_third_year_cohort <= 0:
+    if base_first_year_cohort <= 0:
         raise ImproperlyConfigured("基準回生は正の整数で設定する必要があります。")
 
 

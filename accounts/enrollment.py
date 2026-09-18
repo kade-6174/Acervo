@@ -25,9 +25,9 @@ def school_year_on(on_date: date) -> int:
     return on_date.year if (on_date.month, on_date.day) >= start else on_date.year - 1
 
 
-def third_year_cohort_for_school_year(school_year: int) -> int:
-    """指定学校年度の3年生回生を返す。"""
-    return settings.ACERVO_BASE_THIRD_YEAR_COHORT + (school_year - settings.ACERVO_BASE_SCHOOL_YEAR)
+def first_year_cohort_for_school_year(school_year: int) -> int:
+    """指定学校年度の1年生回生を返す。"""
+    return settings.ACERVO_BASE_FIRST_YEAR_COHORT + (school_year - settings.ACERVO_BASE_SCHOOL_YEAR)
 
 
 def cohort_standing_on(cohort_number: int | None, on_date: date) -> CohortStanding:
@@ -36,14 +36,14 @@ def cohort_standing_on(cohort_number: int | None, on_date: date) -> CohortStandi
         return CohortStanding(EnrollmentStatus.NOT_APPLICABLE, None)
     if cohort_number is None:
         raise ValidationError("school_cohort方式では回生が必要です。")
-    third_year_cohort = third_year_cohort_for_school_year(school_year_on(on_date))
-    cohort_offset = cohort_number - third_year_cohort
+    first_year_cohort = first_year_cohort_for_school_year(school_year_on(on_date))
+    cohort_offset = first_year_cohort - cohort_number
 
     if cohort_offset < 0:
-        return CohortStanding(EnrollmentStatus.GRADUATED, None)
+        return CohortStanding(EnrollmentStatus.NOT_YET_ENROLLED, None)
     if cohort_offset <= 2:
-        return CohortStanding(EnrollmentStatus.ENROLLED, 3 - cohort_offset)
-    return CohortStanding(EnrollmentStatus.NOT_YET_ENROLLED, None)
+        return CohortStanding(EnrollmentStatus.ENROLLED, cohort_offset + 1)
+    return CohortStanding(EnrollmentStatus.GRADUATED, None)
 
 
 def validate_cohort_for_date(cohort_number: int | None, on_date: date) -> None:

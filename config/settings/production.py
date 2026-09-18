@@ -24,12 +24,17 @@ if not os.environ.get("ACERVO_ENROLLMENT_POLICY"):
     raise ImproperlyConfigured("ACERVO_ENROLLMENT_POLICYの設定が必要です。")
 if not isinstance(ACERVO_SITE_NAME, str) or not ACERVO_SITE_NAME.strip():  # noqa: F405
     raise ImproperlyConfigured("ACERVO_SITE_NAMEの設定が必要です。")
+if "ACERVO_BASE_THIRD_YEAR_COHORT" in os.environ:
+    raise ImproperlyConfigured(
+        "ACERVO_BASE_THIRD_YEAR_COHORTは廃止されました。"
+        "ACERVO_BASE_FIRST_YEAR_COHORTへ設定を移行してください。"
+    )
 if ACERVO_ENROLLMENT_POLICY == "school_cohort":  # noqa: F405
     for variable_name in (
         "ACERVO_SCHOOL_YEAR_START_MONTH",
         "ACERVO_SCHOOL_YEAR_START_DAY",
         "ACERVO_BASE_SCHOOL_YEAR",
-        "ACERVO_BASE_THIRD_YEAR_COHORT",
+        "ACERVO_BASE_FIRST_YEAR_COHORT",
     ):
         value = env(variable_name, default=None)  # noqa: F405
         if not isinstance(value, str) or not value.strip():
@@ -39,7 +44,7 @@ validate_enrollment_settings(  # noqa: F405
     ACERVO_SCHOOL_YEAR_START_MONTH,
     ACERVO_SCHOOL_YEAR_START_DAY,
     ACERVO_BASE_SCHOOL_YEAR,
-    ACERVO_BASE_THIRD_YEAR_COHORT,
+    ACERVO_BASE_FIRST_YEAR_COHORT,
 )
 
 if MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN:  # noqa: F405
