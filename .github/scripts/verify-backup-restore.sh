@@ -9,7 +9,8 @@ cleanup() {
   local status=$?
   "${source_compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
   "${target_compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
-  rm -rf "$work_directory"
+  # コンテナ内の非root UIDが作成した一時ファイルも確実に削除する。
+  sudo rm -rf "$work_directory"
   return "$status"
 }
 trap cleanup EXIT

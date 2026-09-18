@@ -13,7 +13,7 @@ RUN apk add --no-cache ca-certificates curl tar \
     && curl --fail --location --silent --show-error \
       "https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/${age_archive}" \
       --output /tmp/age.tar.gz \
-    && echo "${age_sha256}  /tmp/age.tar.gz" | sha256sum --check --status \
+    && echo "${age_sha256}  /tmp/age.tar.gz" | sha256sum -c -s \
     && tar --extract --gzip --file /tmp/age.tar.gz --directory /tmp \
     && install --mode=0555 "/tmp/age/age" /out/age \
     && install --mode=0555 "/tmp/age/age-keygen" /out/age-keygen
