@@ -130,3 +130,5 @@ docker compose -f compose.production.yaml -f compose.direct.yaml exec web python
 ## バックアップ・復元
 
 DB、写真、復元に必要な非公開設定のバックアップと、空環境への完全復元手順はPhase 10で完成予定です。現時点で完成済みの手順として扱わず、実データ投入や更新前には、導入者が承認した保護・復元方針を用意してください。
+
+実運用環境を操作する前の承認項目、受入順序、中止条件は[Step 7C-LIVE 実施前確認](LIVE_PREFLIGHT.md)にまとめています。この確認はPhase 10の完全なバックアップ・復元手順の完成を意味しません。

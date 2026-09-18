@@ -22,7 +22,7 @@
 
 ## 本番導入
 
-本番導入は1台のLinuxホスト上のDocker Composeを正式構成とします。直接HTTPSが標準で、Cloudflare Tunnelは任意です。詳細な設定、起動、MFA、公開境界は[導入マニュアル](docs/DEPLOYMENT.md)を参照してください。
+本番導入は1台のLinuxホスト上のDocker Composeを正式構成とします。直接HTTPSが標準で、Cloudflare Tunnelは任意です。詳細な設定、起動、MFA、公開境界は[導入マニュアル](docs/DEPLOYMENT.md)、実運用環境を操作する前の承認項目と中止条件は[Step 7C-LIVE 実施前確認](docs/LIVE_PREFLIGHT.md)を参照してください。
 
 生物班への導入例は[生物班向け導入・運用例](docs/examples/KDF_BIOLOGY.md)、秘密値を含まない引継ぎ台帳の雛形は[非公開運用台帳テンプレート](docs/templates/PRIVATE_OPERATIONS_RUNBOOK.md)に分離しています。
 

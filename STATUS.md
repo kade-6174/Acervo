@@ -4,10 +4,14 @@
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSEを完了。Step 7C-LIVEの実ドメイン受入は未着手であり、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSEを完了。Step 7C-LIVEのリポジトリ内事前確認は完了したが、実ドメイン受入は未着手であり、Phase 1全体は未完了。
 
 ## Completed
 
+- Step 7C-LIVE事前確認として、汎用設定と生物班の導入例が分離され、`acervo.kdf-biology.org`、`school_cohort`、4月1日、2026年度、33回生、運用責任者がアプリコードや汎用の本番例へ固定されていないことを静的確認した。直接HTTPSは`proxy`だけが80/tcp・443/tcp・443/udpを公開し、Tunnel専用は`proxy`、`web`、`db`、`tunnel`にホスト公開ポートがなく、Compose内部の`http://proxy:8080`をTunnelオリジンとする。両方式を同時に指定せず、直接HTTPSはTunnel資格情報を必要としない。CaddyはTunnel専用でACMEを起動せず、Gunicorn・PostgreSQL・保護写真を公開しない。
+- `docs/LIVE_PREFLIGHT.md`へ、秘密値を含まない承認前の確定チェックリスト、承認後の実行順序と期待結果、中止条件を追加した。公開hostnameとWebAuthn RP ID、Host／CSRF Origin一致、Django秘密鍵とMFA Fernet鍵の別管理、担当者・バックアップ暗号化・復元試験先・対象端末の確定を必須にした。外部環境の操作は行っていない。
+- 完全なバックアップ・空環境復元手順はPhase 10で未完成である。このため、実行可能な手順、復元試験先、復元可能なバックアップが承認・確認されるまで、実データを扱うStep 7C-LIVE完了には進まない。
+- Step 7C-LIVE事前確認のローカル検証では、Markdownローカルリンク、旧回生変数が移行・拒否説明だけに残ること、文書内に具体的な秘密値がないこと、`git diff --check`、Ruff lint／format、Django check、migration差分なし、ランダムな一時値を使う本番相当`check --deploy`、SQLite全231件が成功した（231件、19.127秒）。Docker CLIとCaddy CLIがこのWindows環境にないためCompose設定解決・Caddy adapt／validate・コンテナ起動はローカル未実行である。コード、設定、Compose、Caddy、CIの差分はなく、実装HEAD `a0cd67190a0f938f8027a392c5476908e489c816`のGitHub Actions run `35353377279`でPostgreSQL 18全231件と直接HTTPS／Tunnel専用の本番コンテナ検証が全成功している。
 - Step 7C-DOCとして、汎用ソフトウェア向けの`docs/DEPLOYMENT.md`、生物班への一導入例である`docs/examples/KDF_BIOLOGY.md`、公開リポジトリに実値を書かない`docs/templates/PRIVATE_OPERATIONS_RUNBOOK.md`を追加した。READMEの詳細な本番手順は汎用導入マニュアルへ集約し、公開方式、MFA復旧、在籍ポリシー、引継ぎの説明を重複させない。
 - Step 7C-DOC-Rとして、ライセンス採用前の文書表現と非公開運用台帳の記録範囲を整合した。公開台帳テンプレートには実値を書かず、アクセス制限された非公開コピーには引継ぎに必要な最小限の担当者・連絡先・管理アカウント識別子・内部接続先を記録可能とした。一方、パスワード、token、秘密鍵、Recovery Codesは非公開コピーにも直接記載せず、安全な保管場所への参照だけを残す。Markdownリンクと`git diff --check`を確認し、実装コミット`4b0c8690ba09dd5ce9ceb1c1c962e6fb215e699a`のGitHub Actions run `35349448683`は`test`と`production-container`の全ジョブ成功。コード、Compose、Caddy、CI、DNS、Tunnel、token、本番ホストおよび本番公開の外部状態は変更していない。
 - Step 7C-LICENSEとして、kade_6174が権利を有するAcervo固有のコード、文書、設定例へApache License 2.0を適用した。`LICENSE`は公式本文との行単位一致、`NOTICE`は`Copyright 2026 kade_6174`、`THIRD_PARTY_NOTICES.md`はBootstrap 5.3.8（MIT）とhtmx 2.0.10（0BSD）の同梱ライセンスと配布元を記録する。PEP 639の`license = "Apache-2.0"`、`authors = [{ name = "kade_6174" }]`、ライセンス関連ファイルの`license-files`を設定し、隔離wheelで`License-Expression: Apache-2.0`、Author、LICENSE・NOTICE・第三者通知・同梱ライセンスの収録を確認した。ローカルではRuff lint／format、Django check、migration差分なし、Markdownリンク、`git diff --check`が成功。SQLite全231件は初回に既存TOTP統合テスト1件が一時失敗したが、同一テストの単独再実行と全231件の再実行はいずれも成功した。ローカルの`build`／setuptoolsは未導入のためsdistは未検証。実装コミット`41e3b8fb9d996a700869fb614b7525894fd5b6b7`のGitHub Actions run `35353015064`は`test`（PostgreSQL 18を含む）と`production-container`（直接HTTPS／Tunnel専用）の全ジョブ成功。第三者のコード、静的資産、依存パッケージ、コンテナ基盤は再ライセンスせず、公開Dockerイメージまたは配布済みアーカイブを正式提供する前の完全な依存物・ライセンス・SBOM確認は別タスクとする。コード、migration、Compose、Caddy、CI、DNS、Tunnel、token、本番ホストおよび本番公開の外部状態は変更していない。
@@ -181,6 +185,8 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 ## Remaining
 
 - Acervo本番ホスト名は候補の`acervo.kdf-biology.org`であり、最終確定後にDNS変更、実Tunnel接続または直接HTTPSの証明書取得を手動確認する。現時点で公開サービス用DNSレコードはない。
+- 本番ホストと管理経路、公開方式、`ACERVO_SITE_NAME`、`ACERVO_ORGANIZATION_NAME`、初期・継続管理者、DNS・Cloudflare・サーバー・バックアップの責任者、バックアップ暗号化・保存先、空環境の復元試験先、実運用対象の端末・OS・ブラウザ・同期パスキープロバイダーは、設計責任者が確定する必要がある。
+- Phase 10の完全なバックアップ・復元手順は未完成である。実データを扱うStep 7C-LIVE完了の前に、承認済みのバックアップ手順、空環境への復元試験先、復元可能なバックアップを用意・検証する。
 - 公開環境を用意した後、実運用HTTPSドメインでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告、端末内・同期パスキーの登録・ログイン・削除を確認する。同期パスキーとChrome以外の実運用対象ブラウザも未確認（`localhost`のWindows＋Chrome＋Windows Hello受入は完了）。
 - 後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。Step 7CのDNS変更、実Tunnel作成・token投入、実ドメイン公開、実証明書・実HTTPS受入も未着手。
 
