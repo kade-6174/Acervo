@@ -16,7 +16,8 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$work_directory/archives" "$work_directory/keys" "$work_directory/restored-settings"
-sudo chown -R 10001:10001 "$work_directory"
+# ホスト側は公開鍵と検証結果を書き、コンテナには必要な作業用ディレクトリだけを渡す。
+sudo chown -R 10001:10001 "$work_directory/archives" "$work_directory/keys" "$work_directory/restored-settings"
 
 "${source_compose[@]}" config --quiet
 "${source_compose[@]}" build backup
