@@ -10,7 +10,7 @@ Acervoは1インスタンスを1組織が運用する汎用ソフトウェアで
 - [ ] `DJANGO_ALLOWED_HOSTS`は公開hostname、`DJANGO_CSRF_TRUSTED_ORIGINS`は同じHTTPS Originへ完全一致で設定する。
 - [ ] 直接HTTPSまたはTunnel専用のどちらか一方を選んだ。共通基盤`compose.production.yaml`を単独起動せず、`compose.direct.yaml`と`compose.cloudflare.yaml`を同時に指定しない。
 - [ ] 本番ホスト、管理経路、DNS・Cloudflare・サーバー・バックアップの各責任者、初期管理者username、継続運用管理者候補、障害時の連絡・引継ぎ方法を確定した。
-- [ ] バックアップ保存先、暗号化方式、復元試験先、復元責任者を確定した。パスワード、token、秘密鍵、Recovery Codesは台帳にも直接記載せず、保管場所への参照だけを残す。
+- [ ] バックアップ保存先、暗号化方式、復元試験先、復元責任者を確定した。2人以上の`age`公開鍵をrecipientとして設定し、対応する秘密鍵は印刷・封緘して別々に保管する。パスワード、token、秘密鍵、Recovery Codesは台帳にも直接記載せず、保管場所への参照だけを残す。
 - [ ] 実運用で確認するスマートフォン、OS、PC、ブラウザ、同期パスキープロバイダーを決めた。端末内パスキー、同期パスキー、TOTP、Recovery Codesのすべてを復旧経路として維持する。
 - [ ] `DJANGO_SECRET_KEY`、`ACERVO_MFA_FERNET_KEYS`、DB資格情報、Tunnel tokenを別々に生成・保管できる。これらをGit、ログ、コマンド履歴へ出さない運用手段を確認した。
 

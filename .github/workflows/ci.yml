@@ -104,3 +104,6 @@ jobs:
 
       - name: Tunnel専用構成を検証
         run: bash .github/scripts/verify-production-compose.sh cloudflare
+
+      - name: 暗号化バックアップと空環境復元を検証
+        run: bash .github/scripts/verify-backup-restore.sh

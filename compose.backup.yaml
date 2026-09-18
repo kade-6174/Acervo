@@ -1,0 +1,41 @@
+services:
+  backup:
+    build:
+      context: .
+      dockerfile: deploy/backup/Dockerfile
+    read_only: true
+    user: "10001:10001"
+    security_opt:
+      - no-new-privileges:true
+    env_file:
+      - .env.production
+    volumes:
+      - media_data:/source-media:ro
+      - ./.env.production:/source-settings/.env.production:ro
+    tmpfs:
+      - /tmp
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+
+  restore:
+    build:
+      context: .
+      dockerfile: deploy/backup/Dockerfile
+    read_only: true
+    user: "10001:10001"
+    security_opt:
+      - no-new-privileges:true
+    env_file:
+      - .env.production
+    volumes:
+      - media_data:/target-media
+    tmpfs:
+      - /tmp
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
