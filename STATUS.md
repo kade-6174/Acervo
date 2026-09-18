@@ -4,9 +4,12 @@
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7Bを完了。次は実ドメイン受入のStep 7Cだが未着手であり、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOCを完了。Step 7C-LIVEの実ドメイン受入は未着手であり、Phase 1全体は未完了。
 
 ## Completed
+
+- Step 7C-DOCとして、汎用OSS向けの`docs/DEPLOYMENT.md`、生物班への一導入例である`docs/examples/KDF_BIOLOGY.md`、秘密値を記入しない`docs/templates/PRIVATE_OPERATIONS_RUNBOOK.md`を追加した。READMEの詳細な本番手順は汎用導入マニュアルへ集約し、公開方式、MFA復旧、在籍ポリシー、引継ぎの説明を重複させない。
+- 生物班の例は`school_cohort`の1年生基準（2026年度33回生）とTunnel専用構成を記録するが、サイト名・組織名、VM、Tunnel名、token、バックアップ先、利用端末は未確定または非公開情報として推測・記載していない。外部状態は変更していない。DNS、Tunnel作成・token配置、本番ホスト、本番Compose起動、実HTTPS受入、本番公開はStep 7C-LIVEへ残る。
 
 - Step 7A-R2として、学校回生方式の基準を「基準年度の1年生回生」へ変更した。`ACERVO_BASE_SCHOOL_YEAR=2026`と`ACERVO_BASE_FIRST_YEAR_COHORT=33`では、2026年度に33・32・31回生を順に1・2・3年生、2027年度に34・33・32回生を順に1・2・3年生として扱う。既存の`cohort_number`、DB schema、管理MFA、ログイン、MFAリセット、session、AuditLogは変更していない。
 - 本番で旧`ACERVO_BASE_THIRD_YEAR_COHORT`を検出した場合は、値を表示せず新しい`ACERVO_BASE_FIRST_YEAR_COHORT`への移行を案内してfail-fastで拒否する。旧変数だけでも新旧同時指定でも拒否し、`none`ポリシーの動作は維持する。当時のStep 7A／7A-Rは3年生基準だったが、現在はStep 7A-R2の1年生基準が正とする。migrationは追加していない。

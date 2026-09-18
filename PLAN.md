@@ -102,7 +102,8 @@
   - [x] 7A-R: `school_cohort`の4基準環境変数とサイト表示名の本番fail-fast、開発・本番の環境変数例、ポリシー切替手順を補完する。`none`では学校方式の基準を要求しない。
   - [x] 7A-R2: 学校回生方式の基準を「基準年度の1年生回生」へ変更する。旧`ACERVO_BASE_THIRD_YEAR_COHORT`は本番で安全に拒否し、`ACERVO_BASE_FIRST_YEAR_COHORT`への移行を必須とする。Userの既存回生値とDB schemaは変更しない。
   - [x] 7B: インフラ準備。直接HTTPS共通構成とTunnel専用構成を分け、Tunnel専用時はCaddyを含むアプリ側の80/443をホストへ公開しない。Compose、Caddy、CI、IP信頼境界、ヘルスチェック、永続化を実装・検証した。Cloudflareは任意のまま維持する。
-  - [ ] 7C: 実ドメイン受入。最終公開ホスト名の確定後にDNS変更、実Tunnel接続または直接HTTPS、実証明書、Recovery Codes、端末内・同期パスキー、Chrome以外の実運用対象ブラウザを受入確認する。
+  - [x] 7C-DOC: 汎用導入マニュアル、生物班の導入・運用例、秘密値を含まない非公開運用台帳テンプレートを整備する。DNS、Tunnel、token、本番ホスト、本番Compose、本番公開は変更しない。
+  - [ ] 7C-LIVE: 最終公開ホスト名の確定後にDNS変更、実Tunnel接続または直接HTTPS、実証明書、Recovery Codes、端末内・同期パスキー、Chrome以外の実運用対象ブラウザを受入確認する。
 
 **必須テスト:** パスキー登録とログイン、パスワード後のWebAuthn認証、TOTP登録・認証、リカバリーコードの一回性、再生成、暗号化保存、旧鍵復号と新鍵暗号化、安全でない本番オリジン拒否、MFAリセット。
 

@@ -20,67 +20,11 @@
 - スマートフォンのホーム画面へ追加できるPWA
 - バックアップ・復元を含むセルフホスト運用
 
-## 本番構成
+## 本番導入
 
-正式な本番構成は、1台のLinuxホスト上でDocker Composeを使います。
+本番導入は1台のLinuxホスト上のDocker Composeを正式構成とします。直接HTTPSが標準で、Cloudflare Tunnelは任意です。詳細な設定、起動、MFA、公開境界は[導入マニュアル](docs/DEPLOYMENT.md)を参照してください。
 
-```text
-ブラウザ ──HTTPS── Caddy ── Django/Gunicorn ── PostgreSQL
-                              │
-                              └── 保護された写真ボリューム
-```
-
-- Caddyだけを外部公開し、アプリとDBは内部ネットワークに置きます。
-- PostgreSQLと写真は永続ボリュームへ保存します。
-- 直接HTTPSを標準とし、Cloudflare Tunnelはポート開放できない場合の任意構成です。
-- Cloudflare、S3、外部CDNがなくても主要機能を利用できます。
-- DBと写真を毎日バックアップし、サーバーとは別の保存先へ複製します。
-
-`compose.yaml` は開発専用です。本番の `compose.production.yaml` は、公開ポートを持たない共通基盤です。単独では起動せず、直接HTTPSまたはCloudflare Tunnelの公開方式overlayを**どちらか一方だけ**組み合わせます。
-
-### 直接HTTPS（標準）
-
-直接HTTPSではCaddyだけが80/tcp、443/tcp、443/udpをホストへ公開します。GunicornとPostgreSQLはCompose内部ネットワークだけで利用します。
-
-```bash
-cp .env.production.example .env.production
-chmod 600 .env.production
-# .env.productionのドメイン、許可ホスト、CSRFオリジン、秘密値を変更する
-docker compose -f compose.production.yaml -f compose.direct.yaml config --quiet
-docker compose -f compose.production.yaml -f compose.direct.yaml build
-docker compose -f compose.production.yaml -f compose.direct.yaml up -d
-docker compose -f compose.production.yaml -f compose.direct.yaml ps
-docker compose -f compose.production.yaml -f compose.direct.yaml down
-```
-
-`DJANGO_SECRET_KEY` と `POSTGRES_PASSWORD` には、インスタンスごとに生成した長いランダム値を設定してください。直接HTTPSでは、設定したドメインのA/AAAAレコードをサーバーへ向け、外部から80/443番へ到達できる必要があります。Caddyが証明書を取得・更新します。
-
-本番ではCaddyだけがホストへポートを公開します。GunicornとPostgreSQLにはホスト側の公開ポートがありません。`/admin/` はCaddyで拒否し、`/static/` だけをCaddyから配信します。アップロード写真は静的ディレクトリに置かず、今後実装するDjangoの認証付き経路から返します。
-
-### Cloudflare Tunnelを使う場合（任意）
-
-Tunnel専用構成では、`proxy`、`web`、`db`、`tunnel`のいずれもホストポートを公開しません。受信ポート開放は不要です。Cloudflare側でリモート管理Tunnelを作り、公開ホスト名のオリジンを `http://proxy:8080` に設定する作業、DNS、実token、実接続はStep 7Cで行います。
-
-```bash
-cp .env.cloudflare.example .env.cloudflare
-chmod 600 .env.cloudflare
-# .env.cloudflareへTunnel tokenを設定する
-docker compose \
-  -f compose.production.yaml \
-  -f compose.cloudflare.yaml \
-  up -d
-```
-
-状態確認、停止、管理コマンドにも、選んだ公開方式と同じComposeファイルの組合せを使います。
-
-```bash
-# Tunnel専用構成の例
-docker compose -f compose.production.yaml -f compose.cloudflare.yaml ps
-docker compose -f compose.production.yaml -f compose.cloudflare.yaml down
-docker compose -f compose.production.yaml -f compose.cloudflare.yaml exec web python manage.py reset_admin_mfa ADMIN_USERNAME
-```
-
-Tunnel tokenは秘密情報です。リポジトリ、コマンド文字列、ログへ記録しないでください。Tunnelを使わない直接HTTPS構成では、`.env.cloudflare`もTunnel overlayも不要です。厳格なホストファイアウォールを使う場合だけ、`cloudflared` からCloudflareへ7844/TCPおよび7844/UDPの送信を許可してください。Cloudflare AccessはAcervoのログインや管理者MFAの必須要件ではありません。
+生物班への導入例は[生物班向け導入・運用例](docs/examples/KDF_BIOLOGY.md)、秘密値を含まない引継ぎ台帳の雛形は[非公開運用台帳テンプレート](docs/templates/PRIVATE_OPERATIONS_RUNBOOK.md)に分離しています。
 
 ## 設計文書
 
@@ -88,6 +32,7 @@ Tunnel tokenは秘密情報です。リポジトリ、コマンド文字列、�
 - [PLAN.md](PLAN.md) — Codexが実装する順序、テスト、完了条件
 - [AGENTS.md](AGENTS.md) — Codexが守る恒久的な作業ルール
 - [STATUS.md](STATUS.md) — 実装状況、テスト結果、問題点
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — 汎用OSS向け導入マニュアル
 
 現在はパスキー／セキュリティキーの登録・管理、パスワードログイン後の第二要素認証、passwordless passkeyログインを提供します。パスキーsignupは公開していません。
 
