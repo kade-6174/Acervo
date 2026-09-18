@@ -4,13 +4,13 @@
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-Rを完了。Step 7C-LICENSEはApache License 2.0の実装・検証中であり、Step 7C-LIVEの実ドメイン受入は未着手。Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSEを完了。Step 7C-LIVEの実ドメイン受入は未着手であり、Phase 1全体は未完了。
 
 ## Completed
 
 - Step 7C-DOCとして、汎用ソフトウェア向けの`docs/DEPLOYMENT.md`、生物班への一導入例である`docs/examples/KDF_BIOLOGY.md`、公開リポジトリに実値を書かない`docs/templates/PRIVATE_OPERATIONS_RUNBOOK.md`を追加した。READMEの詳細な本番手順は汎用導入マニュアルへ集約し、公開方式、MFA復旧、在籍ポリシー、引継ぎの説明を重複させない。
 - Step 7C-DOC-Rとして、ライセンス採用前の文書表現と非公開運用台帳の記録範囲を整合した。公開台帳テンプレートには実値を書かず、アクセス制限された非公開コピーには引継ぎに必要な最小限の担当者・連絡先・管理アカウント識別子・内部接続先を記録可能とした。一方、パスワード、token、秘密鍵、Recovery Codesは非公開コピーにも直接記載せず、安全な保管場所への参照だけを残す。Markdownリンクと`git diff --check`を確認し、実装コミット`4b0c8690ba09dd5ce9ceb1c1c962e6fb215e699a`のGitHub Actions run `35349448683`は`test`と`production-container`の全ジョブ成功。コード、Compose、Caddy、CI、DNS、Tunnel、token、本番ホストおよび本番公開の外部状態は変更していない。
-- Step 7C-LICENSEとして、kade_6174が権利を有するAcervo固有のコード、文書、設定例へApache License 2.0を適用する実装と検証を開始した。第三者のコード、静的資産、依存パッケージ、コンテナ基盤は再ライセンスせず、正式配布前の完全な依存物・ライセンス・SBOM確認は別タスクとする。最終CI成功前のため、この項目は未完了である。
+- Step 7C-LICENSEとして、kade_6174が権利を有するAcervo固有のコード、文書、設定例へApache License 2.0を適用した。`LICENSE`は公式本文との行単位一致、`NOTICE`は`Copyright 2026 kade_6174`、`THIRD_PARTY_NOTICES.md`はBootstrap 5.3.8（MIT）とhtmx 2.0.10（0BSD）の同梱ライセンスと配布元を記録する。PEP 639の`license = "Apache-2.0"`、`authors = [{ name = "kade_6174" }]`、ライセンス関連ファイルの`license-files`を設定し、隔離wheelで`License-Expression: Apache-2.0`、Author、LICENSE・NOTICE・第三者通知・同梱ライセンスの収録を確認した。ローカルではRuff lint／format、Django check、migration差分なし、Markdownリンク、`git diff --check`が成功。SQLite全231件は初回に既存TOTP統合テスト1件が一時失敗したが、同一テストの単独再実行と全231件の再実行はいずれも成功した。ローカルの`build`／setuptoolsは未導入のためsdistは未検証。実装コミット`41e3b8fb9d996a700869fb614b7525894fd5b6b7`のGitHub Actions run `35353015064`は`test`（PostgreSQL 18を含む）と`production-container`（直接HTTPS／Tunnel専用）の全ジョブ成功。第三者のコード、静的資産、依存パッケージ、コンテナ基盤は再ライセンスせず、公開Dockerイメージまたは配布済みアーカイブを正式提供する前の完全な依存物・ライセンス・SBOM確認は別タスクとする。コード、migration、Compose、Caddy、CI、DNS、Tunnel、token、本番ホストおよび本番公開の外部状態は変更していない。
 - 生物班の例は`school_cohort`の1年生基準（2026年度33回生）とTunnel専用構成を記録するが、サイト名・組織名、VM、Tunnel名、token、バックアップ先、利用端末は未確定または非公開情報として推測・記載していない。外部状態は変更していない。DNS、Tunnel作成・token配置、本番ホスト、本番Compose起動、実HTTPS受入、本番公開はStep 7C-LIVEへ残る。
 
 - Step 7A-R2として、学校回生方式の基準を「基準年度の1年生回生」へ変更した。`ACERVO_BASE_SCHOOL_YEAR=2026`と`ACERVO_BASE_FIRST_YEAR_COHORT=33`では、2026年度に33・32・31回生を順に1・2・3年生、2027年度に34・33・32回生を順に1・2・3年生として扱う。既存の`cohort_number`、DB schema、管理MFA、ログイン、MFAリセット、session、AuditLogは変更していない。
