@@ -61,11 +61,16 @@ class BackupToolTests(TestCase):
         self.environment.start()
         self.addCleanup(self.environment.stop)
 
-    def test_recipients_require_two_distinct_public_keys(self):
+    def test_recipients_require_one_or_more_distinct_public_keys(self):
         with patch.dict(os.environ, {"ACERVO_BACKUP_AGE_RECIPIENTS": "age1only"}):
+            self.assertEqual(backup_tool.recipients(), ["age1only"])
+        with patch.dict(os.environ, {"ACERVO_BACKUP_AGE_RECIPIENTS": "age1same,age1same"}):
             with self.assertRaisesRegex(backup_tool.BackupError, "age_recipients_invalid"):
                 backup_tool.recipients()
-        with patch.dict(os.environ, {"ACERVO_BACKUP_AGE_RECIPIENTS": "age1same,age1same"}):
+        with patch.dict(os.environ, {"ACERVO_BACKUP_AGE_RECIPIENTS": ""}):
+            with self.assertRaisesRegex(backup_tool.BackupError, "age_recipients_invalid"):
+                backup_tool.recipients()
+        with patch.dict(os.environ, {"ACERVO_BACKUP_AGE_RECIPIENTS": "not-an-age-recipient"}):
             with self.assertRaisesRegex(backup_tool.BackupError, "age_recipients_invalid"):
                 backup_tool.recipients()
 

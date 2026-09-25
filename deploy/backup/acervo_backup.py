@@ -109,7 +109,7 @@ def recipients() -> list[str]:
     raw = os.environ.get("ACERVO_BACKUP_AGE_RECIPIENTS", "")
     values = [value.strip() for value in raw.split(",") if value.strip()]
     if (
-        len(values) < 2
+        not values
         or len(set(values)) != len(values)
         or any(not value.startswith("age1") for value in values)
     ):
