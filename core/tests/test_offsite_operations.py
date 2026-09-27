@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest import TestCase
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 OFFSITE_DIRECTORY = Path(__file__).resolve().parents[2] / "deploy" / "offsite"
 
@@ -112,5 +113,18 @@ class DiscordNotificationTests(TestCase):
 
             with self.assertRaisesRegex(ValueError, "webhook_configuration_invalid") as context:
                 discord.webhook_url(configuration)
+
+            self.assertNotIn("secret-value", str(context.exception))
+
+    def test_http_error_does_not_echo_webhook_url(self):
+        with tempfile.TemporaryDirectory() as directory:
+            configuration = Path(directory) / "discord-webhook.url"
+            url = "https://discord.com/api/webhooks/1234567890/secret-value"
+            configuration.write_text(url, encoding="utf-8")
+            response = HTTPError(url, 404, "Not Found", hdrs=None, fp=None)
+
+            with patch.object(discord, "urlopen", side_effect=response):
+                with self.assertRaisesRegex(ValueError, "webhook_http_404") as context:
+                    discord.notify(configuration, "notification-test")
 
             self.assertNotIn("secret-value", str(context.exception))

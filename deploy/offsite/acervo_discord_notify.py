@@ -37,8 +37,12 @@ def notify(config: Path, failed_unit: str) -> None:
         with urlopen(request, timeout=10) as response:  # noqa: S310 -- URL is locally managed.
             if not 200 <= response.status < 300:
                 raise ValueError("webhook_delivery_failed")
-    except (HTTPError, URLError, TimeoutError) as error:
-        raise ValueError("webhook_delivery_failed") from error
+    except HTTPError as error:
+        raise ValueError(f"webhook_http_{error.code}") from error
+    except TimeoutError as error:
+        raise ValueError("webhook_timeout") from error
+    except URLError as error:
+        raise ValueError("webhook_connection_failed") from error
 
 
 def parse_arguments() -> argparse.Namespace:
