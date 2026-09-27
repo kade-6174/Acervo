@@ -39,7 +39,7 @@
 
 2026-09-28に、`core.tests.test_backup_tool` 19件、Ruff lint／format、Django check、migration差分確認、全Djangoテスト259件、`git diff --check`が成功した。
 
-このWindows環境にはDockerとbashがないため、Composeの署名付き作成→復元試験とshell構文検査は未実行である。`.github/scripts/verify-backup-restore.sh`を含むGitHub Actionsの`production-container`で確認する。
+このWindows環境にはDockerとbashがないため、Composeの署名付き作成→復元試験とshell構文検査はローカル未実行である。mainのGitHub Actions run `36332469569`は`test`と`production-container`が成功し、後者で直接HTTPS、Tunnel専用、署名鍵のコンテナ内利用、署名付き作成、保存先の整合する3ファイルの改ざん拒否、空環境復元を確認した。
 
 ## 次に行うこと
 

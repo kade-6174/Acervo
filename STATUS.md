@@ -12,7 +12,7 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 復元は保存先の3ファイルをprivateな一時領域へスナップショットしてから検証・復号する。検証後に保存先を再読込しないため、検証と復号の間の差替えを受け入れない。外側payloadと内側の写真archiveは展開前にパスを検査し、絶対パス、`..`、symlink、hardlink、デバイス、その他の非通常entry、重複entryを拒否する。保存先を同時に書き換えられる攻撃者は短いコピー競合により復元を失敗させ得るが、署名済みpayloadの任意差替えや任意ファイル書込みには至らない。DB復元後に写真または設定コピーが失敗した場合は空の復元先が部分復元状態になる既存の運用上の制約があり、再試行前に復元先を作り直す必要がある。
 
-ローカルではバックアップ専用19件、Ruff lint／format、Django check、migration差分なし、全259件の回帰テスト、`git diff --check`が成功した。Docker CLIとbashがないため、Compose統合試験はローカル未実行である。GitHub Actionsと実機への鍵配置・署名付きバックアップ作成・空環境復元は、この記録時点では未完了。Cloudflareの公開route設定および一般公開は、この修正をmainへ反映し、CIと実機復元受入を確認するまで進めない。
+ローカルではバックアップ専用19件、Ruff lint／format、Django check、migration差分なし、全259件の回帰テスト、`git diff --check`が成功した。Docker CLIとbashがないため、Compose統合試験はローカル未実行である。mainのGitHub Actions run `36332469569`は`test`と`production-container`の全ジョブが成功した。後者では直接HTTPS構成、Tunnel専用構成、署名付きバックアップ作成、整合する3ファイルの改ざん拒否、空環境への復元までを確認した。実機への鍵配置・署名付きバックアップ作成・空環境復元は未完了。Cloudflareの公開route設定および一般公開は、実機復元受入を確認するまで進めない。
 
 ## 2026-09-27 初回定時実行の確認
 
