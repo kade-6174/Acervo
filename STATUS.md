@@ -20,6 +20,8 @@ VM側`journalctl`の当日分には、PostgreSQL 18を対象とする暗号化�
 
 保持規則のdry-runで示した候補`acervo-20260926T122342Z-ad9357417c17`について、運用者の明示承認後に`--apply`を実行し、`retention_completed deleted=1`を確認した。確定済みの3世代は残った。`acervo-offsite-maintenance.timer`を`enabled`にし、次回のバックアップ機起動時から起動90秒後に実行されるよう設定した。timer有効化直後の`NEXT`は`-`だったため、maintenance serviceを手動で1回実行した。終了コード0、`retention_completed deleted=0`、`health_ok used_percent=0 free_gib=596`を確認した。Discord Webhookのroot専用設定ファイル作成・受信試験、VM200のバックアップservice失敗通知の導入は未実施。
 
+Discord WebhookをLXC 110のroot専用`0600`ファイルに設定し、通知serviceを試験したがHTTP 403で失敗した。Webhook URLはログ・チャットに表示していない。同じURLを使い、明示的な`User-Agent: Acervo-Backup/1.0`付きGETはHTTP 200、テスト通知POSTはHTTP 204だったため、Python標準の通信識別名が403の原因と判断した。通知スクリプトに成功した識別名を追加し、モックでPOSTとヘッダーを確認するテストを追加した。ローカルで`python -m unittest core.tests.test_offsite_operations`は9件成功、Python構文確認と`git diff --check`も成功。修正版のGitHub反映、LXC配布、systemd経由の受信再試験、VM200側の失敗通知設定は未実施。
+
 ## 2026-09-26 実機バックアップ作業の引継ぎ
 
 以下は運用者からの引継ぎ報告であり、この作業ツリーから実機のログや設定を読み返した結果ではない。導入先固有のアドレス、認証情報、秘密鍵の値は記録しない。

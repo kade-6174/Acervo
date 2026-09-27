@@ -30,7 +30,10 @@ def notify(config: Path, failed_unit: str) -> None:
     request = Request(
         url,
         data=json.dumps({"content": message}, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "Acervo-Backup/1.0",
+        },
         method="POST",
     )
     try:

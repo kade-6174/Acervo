@@ -106,6 +106,20 @@ class OffsiteHealthTests(TestCase):
 
 
 class DiscordNotificationTests(TestCase):
+    def test_notification_uses_verified_user_agent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            configuration = Path(directory) / "discord-webhook.url"
+            configuration.write_text(
+                "https://discord.com/api/webhooks/1234567890/test-token", encoding="utf-8"
+            )
+            with patch.object(discord, "urlopen") as send:
+                send.return_value.__enter__.return_value.status = 204
+                discord.notify(configuration, "notification-test")
+
+            request = send.call_args.args[0]
+            self.assertEqual(request.get_header("User-agent"), "Acervo-Backup/1.0")
+            self.assertEqual(request.get_method(), "POST")
+
     def test_invalid_webhook_is_rejected_without_echoing_value(self):
         with tempfile.TemporaryDirectory() as directory:
             configuration = Path(directory) / "discord-webhook.url"
