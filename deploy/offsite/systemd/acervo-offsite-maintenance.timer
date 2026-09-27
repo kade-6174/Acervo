@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Acervo offsite maintenance after backup host boot
+
+[Timer]
+OnBootSec=90s
+Persistent=false
+Unit=acervo-offsite-maintenance.service
+
+[Install]
+WantedBy=timers.target

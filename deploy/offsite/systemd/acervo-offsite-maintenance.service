@@ -1,0 +1,11 @@
+[Unit]
+Description=Maintain and check Acervo offsite backups
+After=network-online.target
+Wants=network-online.target
+OnFailure=acervo-discord-notify@%n.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/acervo/offsite-maintenance.env
+ExecStart=/usr/local/sbin/acervo-offsite-retention --apply
+ExecStartPost=/usr/local/sbin/acervo-offsite-health

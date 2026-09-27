@@ -1,0 +1,8 @@
+[Unit]
+Description=Notify Discord about an Acervo backup service failure (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/acervo-discord-notify %i

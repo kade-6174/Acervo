@@ -14,6 +14,8 @@ VM側`journalctl`の当日分には、PostgreSQL 18を対象とする暗号化�
 
 同日にバックアップ機のLXC 110を実機確認した。LXCは`running`で、`ssh`と`acervo-finalize-incoming.path`はいずれも`active`だった。保存領域`/srv/acervo-backup`は629 GB中2.2 MB使用、597 GB空き。確定済み成果物は`/srv/acervo-backup/sftp/incoming/acervo-...`へ保存され、finalizeスクリプトは`.ready`、必須3ファイル、SHA-256を検証してからディレクトリを確定する。確認時には4世代が確定済みで、合計72 KBだった。別ホストの自動整理、容量監視、失敗通知は未整備であり、削除は行っていない。手動WOL送信は主Proxmoxホスト側で終了コード0だったが、直後のpingではバックアップ機から応答がなく、手動WOLからの起動成立は未確認である。
 
+別ホスト向けに、確定済み成果物だけを日次14・週次8・月次12世代の和集合で保持するスクリプト、起動90秒後に整理と容量・必須unitを検査するsystemd unit、任意のDiscord Webhook失敗通知の導入用ファイルを追加した。保持スクリプトは既定で候補表示だけを行い、`--apply`がなければ削除しない。容量の初期しきい値は空き50 GiB未満または使用率85%以上である。Webhook URLはroot専用の設定ファイルにだけ置き、Git、ログ、コマンド引数には出さない。ローカルでは`python -m unittest core.tests.test_backup_tool core.tests.test_offsite_operations`が17件成功、Python構文確認と`git diff --check`が成功した。RuffはこのWindows環境に未導入のため未実行。実機への導入、dry-run結果の確認、Discord受信確認、実削除は未実施。
+
 ## 2026-09-26 実機バックアップ作業の引継ぎ
 
 以下は運用者からの引継ぎ報告であり、この作業ツリーから実機のログや設定を読み返した結果ではない。導入先固有のアドレス、認証情報、秘密鍵の値は記録しない。

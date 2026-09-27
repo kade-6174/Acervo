@@ -76,6 +76,24 @@ docker compose -f compose.production.yaml -f compose.direct.yaml -f compose.back
 
 別ホスト保存先の自動削除は、日次・週次・月次の保持規則、必要容量、復元可能性を確認してから導入します。規則が未確定の間は過去の成果物を削除しません。失敗通知と空き容量の監視も、日々の運用開始前に担当者と確認頻度を決めます。
 
+## 別ホストの保持・容量監視・Discord通知
+
+別ホストの保持処理も、初期値で日次14世代、週次8世代、月次12世代を残します。`deploy/offsite/acervo_offsite_retention.py`は、確定済みの`acervo-YYYYMMDDTHHMMSSZ-<hex>`ディレクトリだけを対象にします。既定では削除候補を表示するだけで、`--apply`が明示されたときだけ候補を削除します。`.ready`と`.incoming`は対象にしません。
+
+バックアップ機は転送後に停止するため、保持処理と容量監視は起動直後に実行します。`acervo-offsite-maintenance.timer`は起動90秒後に実行し、整理後に、保存先の空き容量、`ssh.service`、`acervo-finalize-incoming.path`を確認します。初期しきい値は空き50 GiB未満または使用率85%以上です。導入先はroot専用の`/etc/acervo/offsite-maintenance.env`で、次の範囲だけ調整できます。
+
+```ini
+ACERVO_BACKUP_RETENTION_DAILY=14
+ACERVO_BACKUP_RETENTION_WEEKLY=8
+ACERVO_BACKUP_RETENTION_MONTHLY=12
+ACERVO_OFFSITE_MIN_FREE_GIB=50
+ACERVO_OFFSITE_MAX_USED_PERCENT=85
+```
+
+Discord通知は任意です。Webhook URLは投稿先チャンネルへの送信権限を持つ秘密情報なので、Git、チャット、ログ、コマンド引数へ書きません。`/etc/acervo/discord-webhook.url`にURLだけを保存し、root所有・`0600`にします。`acervo-discord-notify@.service`は失敗したsystemd unit名だけを通知し、設定値、保存先のファイル名、バックアップ内容を送信しません。VM側の`acervo-daily-backup.service`とLXC側のmaintenance serviceの`OnFailure`から呼び出します。
+
+導入前は、保持スクリプトを`--apply`なしで実行し、削除候補が想定どおりであることを確認します。容量監視とDiscord通知も、テスト専用の失敗unitを使うか、復旧可能な検証環境で通知受信を確認します。実データの成果物を使った通知試験や削除を、初回導入確認へ混ぜません。
+
 ## 空環境への復元
 
 復元は本番環境へ実行しません。対象Compose projectのDBにpublic schemaのテーブルがなく、`media_data`が空である場合だけ許可します。`RESTORE_EMPTY_TARGET`の完全一致確認が必要です。PostgreSQL majorがbackup metadataと対象DBで一致しない場合は拒否します。PostgreSQL major更新は通常復元と混ぜず、別途移行・復元試験を行います。
