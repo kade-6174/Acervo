@@ -16,6 +16,9 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$work_directory/archives" "$work_directory/keys" "$work_directory/restored-settings"
+ssh-keygen -q -t ed25519 -N '' -f "$work_directory/keys/signing"
+printf 'acervo-backup ' > "$work_directory/keys/allowed_signers"
+cat "$work_directory/keys/signing.pub" >> "$work_directory/keys/allowed_signers"
 # ホスト側は公開鍵と検証結果を書き、コンテナには必要な作業用ディレクトリだけを渡す。
 sudo chown -R 10001:10001 "$work_directory/archives" "$work_directory/keys" "$work_directory/restored-settings"
 
@@ -24,13 +27,18 @@ sudo chown -R 10001:10001 "$work_directory/archives" "$work_directory/keys" "$wo
 "${source_compose[@]}" up --detach --wait db web proxy
 "${source_compose[@]}" exec -T web sh -c 'printf %s restored-photo > /app/media/backup-restore-check.txt'
 
-"${source_compose[@]}" run --rm --no-deps -v "$work_directory/keys:/keys" --entrypoint age-keygen backup -o /keys/first.txt 2> "$work_directory/first.public"
-sudo chown -R 10001:10001 "$work_directory/keys"
+ACERVO_BACKUP_SIGNING_PRIVATE_KEY_FILE="$work_directory/keys/signing" "${source_compose[@]}" run --rm --no-deps \
+  --entrypoint sh backup -ceu '
+    printf test > /tmp/signing-input
+    ssh-keygen -Y sign -f /run/acervo-backup-signing/private -n acervo-backup /tmp/signing-input >/dev/null
+    test -s /tmp/signing-input.sig
+  '
+ACERVO_BACKUP_SIGNING_PRIVATE_KEY_FILE="$work_directory/keys/signing" "${source_compose[@]}" run --rm --no-deps -v "$work_directory/keys:/keys" --entrypoint age-keygen backup -o /keys/first.txt 2> "$work_directory/first.public"
 first_recipient="$(sed -n 's/^Public key: //p' "$work_directory/first.public")"
 test -n "$first_recipient"
 recipients="$first_recipient"
 
-"${source_compose[@]}" run --rm --no-deps \
+ACERVO_BACKUP_SIGNING_PRIVATE_KEY_FILE="$work_directory/keys/signing" "${source_compose[@]}" run --rm --no-deps \
   -v "$work_directory/archives:/backups" \
   -e "ACERVO_BACKUP_AGE_RECIPIENTS=$recipients" \
   backup create
@@ -44,9 +52,41 @@ sudo test -f "$work_directory/archives/$backup_id/checksums.sha256"
 sudo test ! -e "$work_directory/archives/$backup_id/database.dump"
 sudo test ! -e "$work_directory/archives/$backup_id/photos.tar"
 
+# 保存先の書込み権限だけで整合する3ファイルを置換しても、署名検証より先へ進まない。
+tampered_id="acervo-tampered"
+sudo cp -a "$work_directory/archives/$backup_id" "$work_directory/archives/$tampered_id"
+sudo python3 - "$work_directory/archives/$tampered_id" <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+directory = Path(sys.argv[1])
+payload = directory / "payload.tar.gz.age"
+payload.write_bytes(b"attacker replacement")
+metadata_path = directory / "metadata.json"
+metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+metadata["encrypted_payload_sha256"] = hashlib.sha256(payload.read_bytes()).hexdigest()
+metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+(directory / "checksums.sha256").write_text(
+    f"{hashlib.sha256(payload.read_bytes()).hexdigest()}  payload.tar.gz.age\n"
+    f"{hashlib.sha256(metadata_path.read_bytes()).hexdigest()}  metadata.json\n",
+    encoding="ascii",
+)
+PY
+
 "${source_compose[@]}" down --volumes --remove-orphans
 "${target_compose[@]}" up --detach --wait db
-"${target_compose[@]}" run --rm --no-deps \
+if ACERVO_BACKUP_ALLOWED_SIGNERS_FILE="$work_directory/keys/allowed_signers" "${target_compose[@]}" run --rm --no-deps \
+  -v "$work_directory/archives:/backups:ro" \
+  -v "$work_directory/keys/first.txt:/run/identity/identity.txt:ro" \
+  -v "$work_directory/restored-settings:/restored-settings" \
+  restore restore --backup-id "$tampered_id" --identity-file /run/identity/identity.txt \
+  --confirm RESTORE_EMPTY_TARGET; then
+  echo "tampered_backup_was_accepted" >&2
+  exit 1
+fi
+ACERVO_BACKUP_ALLOWED_SIGNERS_FILE="$work_directory/keys/allowed_signers" "${target_compose[@]}" run --rm --no-deps \
   -v "$work_directory/archives:/backups:ro" \
   -v "$work_directory/keys/first.txt:/run/identity/identity.txt:ro" \
   -v "$work_directory/restored-settings:/restored-settings" \

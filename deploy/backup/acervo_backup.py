@@ -11,15 +11,20 @@ import secrets
 import shutil
 import subprocess
 import sys
+import tarfile
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-BACKUP_FORMAT_VERSION = 1
+BACKUP_FORMAT_VERSION = 2
 BACKUP_ROOT = Path("/backups")
 SOURCE_MEDIA = Path("/source-media")
 SOURCE_SETTINGS = Path("/source-settings/.env.production")
 TARGET_MEDIA = Path("/target-media")
 RESTORED_SETTINGS = Path("/restored-settings")
+SIGNING_PRIVATE_KEY = Path("/run/acervo-backup-signing/private")
+ALLOWED_SIGNERS = Path("/run/acervo-backup-signing/allowed_signers")
+SIGNING_NAMESPACE = "acervo-backup"
+SIGNING_PRINCIPAL = "acervo-backup"
 
 
 class BackupError(Exception):
@@ -122,6 +127,107 @@ def write_json(path: Path, data: dict[str, object]) -> None:
         json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     path.chmod(0o600)
+
+
+def canonical_metadata(metadata: dict[str, object]) -> bytes:
+    unsigned = {key: value for key, value in metadata.items() if key != "authentication"}
+    return json.dumps(unsigned, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode(
+        "utf-8"
+    )
+
+
+def signature_command(args: list[str], *, input_path: Path | None = None) -> None:
+    try:
+        with input_path.open("rb") if input_path else open(os.devnull, "rb") as stream:
+            subprocess.run(
+                args,
+                check=True,
+                stdin=stream,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise BackupError("backup_authentication_failed") from error
+
+
+def sign_metadata(metadata: dict[str, object], work: Path) -> str:
+    if not SIGNING_PRIVATE_KEY.is_file():
+        fail("backup_signing_key_unavailable")
+    source = work / "metadata-to-sign"
+    signature = source.with_suffix(".sig")
+    try:
+        source.write_bytes(canonical_metadata(metadata))
+        source.chmod(0o600)
+        signature_command(
+            [
+                "ssh-keygen",
+                "-Y",
+                "sign",
+                "-f",
+                str(SIGNING_PRIVATE_KEY),
+                "-n",
+                SIGNING_NAMESPACE,
+                str(source),
+            ]
+        )
+        return signature.read_text(encoding="ascii")
+    except (OSError, UnicodeError) as error:
+        raise BackupError("backup_authentication_failed") from error
+    finally:
+        source.unlink(missing_ok=True)
+        signature.unlink(missing_ok=True)
+
+
+def verify_metadata_authentication(
+    directory: Path, metadata: dict[str, object], work: Path
+) -> None:
+    authentication = metadata.get("authentication")
+    if (
+        metadata.get("format_version") != BACKUP_FORMAT_VERSION
+        or not isinstance(authentication, dict)
+        or authentication.get("algorithm") != "ssh-ed25519"
+        or not isinstance(authentication.get("signature"), str)
+        or not ALLOWED_SIGNERS.is_file()
+    ):
+        fail("backup_authentication_invalid")
+    expected_payload_hash = metadata.get("encrypted_payload_sha256")
+    if (
+        not isinstance(expected_payload_hash, str)
+        or len(expected_payload_hash) != 64
+        or sha256(directory / "payload.tar.gz.age") != expected_payload_hash
+    ):
+        fail("backup_authentication_invalid")
+    source = work / "metadata-to-verify"
+    signature = source.with_suffix(".sig")
+    try:
+        source.write_bytes(canonical_metadata(metadata))
+        signature.write_text(authentication["signature"], encoding="ascii")
+        source.chmod(0o600)
+        signature.chmod(0o600)
+        try:
+            signature_command(
+                [
+                    "ssh-keygen",
+                    "-Y",
+                    "verify",
+                    "-f",
+                    str(ALLOWED_SIGNERS),
+                    "-I",
+                    SIGNING_PRINCIPAL,
+                    "-n",
+                    SIGNING_NAMESPACE,
+                    "-s",
+                    str(signature),
+                ],
+                input_path=source,
+            )
+        except BackupError as error:
+            raise BackupError("backup_authentication_invalid") from error
+    except (OSError, UnicodeError) as error:
+        raise BackupError("backup_authentication_failed") from error
+    finally:
+        source.unlink(missing_ok=True)
+        signature.unlink(missing_ok=True)
 
 
 def component(path: Path, name: str) -> dict[str, object]:
@@ -237,6 +343,10 @@ def create_backup() -> None:
             "format_version": BACKUP_FORMAT_VERSION,
             "postgres_major": manifest["postgres_major"],
         }
+        metadata["authentication"] = {
+            "algorithm": "ssh-ed25519",
+            "signature": sign_metadata(metadata, work),
+        }
         write_json(work / "metadata.json", metadata)
         checksums = work / "checksums.sha256"
         checksums.write_text(
@@ -260,7 +370,7 @@ def create_backup() -> None:
 def load_metadata(directory: Path) -> dict[str, object]:
     try:
         data = json.loads((directory / "metadata.json").read_text(encoding="utf-8"))
-        if data["format_version"] != BACKUP_FORMAT_VERSION or not isinstance(
+        if data["format_version"] not in {1, BACKUP_FORMAT_VERSION} or not isinstance(
             data["created_at"], str
         ):
             raise ValueError
@@ -347,6 +457,76 @@ def verify_checksums(directory: Path) -> None:
         fail("backup_checksum_invalid")
 
 
+def snapshot_backup(directory: Path, work: Path) -> Path:
+    snapshot = work / "backup"
+    snapshot.mkdir(mode=0o700)
+    try:
+        for name in ("payload.tar.gz.age", "metadata.json", "checksums.sha256"):
+            source = directory / name
+            destination = snapshot / name
+            if source.is_symlink() or not source.is_file():
+                fail("backup_snapshot_invalid")
+            with source.open("rb") as input_stream, destination.open("xb") as output_stream:
+                shutil.copyfileobj(input_stream, output_stream)
+            destination.chmod(0o600)
+    except OSError:
+        fail("backup_snapshot_invalid")
+    return snapshot
+
+
+def archive_path(name: str) -> Path | None:
+    path = PurePosixPath(name)
+    if path.is_absolute() or ".." in path.parts:
+        fail("backup_archive_invalid")
+    parts = tuple(part for part in path.parts if part != ".")
+    if not parts:
+        return None
+    return Path(*parts)
+
+
+def extract_archive(
+    archive: Path,
+    destination: Path,
+    *,
+    expected: dict[str, str] | None = None,
+) -> None:
+    try:
+        with tarfile.open(archive, "r:*") as source:
+            members = source.getmembers()
+            seen: set[str] = set()
+            extracted: list[tuple[tarfile.TarInfo, Path]] = []
+            for member in members:
+                path = archive_path(member.name)
+                if path is None:
+                    if not member.isdir():
+                        fail("backup_archive_invalid")
+                    continue
+                name = path.as_posix()
+                if name in seen:
+                    fail("backup_archive_invalid")
+                seen.add(name)
+                member_type = "directory" if member.isdir() else "file" if member.isreg() else None
+                if member_type is None or (expected and expected.get(name) != member_type):
+                    fail("backup_archive_invalid")
+                extracted.append((member, path))
+            if expected and seen != set(expected):
+                fail("backup_archive_invalid")
+            for member, path in extracted:
+                target = destination / path
+                if member.isdir():
+                    target.mkdir(mode=0o700, parents=True, exist_ok=False)
+                    continue
+                target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+                input_stream = source.extractfile(member)
+                if input_stream is None:
+                    fail("backup_archive_invalid")
+                with input_stream, target.open("xb") as output_stream:
+                    shutil.copyfileobj(input_stream, output_stream)
+                target.chmod(0o600)
+    except (OSError, tarfile.TarError):
+        fail("backup_archive_invalid")
+
+
 def target_is_empty() -> None:
     tables = command(
         [
@@ -370,18 +550,20 @@ def restore_backup(backup_name: str, identity_file: Path, confirmation: str) -> 
     if not identity_file.is_file() or not TARGET_MEDIA.is_dir() or not RESTORED_SETTINGS.is_dir():
         fail("restore_target_unavailable")
     directory = BACKUP_ROOT / backup_name
-    if not directory.is_dir() or not backup_name.startswith("acervo-"):
+    if directory.is_symlink() or not directory.is_dir() or not backup_name.startswith("acervo-"):
         fail("backup_not_found")
-    verify_checksums(directory)
-    metadata = load_metadata(directory)
-    if metadata.get("backup_id") != backup_name:
-        fail("backup_metadata_invalid")
-    if int(metadata["postgres_major"]) != postgres_major():
-        fail("postgres_major_incompatible")
-    target_is_empty()
     work = Path("/tmp") / f"restore-{secrets.token_hex(6)}"
     work.mkdir(mode=0o700)
     try:
+        snapshot = snapshot_backup(directory, work)
+        metadata = load_metadata(snapshot)
+        verify_metadata_authentication(snapshot, metadata, work)
+        verify_checksums(snapshot)
+        if metadata.get("backup_id") != backup_name:
+            fail("backup_metadata_invalid")
+        if int(metadata["postgres_major"]) != postgres_major():
+            fail("postgres_major_incompatible")
+        target_is_empty()
         payload = work / "payload.tar.gz"
         try:
             with payload.open("wb") as output:
@@ -391,7 +573,7 @@ def restore_backup(backup_name: str, identity_file: Path, confirmation: str) -> 
                         "--decrypt",
                         "--identity",
                         str(identity_file),
-                        str(directory / "payload.tar.gz.age"),
+                        str(snapshot / "payload.tar.gz.age"),
                     ],
                     check=True,
                     stdin=subprocess.DEVNULL,
@@ -400,19 +582,14 @@ def restore_backup(backup_name: str, identity_file: Path, confirmation: str) -> 
                 )
         except (OSError, subprocess.CalledProcessError) as error:
             raise BackupError("backup_decryption_failed") from error
-        members = command(
-            ["tar", "--list", "--gzip", "--file", str(payload)], output=True
-        ).splitlines()
         expected = {
-            "database.dump",
-            "photos.tar",
-            "settings/",
-            "settings/.env.production",
-            "manifest.json",
+            "database.dump": "file",
+            "photos.tar": "file",
+            "settings": "directory",
+            "settings/.env.production": "file",
+            "manifest.json": "file",
         }
-        if set(members) != expected:
-            fail("backup_contents_invalid")
-        command(["tar", "--extract", "--gzip", "--file", str(payload), "--directory", str(work)])
+        extract_archive(payload, work, expected=expected)
         manifest = json.loads((work / "manifest.json").read_text(encoding="utf-8"))
         if (
             manifest.get("format_version") != BACKUP_FORMAT_VERSION
@@ -443,17 +620,7 @@ def restore_backup(backup_name: str, identity_file: Path, confirmation: str) -> 
             ],
             env=postgres_env(),
         )
-        command(
-            [
-                "tar",
-                "--extract",
-                "--file",
-                str(work / "photos.tar"),
-                "--directory",
-                str(TARGET_MEDIA),
-                "--no-same-owner",
-            ]
-        )
+        extract_archive(work / "photos.tar", TARGET_MEDIA)
         settings_output = RESTORED_SETTINGS / ".env.production"
         if settings_output.exists():
             fail("restore_settings_destination_not_empty")

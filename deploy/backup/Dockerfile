@@ -24,7 +24,9 @@ COPY --from=age-download /out/age /usr/local/bin/age
 COPY --from=age-download /out/age-keygen /usr/local/bin/age-keygen
 COPY deploy/backup/acervo_backup.py /usr/local/lib/acervo-backup/acervo_backup.py
 
-RUN apk add --no-cache python3 \
+RUN apk add --no-cache openssh-client python3 \
+    && addgroup -g 10001 acervo \
+    && adduser -D -H -u 10001 -G acervo acervo \
     && chmod 0555 /usr/local/lib/acervo-backup/acervo_backup.py \
     && mkdir -p /source-media /target-media /source-settings /restored-settings /backups \
     && chown -R 10001:10001 /source-media /target-media /source-settings /restored-settings /backups

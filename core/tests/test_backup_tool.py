@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
+import subprocess
+import tarfile
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -32,6 +35,14 @@ class BackupToolTests(TestCase):
         self.target_media.mkdir()
         self.restored_settings = self.root / "restored-settings"
         self.restored_settings.mkdir()
+        self.signing_private_key = self.root / "signing-private"
+        self.allowed_signers = self.root / "allowed_signers"
+        subprocess.run(
+            ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(self.signing_private_key)],
+            check=True,
+        )
+        public_key = self.signing_private_key.with_suffix(".pub").read_bytes().split()[:2]
+        self.allowed_signers.write_bytes(b"acervo-backup " + b" ".join(public_key) + b"\n")
         self.constants = patch.multiple(
             backup_tool,
             BACKUP_ROOT=self.backups,
@@ -39,6 +50,8 @@ class BackupToolTests(TestCase):
             SOURCE_SETTINGS=self.settings,
             TARGET_MEDIA=self.target_media,
             RESTORED_SETTINGS=self.restored_settings,
+            SIGNING_PRIVATE_KEY=self.signing_private_key,
+            ALLOWED_SIGNERS=self.allowed_signers,
         )
         self.constants.start()
         self.addCleanup(self.constants.stop)
@@ -140,6 +153,180 @@ class BackupToolTests(TestCase):
         )
         with self.assertRaisesRegex(backup_tool.BackupError, "backup_checksum_mismatch"):
             backup_tool.verify_checksums(archive)
+
+    def test_replaced_backup_metadata_and_checksums_fail_authentication(self):
+        archive = self.backups / "acervo-test"
+        archive.mkdir()
+        payload = archive / "payload.tar.gz.age"
+        payload.write_bytes(b"original encrypted payload")
+        metadata = {
+            "backup_id": archive.name,
+            "components": [],
+            "created_at": "2026-09-27T00:00:00Z",
+            "encrypted_payload_sha256": backup_tool.sha256(payload),
+            "format_version": backup_tool.BACKUP_FORMAT_VERSION,
+            "postgres_major": 18,
+        }
+        metadata["authentication"] = {
+            "algorithm": "ssh-ed25519",
+            "signature": backup_tool.sign_metadata(metadata, self.root),
+        }
+        payload.write_bytes(b"attacker replacement")
+        metadata["encrypted_payload_sha256"] = backup_tool.sha256(payload)
+        (archive / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+        (archive / "checksums.sha256").write_text(
+            f"{backup_tool.sha256(payload)}  payload.tar.gz.age\n"
+            f"{backup_tool.sha256(archive / 'metadata.json')}  metadata.json\n",
+            encoding="ascii",
+        )
+        with self.assertRaisesRegex(backup_tool.BackupError, "backup_authentication_invalid"):
+            backup_tool.verify_metadata_authentication(archive, metadata, self.root)
+
+    def test_signed_metadata_is_accepted(self):
+        archive = self.backups / "acervo-test"
+        archive.mkdir()
+        payload = archive / "payload.tar.gz.age"
+        payload.write_bytes(b"signed encrypted payload")
+        metadata = {
+            "backup_id": archive.name,
+            "components": [],
+            "created_at": "2026-09-27T00:00:00Z",
+            "encrypted_payload_sha256": backup_tool.sha256(payload),
+            "format_version": backup_tool.BACKUP_FORMAT_VERSION,
+            "postgres_major": 18,
+        }
+        metadata["authentication"] = {
+            "algorithm": "ssh-ed25519",
+            "signature": backup_tool.sign_metadata(metadata, self.root),
+        }
+        backup_tool.verify_metadata_authentication(archive, metadata, self.root)
+
+    def test_unsigned_backup_is_rejected(self):
+        archive = self.backups / "acervo-test"
+        archive.mkdir()
+        payload = archive / "payload.tar.gz.age"
+        payload.write_bytes(b"unsigned encrypted payload")
+        metadata = {
+            "backup_id": archive.name,
+            "components": [],
+            "created_at": "2026-09-27T00:00:00Z",
+            "encrypted_payload_sha256": backup_tool.sha256(payload),
+            "format_version": 1,
+            "postgres_major": 18,
+        }
+        with self.assertRaisesRegex(backup_tool.BackupError, "backup_authentication_invalid"):
+            backup_tool.verify_metadata_authentication(archive, metadata, self.root)
+
+    def test_invalid_signature_is_rejected(self):
+        archive = self.backups / "acervo-test"
+        archive.mkdir()
+        payload = archive / "payload.tar.gz.age"
+        payload.write_bytes(b"signed encrypted payload")
+        metadata = {
+            "backup_id": archive.name,
+            "components": [],
+            "created_at": "2026-09-27T00:00:00Z",
+            "encrypted_payload_sha256": backup_tool.sha256(payload),
+            "format_version": backup_tool.BACKUP_FORMAT_VERSION,
+            "postgres_major": 18,
+        }
+        signature = backup_tool.sign_metadata(metadata, self.root)
+        metadata["authentication"] = {
+            "algorithm": "ssh-ed25519",
+            "signature": f"x{signature[1:]}",
+        }
+        with self.assertRaisesRegex(backup_tool.BackupError, "backup_authentication_invalid"):
+            backup_tool.verify_metadata_authentication(archive, metadata, self.root)
+
+    def test_untrusted_public_key_is_rejected(self):
+        archive = self.backups / "acervo-test"
+        archive.mkdir()
+        payload = archive / "payload.tar.gz.age"
+        payload.write_bytes(b"signed encrypted payload")
+        metadata = {
+            "backup_id": archive.name,
+            "components": [],
+            "created_at": "2026-09-27T00:00:00Z",
+            "encrypted_payload_sha256": backup_tool.sha256(payload),
+            "format_version": backup_tool.BACKUP_FORMAT_VERSION,
+            "postgres_major": 18,
+        }
+        metadata["authentication"] = {
+            "algorithm": "ssh-ed25519",
+            "signature": backup_tool.sign_metadata(metadata, self.root),
+        }
+        other_private_key = self.root / "other-signing-private"
+        subprocess.run(
+            ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(other_private_key)],
+            check=True,
+        )
+        other_public_key = other_private_key.with_suffix(".pub").read_bytes().split()[:2]
+        self.allowed_signers.write_bytes(b"acervo-backup " + b" ".join(other_public_key) + b"\n")
+        with self.assertRaisesRegex(backup_tool.BackupError, "backup_authentication_invalid"):
+            backup_tool.verify_metadata_authentication(archive, metadata, self.root)
+
+    def test_extract_archive_rejects_links(self):
+        archive = self.root / "photos.tar"
+        with tarfile.open(archive, "w") as output:
+            member = tarfile.TarInfo("photo-link")
+            member.type = tarfile.SYMTYPE
+            member.linkname = "/etc/passwd"
+            output.addfile(member)
+        with self.assertRaisesRegex(backup_tool.BackupError, "backup_archive_invalid"):
+            backup_tool.extract_archive(archive, self.target_media)
+
+    def test_extract_archive_rejects_traversal_and_absolute_paths(self):
+        for name in ("../outside", "/outside"):
+            archive = self.root / f"{len(name)}.tar"
+            with tarfile.open(archive, "w") as output:
+                member = tarfile.TarInfo(name)
+                member.size = 1
+                output.addfile(member, io.BytesIO(b"x"))
+            with self.assertRaisesRegex(backup_tool.BackupError, "backup_archive_invalid"):
+                backup_tool.extract_archive(archive, self.target_media)
+
+    def test_extract_archive_rejects_hard_links(self):
+        archive = self.root / "photos.tar"
+        with tarfile.open(archive, "w") as output:
+            member = tarfile.TarInfo("photo-link")
+            member.type = tarfile.LNKTYPE
+            member.linkname = "photo.jpg"
+            output.addfile(member)
+        with self.assertRaisesRegex(backup_tool.BackupError, "backup_archive_invalid"):
+            backup_tool.extract_archive(archive, self.target_media)
+
+    def test_snapshot_prevents_reopen_of_replaced_backup_files(self):
+        archive = self.backups / "acervo-test"
+        archive.mkdir()
+        payload = archive / "payload.tar.gz.age"
+        payload.write_bytes(b"original encrypted payload")
+        metadata = {
+            "backup_id": archive.name,
+            "components": [],
+            "created_at": "2026-09-27T00:00:00Z",
+            "encrypted_payload_sha256": backup_tool.sha256(payload),
+            "format_version": backup_tool.BACKUP_FORMAT_VERSION,
+            "postgres_major": 18,
+        }
+        metadata["authentication"] = {
+            "algorithm": "ssh-ed25519",
+            "signature": backup_tool.sign_metadata(metadata, self.root),
+        }
+        (archive / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+        (archive / "checksums.sha256").write_text(
+            f"{backup_tool.sha256(payload)}  payload.tar.gz.age\n"
+            f"{backup_tool.sha256(archive / 'metadata.json')}  metadata.json\n",
+            encoding="ascii",
+        )
+        work = self.root / "restore-work"
+        work.mkdir()
+        snapshot = backup_tool.snapshot_backup(archive, work)
+        payload.write_bytes(b"attacker replacement")
+        restored_metadata = backup_tool.load_metadata(snapshot)
+        backup_tool.verify_metadata_authentication(snapshot, restored_metadata, work)
+        self.assertEqual(
+            (snapshot / "payload.tar.gz.age").read_bytes(), b"original encrypted payload"
+        )
 
     def test_nonempty_restore_target_is_rejected_before_decryption(self):
         self.target_media.joinpath("existing.jpg").write_bytes(b"existing")

@@ -12,6 +12,7 @@ services:
     volumes:
       - media_data:/source-media:ro
       - ./.env.production:/source-settings/.env.production:ro
+      - ${ACERVO_BACKUP_SIGNING_PRIVATE_KEY_FILE:-/etc/acervo/backup-signing/private}:/run/acervo-backup-signing/private:ro
     tmpfs:
       - /tmp
     networks:
@@ -32,6 +33,7 @@ services:
       - .env.production
     volumes:
       - media_data:/target-media
+      - ${ACERVO_BACKUP_ALLOWED_SIGNERS_FILE:-/etc/acervo/backup-signing/allowed_signers}:/run/acervo-backup-signing/allowed_signers:ro
     tmpfs:
       - /tmp
     networks:

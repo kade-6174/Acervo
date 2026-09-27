@@ -6,6 +6,14 @@
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。導入先ではバックアップの実機設定、空データ復元試験、初回timer起動、暗号化バックアップ作成・別ホスト保存確定、停止要求後のバックアップ機へのネットワーク非応答を確認した。Step 7C-LIVEの承認パッケージと実ドメイン受入、Phase 1全体は未完了。
 
+## 2026-09-28 バックアップ復元の真正性検証を強化（リリース前）
+
+セキュリティ確認レポート（scan `84ca32bf-93bf-44b7-bf79-1ad0ba982281`）の唯一の指摘は、別ホスト保存先を書き換えられる攻撃者が、暗号化payload・metadata・checksumsを整合させて差し替えると復元を通過できる点だった。修正作業ツリーでは、バックアップ作成時に専用Ed25519秘密鍵でpayloadのSHA-256を含む正規化metadataへ署名し、復元時に保存先とは別の信頼できる保管場所からread-onlyで渡す`allowed_signers`だけを使って、復号・展開より前に検証するよう変更した。署名のない旧形式（format version 1）と不正署名は復元を拒否する。署名用秘密鍵は作成コンテナだけへ、公開鍵集合は復元コンテナだけへ渡し、どちらもコンテナ内ではread-onlyとする。
+
+復元は保存先の3ファイルをprivateな一時領域へスナップショットしてから検証・復号する。検証後に保存先を再読込しないため、検証と復号の間の差替えを受け入れない。外側payloadと内側の写真archiveは展開前にパスを検査し、絶対パス、`..`、symlink、hardlink、デバイス、その他の非通常entry、重複entryを拒否する。保存先を同時に書き換えられる攻撃者は短いコピー競合により復元を失敗させ得るが、署名済みpayloadの任意差替えや任意ファイル書込みには至らない。DB復元後に写真または設定コピーが失敗した場合は空の復元先が部分復元状態になる既存の運用上の制約があり、再試行前に復元先を作り直す必要がある。
+
+ローカルではバックアップ専用19件、Ruff lint／format、Django check、migration差分なし、全259件の回帰テスト、`git diff --check`が成功した。Docker CLIとbashがないため、Compose統合試験はローカル未実行である。GitHub Actionsと実機への鍵配置・署名付きバックアップ作成・空環境復元は、この記録時点では未完了。Cloudflareの公開route設定および一般公開は、この修正をmainへ反映し、CIと実機復元受入を確認するまで進めない。
+
 ## 2026-09-27 初回定時実行の確認
 
 運用者から主Proxmoxホストと本番候補VMの`systemctl list-timers`／`systemctl show`の実機出力を受領した。起動timerは17:55:20 JST、バックアップtimerは18:00:04 JSTに起動し、両serviceとも`Result=success`、`ExecMainStatus=0`だった。VM側serviceは18:00:07 JSTに終了した。両timerの次回は2026-09-28の17:55／18:00 JST。
