@@ -1,10 +1,16 @@
 # Project Status
 
-最終更新: 2026-09-26
+最終更新: 2026-09-27
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。導入先ではバックアップの実機設定と空データ復元試験が進んだが、Step 7C-LIVEの承認パッケージ、初回定時実行、実ドメイン受入は未完了。Phase 1全体も未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。導入先ではバックアップの実機設定、空データ復元試験、初回timer起動、暗号化バックアップ作成・別ホスト保存確定、停止要求後のバックアップ機へのネットワーク非応答を確認した。Step 7C-LIVEの承認パッケージと実ドメイン受入、Phase 1全体は未完了。
+
+## 2026-09-27 初回定時実行の確認
+
+運用者から主Proxmoxホストと本番候補VMの`systemctl list-timers`／`systemctl show`の実機出力を受領した。起動timerは17:55:20 JST、バックアップtimerは18:00:04 JSTに起動し、両serviceとも`Result=success`、`ExecMainStatus=0`だった。VM側serviceは18:00:07 JSTに終了した。両timerの次回は2026-09-28の17:55／18:00 JST。
+
+VM側`journalctl`の当日分には、PostgreSQL 18を対象とする暗号化バックアップ作成、保持処理`deleted=0`、暗号化payload・metadata・checksumsのSFTP転送、`.ready`送信、`upload_complete`、`offsite_verified`、`shutdown_requested`、service正常終了が記録されていた。backup IDは`acervo-20260927T090005Z-04948a9e7b60`。別ホスト保存先の確定をスクリプトの検証ログで確認した。その後、主Proxmoxホストからバックアップ機のホストIPと保存用LXCのIPへ各2回pingし、どちらも応答0件だった。これは停止要求後の期待状態と整合するが、pingだけで物理的な電源断は断定できない。初回定時バックアップの作成・保存確定と停止要求、停止後のネットワーク非応答は確認済み。実データを使う復元受入は未実施。
 
 ## 2026-09-26 実機バックアップ作業の引継ぎ
 
@@ -13,11 +19,11 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 - 本番候補VMでPostgreSQLの`db`は稼働中。Web、Caddy、Tunnelの稼働と一般公開は未確認。`age`で暗号化したDB・写真・必要設定のバックアップをVMの永続領域へ作成し、別物理ホスト上のSFTP保存先へ転送した。保存先では`.ready`を契機に必要ファイルとSHA-256を照合して保存を確定する。
 - 別VMの空のDB・写真領域へ別ホストから取得したバックアップを復元した。元と復元先のDBテーブル数・写真ファイル数はいずれも0で一致し、復元設定ファイルのSHA-256も一致した。試験に使った一時秘密鍵・設定ファイル・Dockerボリュームは試験VMから削除した。これは空データの復元確認であり、実データ・ログイン・標本詳細・写真表示の受入ではない。
 - 日次バックアップスクリプトの手動実行は終了コード0で完了し、作成、転送、保存確定の確認、バックアップ機の停止まで進んだ。失敗時は停止要求へ進まない構成との報告を受けた。バックアップ機の起動は本番候補VMからのWOLでは失敗し、主ProxmoxホストからのWOLで成功した。
-- 主Proxmoxホストに毎日17:55 JSTの起動timer、本番候補VMに毎日18:00 JSTのバックアップtimerを設定した。service・timerの内容は運用者が読み返した。VM側は`Persistent=false`であり、停止中に逃した実行は自動で追いかけない。2026-09-26に`list-timers --all`の実機出力を受領し、両timerの次回が2026-09-27の17:55／18:00 JST、`LAST`がともに`-`、VM側確認コマンドの終了コードが0であることを確認した。両timerの`systemctl is-enabled`も`enabled`（VM側確認コマンドは終了コード0）で、再起動後も有効化される設定を確認した。初回の**timer起動による**実行結果は未確認。
+- 主Proxmoxホストに毎日17:55 JSTの起動timer、本番候補VMに毎日18:00 JSTのバックアップtimerを設定した。service・timerの内容は運用者が読み返した。VM側は`Persistent=false`であり、停止中に逃した実行は自動で追いかけない。2026-09-26に`list-timers --all`の実機出力を受領し、両timerの次回が2026-09-27の17:55／18:00 JST、`LAST`がともに`-`、VM側確認コマンドの終了コードが0であることを確認した。両timerの`systemctl is-enabled`も`enabled`（VM側確認コマンドは終了コード0）で、再起動後も有効化される設定を確認した。翌日の初回起動結果は上記に記録する。
 - バックアップ機の非特権LXCはsystemd起動時にmount単位3件が失敗した。`nesting=1`設定後の再起動で失敗単位0件、`ssh`と保存確定用path単位は`active`と報告された。nestingによりホストの`/proc`・`/sys`がより見える運用上の注意がある。
 - 別ホスト保存先の旧世代の自動整理、失敗通知、容量監視は未整備。保存先容量は約640 GB。保持・削除ルールが確定するまで過去の成果物を削除しない。
 
-次は初回定時実行後にVM側サービスの終了状態と安全なログ、別ホスト側の保存確定、バックアップ機停止を確認する。運用者から結果を受領するまでは成功扱いにしない。公開設定と受入は`docs/LIVE_PREFLIGHT.md`の承認事項を満たしてから進める。
+この時点で未確認だった初回定時実行の結果は、翌日の記録に記載する。公開設定と受入は`docs/LIVE_PREFLIGHT.md`の承認事項を満たしてから進める。
 
 ## Completed
 
@@ -205,7 +211,7 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 - Acervo本番ホスト名は候補の`acervo.kdf-biology.org`であり、最終確定後にDNS変更、実Tunnel接続または直接HTTPSの証明書取得を手動確認する。現時点で公開サービス用DNSレコードはない。
 - 本番ホストと管理経路、公開方式、`ACERVO_SITE_NAME`、`ACERVO_ORGANIZATION_NAME`、初期・継続管理者、DNS・Cloudflare・サーバー・バックアップの責任者、バックアップ暗号化・保存先、空環境の復元試験先、実運用対象の端末・OS・ブラウザ・同期パスキープロバイダーは、設計責任者が確定する必要がある。
-- Phase 10Aの実装・CI復元試験に加え、導入先ではサーバー外保管と空データ復元試験、手動バックアップの成功が報告された。復号identityの保管体制・recipient本数の承認状態、初回定時実行、実データを使う復元受入、四半期ごとの定期復元試験は未確認または未実施である。別ホスト保存先の保持・削除ルール、失敗通知、容量監視も未整備である。
+- Phase 10Aの実装・CI復元試験に加え、導入先ではサーバー外保管、空データ復元試験、手動バックアップと初回定時バックアップの作成・保存確定が確認された。復号identityの保管体制・recipient本数の承認状態、実データを使う復元受入、四半期ごとの定期復元試験は未確認または未実施である。別ホスト保存先の保持・削除ルール、失敗通知、容量監視も未整備である。
 - 公開環境を用意した後、実運用HTTPSドメインでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告、端末内・同期パスキーの登録・ログイン・削除を確認する。同期パスキーとChrome以外の実運用対象ブラウザも未確認（`localhost`のWindows＋Chrome＋Windows Hello受入は完了）。
 - 後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。Step 7CのDNS変更、実Tunnel作成・token投入、実ドメイン公開、実証明書・実HTTPS受入も未着手。
 
