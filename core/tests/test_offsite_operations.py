@@ -73,9 +73,7 @@ class OffsiteRetentionTests(TestCase):
         ignored.mkdir()
 
         records = retention.backup_records(self.root)
-        expected = {
-            record.path for record in retention.retention_candidates(records)
-        }
+        expected = {record.path for record in retention.retention_candidates(records)}
         retention.run(self.root, apply=True)
 
         self.assertTrue(all(not candidate.exists() for candidate in expected))

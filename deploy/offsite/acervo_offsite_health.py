@@ -34,9 +34,7 @@ def environment_integer(name: str, default: int, *, minimum: int, maximum: int) 
 
 def ensure_required_units_active() -> None:
     for unit in REQUIRED_UNITS:
-        result = subprocess.run(
-            ["/usr/bin/systemctl", "is-active", "--quiet", unit], check=False
-        )
+        result = subprocess.run(["/usr/bin/systemctl", "is-active", "--quiet", unit], check=False)
         if result.returncode != 0:
             raise HealthError("required_unit_inactive")
 

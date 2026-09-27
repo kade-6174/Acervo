@@ -63,9 +63,7 @@ def backup_records(root: Path) -> list[BackupRecord]:
         if match is None:
             continue
         try:
-            created_at = datetime.strptime(match.group(1), "%Y%m%dT%H%M%SZ").replace(
-                tzinfo=UTC
-            )
+            created_at = datetime.strptime(match.group(1), "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
         except ValueError as error:
             raise RetentionError("backup_id_invalid") from error
         records.append(BackupRecord(created_at=created_at, path=entry))
