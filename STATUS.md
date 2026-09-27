@@ -26,6 +26,8 @@ Discord WebhookをLXC 110のroot専用`0600`ファイルに設定し、通知ser
 
 VM200も`d4babc8`へ更新し、`acervo-discord-notify`、通知用systemd template、`acervo-daily-backup.service`の`OnFailure` drop-inを配置してdaemon-reloadした。Webhook URLは主Proxmoxホストから`qm guest exec --pass-stdin`で渡し、画面、コマンド履歴、ログへ表示せずにVMのroot専用`/etc/acervo/discord-webhook.url`（`root:root 0600`）へ保存した。VM上の`acervo-discord-notify@notification-test.service`は`Result=success`、`ExecMainStatus=0`で終了し、運用者がDiscordへの着信も確認した。
 
+GitHub Actionsの品質確認は、別ホスト運用テスト4か所の100文字超過（E501）で失敗した。テストの意味を変えずに改行して修正し、ローカルの`python -m unittest core.tests.test_offsite_operations`は9件成功、`git diff --check`も成功した。このWindows環境にRuffは未導入のため、Ruffの最終確認はGitHub Actionsで行う。
+
 ## 2026-09-26 実機バックアップ作業の引継ぎ
 
 以下は運用者からの引継ぎ報告であり、この作業ツリーから実機のログや設定を読み返した結果ではない。導入先固有のアドレス、認証情報、秘密鍵の値は記録しない。

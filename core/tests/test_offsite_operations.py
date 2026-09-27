@@ -72,7 +72,10 @@ class OffsiteRetentionTests(TestCase):
         ignored = self.root / ".acervo-unfinished.incoming"
         ignored.mkdir()
 
-        expected = {record.path for record in retention.retention_candidates(retention.backup_records(self.root))}
+        records = retention.backup_records(self.root)
+        expected = {
+            record.path for record in retention.retention_candidates(records)
+        }
         retention.run(self.root, apply=True)
 
         self.assertTrue(all(not candidate.exists() for candidate in expected))
@@ -80,7 +83,10 @@ class OffsiteRetentionTests(TestCase):
 
     def test_invalid_retention_setting_fails(self):
         with patch.dict(os.environ, {"ACERVO_BACKUP_RETENTION_DAILY": "0"}):
-            with self.assertRaisesRegex(retention.RetentionError, "retention_configuration_invalid"):
+            with self.assertRaisesRegex(
+                retention.RetentionError,
+                "retention_configuration_invalid",
+            ):
                 retention.retention_limits()
 
 
@@ -91,7 +97,11 @@ class OffsiteHealthTests(TestCase):
         self.addCleanup(self.temporary_directory.cleanup)
 
     def test_capacity_threshold_rejects_low_free_space(self):
-        usage = type("Usage", (), {"total": 100 * 1024**3, "used": 90 * 1024**3, "free": 10 * 1024**3})
+        usage = type(
+            "Usage",
+            (),
+            {"total": 100 * 1024**3, "used": 90 * 1024**3, "free": 10 * 1024**3},
+        )
         with (
             patch.object(health.shutil, "disk_usage", return_value=usage),
             patch.dict(os.environ, {"ACERVO_OFFSITE_MIN_FREE_GIB": "50"}),
@@ -100,7 +110,11 @@ class OffsiteHealthTests(TestCase):
                 health.inspect_capacity(self.root)
 
     def test_capacity_check_reports_healthy_space(self):
-        usage = type("Usage", (), {"total": 100 * 1024**3, "used": 20 * 1024**3, "free": 80 * 1024**3})
+        usage = type(
+            "Usage",
+            (),
+            {"total": 100 * 1024**3, "used": 20 * 1024**3, "free": 80 * 1024**3},
+        )
         with patch.object(health.shutil, "disk_usage", return_value=usage):
             self.assertEqual(health.inspect_capacity(self.root), (20, 80))
 
