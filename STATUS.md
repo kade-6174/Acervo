@@ -28,7 +28,7 @@ VM200も`d4babc8`へ更新し、`acervo-discord-notify`、通知用systemd templ
 
 GitHub Actionsの品質確認は、別ホスト運用テスト4か所の100文字超過（E501）で失敗した。テストの意味を変えずに改行して修正し、ローカルの`python -m unittest core.tests.test_offsite_operations`は9件成功、`git diff --check`も成功した。このWindows環境にRuffは未導入のため、Ruffの最終確認はGitHub Actionsで行う。
 
-初回修正後のGitHub ActionsではRuffの構文検査は成功し、formatterが既存の別ホスト運用ファイル2件とテスト1件の整形差分を検出した。Ruff出力どおりに整形し、運用テスト9件、`git diff --check`、対象3ファイルの100文字超過なしを再確認した。GitHub Actionsでの再確認は次のコミットで行う。
+初回修正後のGitHub ActionsではRuffの構文検査は成功し、formatterが既存の別ホスト運用ファイル2件とテスト1件の整形差分を検出した。Ruff出力どおりに整形し、運用テスト9件、`git diff --check`、対象3ファイルの100文字超過なしを再確認した。修正コミット`81d91d7`のGitHub Actions run `36317255882`では、品質確認、PostgreSQLテスト、直接HTTPS構成、Tunnel専用構成、暗号化バックアップから空環境復元まで全て成功した。
 
 ## 2026-09-26 実機バックアップ作業の引継ぎ
 
