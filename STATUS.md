@@ -18,6 +18,8 @@ VM側`journalctl`の当日分には、PostgreSQL 18を対象とする暗号化�
 
 導入用ファイルをGitHubの`main`へ反映し、物理バックアップ機の作業用コピーがコミット`11115271bea6ca5a4449756432f95b1efa796dde`であることを確認した。LXC 110へ保持、容量監視、Discord通知、maintenance unitの各ファイルを配置してdaemon-reloadを実行した。保持処理のdry-runでは、`acervo-20260926T122342Z-ad9357417c17`だけが削除候補になった。同じ日付のより新しい世代があるため、日次14・週次8・月次12の保持規則では対象外となる。実削除とmaintenance timerの有効化は未実施。容量監視は`health_ok used_percent=0 free_gib=596`で成功した。Discord Webhookの作成・root専用設定ファイルへの保存・受信試験、VM200のバックアップservice失敗通知の導入は未実施。物理バックアップ機の`apt-get update`はEnterpriseリポジトリの401で非ゼロ終了したが、Debian公式リポジトリからのGit導入は成功した。Enterpriseリポジトリ設定は変更していない。
 
+保持規則のdry-runで示した候補`acervo-20260926T122342Z-ad9357417c17`について、運用者の明示承認後に`--apply`を実行し、`retention_completed deleted=1`を確認した。確定済みの3世代は残った。`acervo-offsite-maintenance.timer`を`enabled`にし、次回のバックアップ機起動時から起動90秒後に実行されるよう設定した。timer有効化直後の`NEXT`は`-`だったため、maintenance serviceを手動で1回実行した。終了コード0、`retention_completed deleted=0`、`health_ok used_percent=0 free_gib=596`を確認した。Discord Webhookのroot専用設定ファイル作成・受信試験、VM200のバックアップservice失敗通知の導入は未実施。
+
 ## 2026-09-26 実機バックアップ作業の引継ぎ
 
 以下は運用者からの引継ぎ報告であり、この作業ツリーから実機のログや設定を読み返した結果ではない。導入先固有のアドレス、認証情報、秘密鍵の値は記録しない。
