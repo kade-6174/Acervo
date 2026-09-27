@@ -16,6 +16,8 @@ VM側`journalctl`の当日分には、PostgreSQL 18を対象とする暗号化�
 
 別ホスト向けに、確定済み成果物だけを日次14・週次8・月次12世代の和集合で保持するスクリプト、起動90秒後に整理と容量・必須unitを検査するsystemd unit、任意のDiscord Webhook失敗通知の導入用ファイルを追加した。保持スクリプトは既定で候補表示だけを行い、`--apply`がなければ削除しない。容量の初期しきい値は空き50 GiB未満または使用率85%以上である。Webhook URLはroot専用の設定ファイルにだけ置き、Git、ログ、コマンド引数には出さない。ローカルでは`python -m unittest core.tests.test_backup_tool core.tests.test_offsite_operations`が17件成功、Python構文確認と`git diff --check`が成功した。RuffはこのWindows環境に未導入のため未実行。実機への導入、dry-run結果の確認、Discord受信確認、実削除は未実施。
 
+導入用ファイルをGitHubの`main`へ反映し、物理バックアップ機の作業用コピーがコミット`11115271bea6ca5a4449756432f95b1efa796dde`であることを確認した。LXC 110へ保持、容量監視、Discord通知、maintenance unitの各ファイルを配置してdaemon-reloadを実行した。保持処理のdry-runでは、`acervo-20260926T122342Z-ad9357417c17`だけが削除候補になった。同じ日付のより新しい世代があるため、日次14・週次8・月次12の保持規則では対象外となる。実削除とmaintenance timerの有効化は未実施。容量監視は`health_ok used_percent=0 free_gib=596`で成功した。Discord Webhookの作成・root専用設定ファイルへの保存・受信試験、VM200のバックアップservice失敗通知の導入は未実施。物理バックアップ機の`apt-get update`はEnterpriseリポジトリの401で非ゼロ終了したが、Debian公式リポジトリからのGit導入は成功した。Enterpriseリポジトリ設定は変更していない。
+
 ## 2026-09-26 実機バックアップ作業の引継ぎ
 
 以下は運用者からの引継ぎ報告であり、この作業ツリーから実機のログや設定を読み返した結果ではない。導入先固有のアドレス、認証情報、秘密鍵の値は記録しない。
