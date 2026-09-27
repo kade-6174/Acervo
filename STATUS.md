@@ -22,6 +22,10 @@ VM側`journalctl`の当日分には、PostgreSQL 18を対象とする暗号化�
 
 Discord WebhookをLXC 110のroot専用`0600`ファイルに設定し、通知serviceを試験したがHTTP 403で失敗した。Webhook URLはログ・チャットに表示していない。同じURLを使い、明示的な`User-Agent: Acervo-Backup/1.0`付きGETはHTTP 200、テスト通知POSTはHTTP 204だったため、Python標準の通信識別名が403の原因と判断した。通知スクリプトに成功した識別名を追加し、モックでPOSTとヘッダーを確認するテストを追加した。ローカルで`python -m unittest core.tests.test_offsite_operations`は9件成功、Python構文確認と`git diff --check`も成功。修正版のGitHub反映、LXC配布、systemd経由の受信再試験、VM200側の失敗通知設定は未実施。
 
+修正版`d4babc8`をGitHubへ反映し、物理バックアップ機の作業用コピーを同コミットへ更新して、通知スクリプトをLXC 110に再配置した。`acervo-discord-notify@notification-test.service`の再試験は`Result=success`、`ExecMainStatus=0`、最新ログは`discord_notification_sent unit=notification-test`となり、運用者がDiscordへの着信も確認した。VM200の日次バックアップserviceの失敗通知はまだ未導入。
+
+VM200も`d4babc8`へ更新し、`acervo-discord-notify`、通知用systemd template、`acervo-daily-backup.service`の`OnFailure` drop-inを配置してdaemon-reloadした。Webhook URLは主Proxmoxホストから`qm guest exec --pass-stdin`で渡し、画面、コマンド履歴、ログへ表示せずにVMのroot専用`/etc/acervo/discord-webhook.url`（`root:root 0600`）へ保存した。VM上の`acervo-discord-notify@notification-test.service`は`Result=success`、`ExecMainStatus=0`で終了し、運用者がDiscordへの着信も確認した。
+
 ## 2026-09-26 実機バックアップ作業の引継ぎ
 
 以下は運用者からの引継ぎ報告であり、この作業ツリーから実機のログや設定を読み返した結果ではない。導入先固有のアドレス、認証情報、秘密鍵の値は記録しない。
