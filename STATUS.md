@@ -1,10 +1,18 @@
 # Project Status
 
-最終更新: 2026-09-27
+最終更新: 2026-09-28
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。導入先ではバックアップの実機設定、初回timer起動、署名付き暗号化バックアップ作成・別ホスト保存確定、VM201への復元を確認した。Step 7C-LIVEの承認パッケージと実ドメイン受入、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。導入先ではバックアップの実機設定、初回timer起動、署名付き暗号化バックアップ作成・別ホスト保存確定、VM201への空データ復元を確認した。Step 7C-LIVE-Aの承認パッケージと実ドメイン受入、標本機能実装後の7C-LIVE-B、Phase 1全体は未完了。
+
+## 2026-09-28 チャット引継ぎとLIVE受入順序の整理
+
+`AGENTS.md`、`PROJECT_SPEC.md`、`PLAN.md`、`STATUS.md`の順に確認し、`git status`は変更なしの`main...origin/main`、HEADは`fb78906`だった。関連URLを調べ、現在のルーティングに標本・QR・保護写真の経路がなく、Phase 2〜5のモデル・登録・詳細機能が未実装であることを確認した。既存変更はなかった。
+
+設計責任者の回答により、Step 7C-LIVEの受入を7C-LIVE-A（公開基盤・認証・MFA・空データ復元）と7C-LIVE-B（標本実装後の標本・写真・実データ復元）に分けた。`PLAN.md`と`docs/LIVE_PREFLIGHT.md`の順序と確認項目を更新した。7C-LIVE-Aの成功後にPhase 1Dへ進めるが、一般利用開始とStep 7C-LIVE全体の完了は7C-LIVE-Bまで保留する。`PROJECT_SPEC.md`のMVP範囲・標本番号・QR・認可・バックアップ要件は変更していない。コード、DB、Compose、本番VM、Cloudflare route/DNSは変更していない。
+
+ローカル仮想環境のPython 3.13.14でDjango system checkは0件、SQLiteの全259テストは成功、Ruff lintは成功、format checkは94ファイル成功した。通常の`python`ではDjangoが未導入のためcheck・testが`ModuleNotFoundError`で失敗したが、`.venv`で再実行して成功した。今回の文書変更に対するPostgreSQL、Compose、実ドメイン、端末、QR初回登録、標本詳細・写真の認可は未確認。後三者は機能自体が未実装であり、実装後に通常経路・権限不足・不正入力・競合を含む必須テストと実機受入を行う。次は7C-LIVE-Aの残る人による確定項目を確認し、承認後に公開基盤とMFAの実ドメイン受入を進める。
 
 ## 2026-09-28 標本番号・QR方式の設計確認
 
