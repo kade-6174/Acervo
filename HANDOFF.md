@@ -13,9 +13,9 @@
 
 | 指摘 | 状態 | 実装・確認 |
 | --- | --- | --- |
-| 保存先改ざん済みバックアップを復元できる | 修正済み、リリース前 | 専用Ed25519鍵で正規化metadataとencrypted payload SHA-256を署名し、復号前に信頼済み`allowed_signers`で検証する。未署名format version 1、不正署名、未知の公開鍵は拒否する。 |
-| 検証後に保存先を差し替える競合 | 修正済み、リリース前 | `snapshot_backup()`が必須3ファイルをprivateな作業領域に固定し、以降は保存先を再読込しない。 |
-| archiveによるパス脱出・リンク展開 | 修正済み、リリース前 | 手動展開前に絶対パス、`..`、symlink、hardlink、デバイス、非通常entry、重複entryを拒否する。 |
+| 保存先改ざん済みバックアップを復元できる | 修正済み、実機で正常系確認済み | 専用Ed25519鍵で正規化metadataとencrypted payload SHA-256を署名し、復号前に信頼済み`allowed_signers`で検証する。未署名format version 1、不正署名、未知の公開鍵は拒否する。 |
+| 検証後に保存先を差し替える競合 | 修正済み、テスト済み | `snapshot_backup()`が必須3ファイルをprivateな作業領域に固定し、以降は保存先を再読込しない。 |
+| archiveによるパス脱出・リンク展開 | 修正済み、テスト済み | 手動展開前に絶対パス、`..`、symlink、hardlink、デバイス、非通常entry、重複entryを拒否する。 |
 
 公開鍵集合はバックアップ保存先と別の信頼できる保管場所から復元コンテナへread-onlyで渡す。署名秘密鍵は作成コンテナだけへread-onlyで渡し、復元側へは渡さない。秘密鍵・Webhook・age identity・本番`.env`の値は記録、ログ、Gitに含めない。
 
@@ -41,13 +41,14 @@
 
 このWindows環境にはDockerとbashがないため、Composeの署名付き作成→復元試験とshell構文検査はローカル未実行である。mainのGitHub Actions run `36332469569`は`test`と`production-container`が成功し、後者で直接HTTPS、Tunnel専用、署名鍵のコンテナ内利用、署名付き作成、保存先の整合する3ファイルの改ざん拒否、空環境復元を確認した。
 
+実機ではVM200が署名付き形式v2バックアップ`acervo-20260927T164402Z-b091646e79ee`を作成し、LXC110で保存確定・payloadとmetadataのSHA-256照合を確認した。VM201では独立した`allowed_signers`による署名検証、空環境への復元が成功した。復元後のVM200／VM201のDBテーブル数は15／15、写真ファイル数は0／0、設定ファイルのSHA-256は一致した。管理用PCで修正したage秘密鍵の控えは、実payloadを復号できたVM201上の鍵とバイト単位で一致した。復元後の`check --deploy`は問題0件、検証用の非公開Caddy設定で`/health/`は200、`/accounts/login/`は200、`/admin/`は404、DB・Web・Caddyのホスト公開ポートは空だった。写真・実データ・認証済み画面表示の受入試験は未実施。
+
 ## 次に行うこと
 
-1. 差分を最終確認して日本語コミットを作成し、mainへpushする。
-2. GitHub Actionsの`test`と`production-container`の成功を確認する。
-3. VM200に署名秘密鍵を安全な権限で配置し、VM201などの復元環境に別保管の`allowed_signers`を配置する。実値はチャットやログへ出さない。
-4. 署名付きformat version 2バックアップを作り、別ホスト保存確定後に空の復元環境で復元する。DB、写真、設定、ログイン、標本詳細、写真表示を受入確認する。
-5. 上記が成功するまでCloudflareのpublic hostname route設定と一般公開を進めない。
+1. 管理用PCの修正済みage鍵と印刷保管物の一致をオフラインで確認する。元の誤記ファイルを正しい復元鍵として扱わない。
+2. `docs/LIVE_PREFLIGHT.md`の未確定項目を設計責任者・運用者と確認する。代表的な非機密テストデータと写真を使う受入、認証済み画面・MFA・保護写真・再起動後の永続化、独立環境への再復元は未実施。一般公開用のCloudflare routeとDNSはまだ設定しない。
+
+VM201の試験用コンテナと5つのDockerボリューム、一時的なage鍵・SFTP鍵・known_hosts・復元試験用設定・バックアップコピーは削除済み。`allowed_signers`だけ次回の復元用に残した。VM200とLXC110の成果物は維持した。
 
 ## 残る制約
 
