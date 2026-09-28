@@ -9,9 +9,9 @@ DNS、Tunnel、token、本番ホスト、本番Compose起動、実HTTPS受入は
 本番ホスト上の権限制限された`.env.production`へ、次の値を設定します。Gitへコミットしません。
 
 ```ini
-ACERVO_PUBLIC_BASE_URL=https://acervo.kdf-biology.org
-DJANGO_ALLOWED_HOSTS=acervo.kdf-biology.org
-DJANGO_CSRF_TRUSTED_ORIGINS=https://acervo.kdf-biology.org
+ACERVO_PUBLIC_BASE_URL=https://specimens.kdf-biology.org
+DJANGO_ALLOWED_HOSTS=specimens.kdf-biology.org
+DJANGO_CSRF_TRUSTED_ORIGINS=https://specimens.kdf-biology.org
 
 ACERVO_ENROLLMENT_POLICY=school_cohort
 ACERVO_SCHOOL_YEAR_START_MONTH=4
@@ -21,6 +21,12 @@ ACERVO_BASE_FIRST_YEAR_COHORT=33
 ```
 
 `ACERVO_SITE_NAME`と`ACERVO_ORGANIZATION_NAME`は未確定のため、この文書で推測して設定しません。旧`ACERVO_BASE_THIRD_YEAR_COHORT`は使いません。
+
+## 標本番号とQRラベル（Phase 2・3の実装予定）
+
+この導入先の標本番号接頭辞は`KDF-BIO`とします。最初の標本番号は`KDF-BIO-000001`、次は`KDF-BIO-000002`です。番号は登録確定時にだけ発行し、確認画面では消費しません。削除後も再利用せず、年度が変わっても振り直しません。6桁を超えたら桁数を増やします。Acervo本体では接頭辞を導入先設定として扱い、`KDF-BIO`をコードに固定しません。接頭辞の設定項目と採番機能はまだ実装していないため、現時点の`.env.production`へ架空の設定キーを追加しません。
+
+QRは標本番号とは別のランダムなUUIDv4識別子を持ち、未使用のラベルを先に発行できます。QRへ記録する内容は`https://specimens.kdf-biology.org/q/<uuidv4>/`形式のURLで、`<uuidv4>`にはラベルごとの識別子を入れます。標本名・標本番号・採集地は入れません。Acervo内のカメラでも端末標準のカメラでも同じURLへ進み、未ログインならログイン後に元のQR判定へ戻ります。未使用QRは初回登録、使用済みQRは権限確認後の標本詳細へ進みます。QRを知っているだけでは標本情報を表示しません。QRの発行・割当・無効化・読取はPhase 3以降の作業であり、現時点で本番運用には使えません。
 
 学校年度は4月1日に切り替わります。
 

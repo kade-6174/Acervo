@@ -46,7 +46,7 @@ MVPの中心価値は「スマートフォンで未使用QRを読む → 標本�
 | リバースプロキシ | Caddy。HTTPS終端、HTTPからHTTPSへの転送、Djangoへの中継を担当する。 |
 | 配備 | Docker Engine + Docker Compose。単一のLinuxホストを標準とする。 |
 | PWA | Manifest、Service Worker、ホーム画面追加、QRカメラ読取をMVPに含める。 |
-| QR読取 | ブラウザカメラを利用し、Acervo内URL形式のQRだけを扱う。 |
+| QR読取 | ブラウザカメラを利用し、UUIDv4識別子を含むAcervo内URL形式のQRだけを扱う。 |
 | 管理 | アプリ内の `/management/` を作り、Django `/admin/` と分離する。 |
 
 React、Redis、Celery、Kubernetesは、実際に必要となる要件が生じた時点で再評価する。MVPでは依存関係と運用負荷を増やさない。
@@ -227,11 +227,12 @@ GBIFやCatalogue of Life等は候補取得・照合元として検討できる�
 ## 7. QRラベル
 
 - QRには標本名、標本番号、採集地等を入れない。
-- `https://<public-hostname>/q/<random-token>/` 形式とし、tokenは暗号学的乱数から生成した推測困難な値とする。
+- `https://<public-hostname>/q/<uuidv4>/` 形式とし、QRごとに暗号学的乱数によるUUIDv4識別子を発行する。標本番号とは独立し、既存QRの識別子を再利用しない。
 - QR状態は `unused`、`assigned`、`retired` とする。
-- 未使用QRは登録フロー、使用済みQRは標本詳細、無効QRは警告へ進む。
+- 未使用QRは登録フロー、使用済みQRは標本詳細、無効QRは警告へ進む。未ログインならログイン後に同じQRの判定へ戻し、初回登録時にも未使用QRを読み取れるようにする。
 - QRを知っているだけで標本情報を表示せず、常にログインを要求する。
 - 1枚のQRは1標本だけに対応し、DB制約とトランザクションで二重利用を防ぐ。
+- 印刷済みQRのURLを保つため、公開hostnameを変更する場合は旧hostnameからの安全な転送を維持するか、ラベルを再印刷する。DB内のUUIDv4識別子は変更しない。
 - 20mm角を基本とし、15mm角は実印刷・実機試験後に対応可否を決める。
 
 ## 8. 画面・内部HTTP仕様

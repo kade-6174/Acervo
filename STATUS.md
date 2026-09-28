@@ -6,6 +6,12 @@
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。導入先ではバックアップの実機設定、初回timer起動、署名付き暗号化バックアップ作成・別ホスト保存確定、VM201への復元を確認した。Step 7C-LIVEの承認パッケージと実ドメイン受入、Phase 1全体は未完了。
 
+## 2026-09-28 標本番号・QR方式の設計確認
+
+生物班導入先の標本番号接頭辞を運用者が`KDF-BIO`に確定した。例は`KDF-BIO-000001`。標本番号の接頭辞は製品コードへ固定せず、登録確定時のみ採番・変更不可・削除後も再利用しないという`PROJECT_SPEC.md`の不変条件を維持する。導入例の公開hostnameを、運用者が選んだ`specimens.kdf-biology.org`へ更新した。
+
+運用者は、QRにIDのみを記録する案とUUIDv7も検討し、初回登録で困らず端末標準のカメラでも使える「UUIDv4識別子を含むAcervoのURL」を選択した。QRは標本番号を含まず、未ログイン時はログイン後に同じQR判定へ戻す。`PROJECT_SPEC.md`と`PLAN.md`にUUIDv4形式と初回登録の必須確認を反映した。UUIDv7の時刻順序はQRには不要で、発行時刻を含まないUUIDv4を採用する。接頭辞の設定項目、SpecimenSequence、Specimen、QRLabel、QR読取は未実装であり、`PLAN.md`のPhase 2・3以降で扱う。Phase 1全体の完了条件が未達のため、アプリ実装・DB・外部公開設定は今回変更しない。今回の変更は文書のみで、実機の初回登録は未確認。
+
 ## 2026-09-28 署名付きバックアップの実機復元
 
 VM200の署名秘密鍵をUID/GID 10001・mode 0600で配置し、VM201にはバックアップ保存先とは別経路で取得した`allowed_signers`を配置した。VM200で形式v2・`ssh-ed25519`署名付きのバックアップ`acervo-20260927T164402Z-b091646e79ee`を作成し、LXC110に転送して保存確定を確認した。保存先の`checksums.sha256`はpayloadとmetadataの両方で成功した。VM201に取得した3ファイルも同様に照合し、独立した公開鍵による署名検証は`signature=valid`だった。VM201の空DB・空写真領域へ復元し、`restore_completed`と終了コード0を確認した。
@@ -243,11 +249,11 @@ GitHub Actionsの品質確認は、別ホスト運用テスト4か所の100文�
 
 ## Remaining
 
-- Acervo本番ホスト名は候補の`acervo.kdf-biology.org`であり、最終確定後にDNS変更、実Tunnel接続または直接HTTPSの証明書取得を手動確認する。現時点で公開サービス用DNSレコードはない。
-- 本番ホストと管理経路、公開方式、`ACERVO_SITE_NAME`、`ACERVO_ORGANIZATION_NAME`、初期・継続管理者、DNS・Cloudflare・サーバー・バックアップの責任者、バックアップ暗号化・保存先、空環境の復元試験先、実運用対象の端末・OS・ブラウザ・同期パスキープロバイダーは、設計責任者が確定する必要がある。
-- Phase 10Aの実装・CI復元試験に加え、導入先ではサーバー外保管、空データ復元試験、手動バックアップと初回定時バックアップの作成・保存確定が確認された。復号identityの保管体制・recipient本数の承認状態、実データを使う復元受入、四半期ごとの定期復元試験は未確認または未実施である。別ホスト保存先の保持・削除ルール、失敗通知、容量監視も未整備である。
+- 本番公開hostnameは`specimens.kdf-biology.org`を選択し、VM200の本番設定にも反映した。Cloudflare Tunnelの接続と内部ヘルスチェックは確認したが、公開用routeとDNS、実ドメインでのHTTPS受入は未実施である。
+- `ACERVO_SITE_NAME`、`ACERVO_ORGANIZATION_NAME`、初期・継続管理者、DNS・Cloudflare・サーバー・バックアップの責任者、秘密鍵の保管・引継ぎ、実運用対象の端末・OS・ブラウザ・同期パスキープロバイダーは、設計責任者と運用者が確定する必要がある。
+- 署名付き暗号化バックアップの別ホスト保存とVM201への空環境復元は成功した。別ホストの保持規則・容量監視・Discord失敗通知も手動で動作確認済み。印刷したage秘密鍵控えと修正済みデジタル控えの一致、実データ・写真を使う復元受入、四半期ごとの定期復元試験予定は未確認または未実施である。
 - 公開環境を用意した後、実運用HTTPSドメインでRecovery Codes初回表示の「すべてコピー」、ローカルBlobによるファイル保存、保存確認前の離脱警告、端末内・同期パスキーの登録・ログイン・削除を確認する。同期パスキーとChrome以外の実運用対象ブラウザも未確認（`localhost`のWindows＋Chrome＋Windows Hello受入は完了）。
-- 後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。Step 7CのDNS変更、実Tunnel作成・token投入、実ドメイン公開、実証明書・実HTTPS受入も未着手。
+- 後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。Tunnel自体は作成・接続済みだが、Step 7Cの公開route、DNS、実ドメイン公開、実HTTPS受入は未着手。
 
 ## Tests
 
