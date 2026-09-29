@@ -6,6 +6,28 @@
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。導入先ではバックアップの実機設定、初回timer起動、署名付き暗号化バックアップ作成・別ホスト保存確定、VM201への空データ復元を確認した。Step 7C-LIVE-Aの承認パッケージと実ドメイン受入、標本機能実装後の7C-LIVE-B、Phase 1全体は未完了。
 
+## 2026-09-28 7C-LIVE-Aの実機準備
+
+設計責任者から、`docs/LIVE_PREFLIGHT.md`の責任者・バックアップ運用・受入端末はすべて確定・承認済みとの回答を受けた。具体的な担当・端末・秘密値は公開リポジトリへ記載しない。ローカル環境から主ProxmoxホストへのSSHはネットワーク制限を越えた試行でも認証拒否となり、Codexから直接実機操作はできなかった。運用者が`root@pve:~#`で`qm status 200`を実行し、VM200の`status: running`を確認した。`qm guest exec 200 -- systemctl show -p WorkingDirectory --value acervo-daily-backup.service`は終了コード0で空行を返したが、読み取り専用の検索で`/opt/acervo/compose.production.yaml`を確認した。VM200の`docker ps`には`tunnel`、`proxy`、`web`、`db`の4コンテナがあり、`proxy`、`web`、`db`はhealthyだった。表示されたポートはコンテナ内部の80/443/2019、8000、5432で、ホストへの転送表記はなかった。
+
+VM200の`/opt/acervo`でCloudflare専用Composeの`config --quiet`は終了コード0で`COMPOSE_OK`、`web`の`python manage.py check --deploy`は問題0件、`proxy`の`caddy validate`は`Valid configuration`で終了コード0だった。これは設定・起動済みコンテナの確認であり、イメージの再ビルド、再起動、永続化は今回未確認。
+
+運用者本人がCloudflareへサインインした後、管理画面で`Acervo-vm200` Tunnelの状態が正常、レプリカ1件、ルート0件であることを確認した。公開操作の最終確認を受けて、`specimens.kdf-biology.org`の公開アプリケーションルートを`http://proxy:8080`へ追加した。管理画面には追加成功、同hostnameのCNAME作成、ルート1件と表示された。Cloudflareのroute/DNS以外にVM200の設定・コンテナ、VM201、LXC110、`/dev/sda`は変更していない。
+
+Codexブラウザからの公開URLへのアクセスは`ERR_BLOCKED_BY_CLIENT`となったが、同じ管理用PCの`curl.exe`では証明書検証結果0で`/health/`が200、`/accounts/login/`が200、`/admin/`が404、未ログインの`/management/`が302だった。後者の転送先は同一HTTPS Originの`/accounts/login/?next=/management/`。ログイン画面の応答ヘッダーではCSRF CookieのSecureとSameSite、HSTSの存在を値を出さずに確認した。実ブラウザでの管理者ログイン・MFA、セッションCookie、別OS・端末、バックアップの今回の再試験は未実施。
+
+実ブラウザの管理者ログインを案内した後、運用者から管理者を作成した覚えがないとの指摘を受けた。VM200のDjango ORMで全ユーザー数とadmin数だけを読み取り、結果は`0 0`だった。初期管理者は未作成で、一時パスワードも未発行。ログイン・MFAの受入はこの段階では実施できない。初期管理者のユーザー名と回生番号を運用者へ確認中で、パスワード等の秘密値はチャットに出さない。
+
+運用者指定の`kade6174`、33回生で`bootstrap_admin`を実行し、終了コード0で初期管理者を作成した。最初に表示された一時パスワードがチャットに貼られたため、直ちに使用停止とした。再発行時にも一時パスワードがチャットへ貼られたため、これも使用停止とした。最後に運用者が画面に表示されない値を入力する方式でパスワードを設定した。最初の試行は12文字未満のためDjangoのバリデーションで拒否され、パスワード変更は行われなかった。2回目は`password_updated`と終了コード0で成功し、`must_change_password=True`を維持した。値そのものは記録・表示していない。公開HTTPSでの初回パスワード変更、TOTPまたはパスキーのprimary MFA登録、Recovery Codes、管理者MFAゲートの実ブラウザ受入は未実施。
+
+平文の`http://specimens.kdf-biology.org/health/`は当初200で、HTTPSへの転送がなかった。Cloudflareの対象hostnameだけに一致する`http://specimens.kdf-biology.org/*`から`https://specimens.kdf-biology.org/${1}`への308転送（クエリ保持）をフォームへ入力し、画面のルール検証は成功した。最初の「デプロイ」は自動承認審査で拒否された。理由は、公開ルートの承認だけでは追加の永続的な転送ルール変更への明示承認を確認できないため。運用者からこのルールへの明示承認を得てデプロイし、Cloudflare画面で同ルールがアクティブと表示された。管理用PCから`http://specimens.kdf-biology.org/health/?probe=1`は308で、転送先はパス・クエリを保つ同hostnameのHTTPS URLだった。HTTPSの`/health/`は200、証明書検証結果0を再確認した。
+
+運用者は公開HTTPSで初回ログイン、パスワード変更、Recovery Codes生成、TOTP認証、パスキー登録を完了した。パスワードログイン後の第二要素としてのパスキーは成功した一方、ログイン画面からの直接ログインは失敗した。既存WebAuthn認証器について、秘密値・credential本体を出さずにpasswordless判定だけを読んだ結果は`[None]`だった。これは登録時の`credProps`結果が端末から返らない場合に、既存実装が直接ログイン不可として扱うためである。
+
+作業ツリーで、パスキー登録開始時に選んだ方式をサーバー側のsession-bound challengeへ結び付け、成功時に認証器データへ方式だけを保存する修正を実装した。直接ログイン時は、このサーバー記録または既存の`credProps`の明示trueを要求する。選択と異なる送信、登録開始前の送信では認証器を作成しない。既存の`[None]`認証器を後から直接ログイン可能と分類しないため、本修正の本番反映後に、ログイン済みの設定画面で「パスキーとして登録する」を有効にした新規登録と直接ログイン受入が必要である。新しい直接ログインを確認するまで既存認証器を削除しない。ログイン画面では共通ナビゲーションの重複した「ログイン」リンクを隠し、入力欄下の送信ボタンだけを残す修正も実装した。
+
+作業ツリーで`python manage.py test --settings=config.settings.test`は262件すべて成功、`ruff check .`、`ruff format --check .`、`python manage.py check --settings=config.settings.test`、`makemigrations --check --dry-run`、`git diff --check`は成功した。変更は未コミット・未pushであり、GitHub Actions、VM200でのCompose再ビルド・再起動、実ブラウザでの直接ログインおよび重複リンク解消は未確認である。
+
 ## 2026-09-28 チャット引継ぎとLIVE受入順序の整理
 
 `AGENTS.md`、`PROJECT_SPEC.md`、`PLAN.md`、`STATUS.md`の順に確認し、`git status`は変更なしの`main...origin/main`、HEADは`fb78906`だった。関連URLを調べ、現在のルーティングに標本・QR・保護写真の経路がなく、Phase 2〜5のモデル・登録・詳細機能が未実装であることを確認した。既存変更はなかった。

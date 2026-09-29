@@ -23,7 +23,7 @@
               <button class="btn btn-outline-secondary" type="submit">ログアウト</button>
             </form>
           </div>
-        {% else %}
+        {% elif request.resolver_match.url_name != "account_login" %}
           <a class="btn btn-outline-primary" href="{% url 'account_login' %}">ログイン</a>
         {% endif %}
       </nav>

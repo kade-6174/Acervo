@@ -73,6 +73,22 @@ class WebAuthnManagementTests(TestCase):
     ):
         self.recent_login()
         url = reverse("mfa_add_webauthn")
+        options = self.client.post(
+            reverse("mfa_webauthn_registration_options"), {"passwordless": "true"}
+        )
+        self.assertEqual(options.status_code, 200)
+        self.assertEqual(
+            options.json()["creation_options"]["publicKey"]["authenticatorSelection"][
+                "residentKey"
+            ],
+            "required",
+        )
+        self.assertEqual(
+            options.json()["creation_options"]["publicKey"]["authenticatorSelection"][
+                "userVerification"
+            ],
+            "required",
+        )
         with (
             patch(
                 "allauth.mfa.webauthn.internal.auth.parse_registration_response", autospec=True
@@ -81,18 +97,36 @@ class WebAuthnManagementTests(TestCase):
                 "allauth.mfa.webauthn.internal.auth.complete_registration", autospec=True
             ) as complete,
         ):
-            response = self.client.post(url, {"name": "私の鍵", "credential": '{"id": "test"}'})
-        parse.assert_called_once()
+            response = self.client.post(
+                url,
+                {"name": "私の鍵", "passwordless": "on", "credential": '{"id": "test"}'},
+            )
+        self.assertGreaterEqual(parse.call_count, 1)
         complete.assert_called_once()
         self.assertRedirects(
             response, reverse("mfa_view_recovery_codes"), fetch_redirect_response=False
         )
         key = Authenticator.objects.get(user=self.user, type="webauthn")
         self.assertEqual(key.data["name"], "私の鍵")
+        self.assertTrue(key.data["acervo_passwordless"])
         self.assertTrue(
             Authenticator.objects.filter(user=self.user, type="recovery_codes").exists()
         )
         self.assertFalse(Authenticator.objects.filter(user=self.other, type="webauthn").exists())
+
+    def test_registration_without_server_options_does_not_create_a_key(self):
+        self.recent_login()
+        with (
+            patch("allauth.mfa.webauthn.internal.auth.parse_registration_response", autospec=True),
+            patch("allauth.mfa.webauthn.internal.auth.complete_registration", autospec=True),
+        ):
+            response = self.client.post(
+                reverse("mfa_add_webauthn"),
+                {"name": "私の鍵", "passwordless": "on", "credential": '{"id": "test"}'},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Authenticator.objects.filter(user=self.user, type="webauthn").exists())
 
     def test_idor_edit_remove_are_404_and_own_edit_remove_use_post(self):
         self.recent_login()

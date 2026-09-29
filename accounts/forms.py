@@ -144,7 +144,10 @@ class AcervoLoginWebAuthnForm(_AcervoWebAuthnAuthenticationForm, LoginWebAuthnFo
             user = webauthn_auth.extract_user_from_response(credential)
             clear_rate_limit = check_rate_limit(user)
             authenticator = webauthn_auth.complete_authentication(user, credential)
-            if authenticator.wrap().is_passwordless is not True:
+            if (
+                authenticator.data.get("acervo_passwordless") is not True
+                and authenticator.wrap().is_passwordless is not True
+            ):
                 raise get_account_adapter().validation_error("incorrect_code")
             clear_rate_limit()
             return authenticator

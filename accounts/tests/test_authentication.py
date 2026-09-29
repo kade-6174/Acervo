@@ -33,6 +33,15 @@ class AuthenticationTests(TestCase):
         self.assertNotContains(response, "パスワードをお忘れ")
         self.assertNotContains(response, "新規登録")
 
+    def test_login_page_hides_the_navigation_login_link(self):
+        response = self.client.get(reverse("account_login"), **CLIENT_IP_HEADER)
+
+        self.assertNotContains(
+            response,
+            f'<a class="btn btn-outline-primary" href="{reverse("account_login")}">ログイン</a>',
+            html=True,
+        )
+
     def test_username_password_login_succeeds_without_email(self):
         self.assertEqual(self.user.email, "")
 

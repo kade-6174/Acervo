@@ -145,6 +145,16 @@ class PasskeyLoginTests(TestCase):
         recovery.refresh_from_db()
         self.assertEqual(recovery.data["used_mask"], 0)
 
+    def test_server_recorded_passkey_is_accepted_when_credprops_is_unavailable(self):
+        self.key.data["acervo_passwordless"] = True
+        self.key.save(update_fields=["data"])
+
+        with self.webauthn_success(passwordless=None):
+            response = self.post_login(self.credential())
+
+        self.assertRedirects(response, reverse("core:home"), fetch_redirect_response=False)
+        self.assertEqual(int(self.client.session[SESSION_KEY]), self.user.pk)
+
     @override_settings(ACCOUNT_RATE_LIMITS={"login_failed": "1/m/ip"})
     def test_credential_must_be_passwordless_and_failures_do_not_clear_or_leak(self):
         for passwordless in (False, None):

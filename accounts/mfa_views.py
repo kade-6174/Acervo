@@ -18,7 +18,15 @@ from allauth.mfa.webauthn import views as webauthn_views
 from allauth.mfa.webauthn.internal import auth as webauthn_auth
 from allauth.mfa.webauthn.internal import flows as webauthn_flows
 from django.contrib.auth import REDIRECT_FIELD_NAME
-from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.contrib.auth.decorators import login_required
+from django.http import (
+    HttpRequest,
+    HttpResponse,
+    HttpResponseNotAllowed,
+    HttpResponseRedirect,
+    JsonResponse,
+)
+from django.views.generic.edit import FormView
 from fido2.webauthn import UserVerificationRequirement
 
 
@@ -66,6 +74,59 @@ class AcervoRemoveWebAuthnView(webauthn_views.RemoveWebAuthnView):
 
 
 remove_webauthn = AcervoRemoveWebAuthnView.as_view()
+
+
+_REGISTRATION_PASSWORDLESS_SESSION_KEY = "acervo.mfa.webauthn.registration_passwordless"
+
+
+@login_required
+def begin_webauthn_registration(request: HttpRequest) -> HttpResponse:
+    """選択された登録方式に対応する、セッション結合済みchallengeを返す。"""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    response = _redirect_stale_post(request)
+    if response:
+        return response
+
+    passwordless = request.POST.get("passwordless") == "true"
+    options = webauthn_auth.begin_registration(request.user, passwordless)
+    request.session[_REGISTRATION_PASSWORDLESS_SESSION_KEY] = passwordless
+    return JsonResponse({"creation_options": options})
+
+
+class AcervoAddWebAuthnView(webauthn_views.AddWebAuthnView):
+    """選択内容をchallengeに結び付け、対応する登録方式だけを保存する。"""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # allauth標準viewが事前に作る固定方式のchallengeは使わない。
+        context.pop("js_data", None)
+        webauthn_auth.clear_state()
+        self.request.session.pop(_REGISTRATION_PASSWORDLESS_SESSION_KEY, None)
+        return context
+
+    def form_valid(self, form):
+        passwordless = form.cleaned_data["passwordless"]
+        requested_passwordless = self.request.session.pop(
+            _REGISTRATION_PASSWORDLESS_SESSION_KEY, None
+        )
+        if requested_passwordless is None or requested_passwordless is not passwordless:
+            form.add_error(None, "登録操作をもう一度開始してください。")
+            return self.form_invalid(form)
+
+        authenticator, recovery_codes = webauthn_flows.add_authenticator(
+            self.request,
+            name=form.cleaned_data["name"],
+            credential=form.cleaned_data["credential"],
+        )
+        # credProps未対応の認証器でも、サーバーが要求した登録方式を保持する。
+        authenticator.data["acervo_passwordless"] = passwordless
+        authenticator.save(update_fields=["data"])
+        self.did_generate_recovery_codes = bool(recovery_codes)
+        return FormView.form_valid(self, form)
+
+
+add_webauthn = AcervoAddWebAuthnView.as_view()
 
 
 def begin_passwordless_authentication():

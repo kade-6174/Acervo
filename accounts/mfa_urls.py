@@ -39,7 +39,12 @@ urlpatterns = [
         name="mfa_download_recovery_codes",
     ),
     path("webauthn/", never_cache(webauthn_views.list_webauthn), name="mfa_list_webauthn"),
-    path("webauthn/add/", never_cache(webauthn_views.add_webauthn), name="mfa_add_webauthn"),
+    path("webauthn/add/", never_cache(mfa_views.add_webauthn), name="mfa_add_webauthn"),
+    path(
+        "webauthn/registration-options/",
+        never_cache(mfa_views.begin_webauthn_registration),
+        name="mfa_webauthn_registration_options",
+    ),
     path("webauthn/login/", never_cache(mfa_views.login_webauthn), name="mfa_login_webauthn"),
     path(
         "webauthn/reauthenticate/",

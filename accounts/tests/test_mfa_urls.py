@@ -205,22 +205,19 @@ class MFAURLRoutingTests(TestCase):
         resp = self.client.get(reverse("mfa_download_recovery_codes"))
         self.assertEqual(resp.status_code, 404)
 
-        # Step 4B: WebAuthn登録はallauth標準のchallengeとpasskey要件を返す。
+        # 登録画面は、選択後にサーバーから方式に対応したchallengeを取得する。
         webauthn_add = self.client.get(reverse("mfa_add_webauthn"))
         self.assertEqual(webauthn_add.status_code, 200)
         self.assertEqual(
             webauthn_add.headers["Cache-Control"],
             "max-age=0, no-cache, no-store, must-revalidate, private",
         )
-        selection = webauthn_add.context["js_data"]["creation_options"]["publicKey"][
-            "authenticatorSelection"
-        ]
-        # allauthは標準値を返し、チェック済みのpasswordless選択肢を標準JSが
-        # resident key / user verification required に切り替える。
-        self.assertEqual(selection["residentKey"].value, "discouraged")
-        self.assertEqual(selection["userVerification"].value, "discouraged")
         self.assertContains(webauthn_add, 'name="passwordless"')
         self.assertContains(webauthn_add, 'id="id_passwordless" checked')
+        self.assertContains(
+            webauthn_add,
+            reverse("mfa_webauthn_registration_options"),
+        )
         self.assertContains(
             webauthn_add, "秘密鍵や生体情報がAcervoへ送信・保存されることはありません"
         )
