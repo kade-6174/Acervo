@@ -12,6 +12,8 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 運用者が主Proxmoxホストで`qm status 201`を実行し、VM201の停止を確認した。VM200の`/srv/acervo-backups`には9月27日、28日、29日のバックアップディレクトリがあり、最新候補は`acervo-20260929T090008Z-7454c88b9a7b`だった。別ホストのLXC110は`running`で、同backup IDの確定済みディレクトリにおける`sha256sum -c checksums.sha256`は`payload.tar.gz.age`と`metadata.json`の両方で`OK`だった。これは保存先のファイル整合性の確認であり、署名検証・復号・管理者データの有無・復元成功はまだ確認していない。VM201のコンテナ・ボリュームの現状確認を次に行う。
 
+主ProxmoxホストでVM201を起動し、`qm status 201`は`running`だった。起動直後の`qm guest exec`はゲストエージェント未起動で失敗したが、再試行で応答した。VM201に`/opt/acervo/compose.production.yaml`と`/etc/acervo/backup-signing/allowed_signers`が存在し、Dockerコンテナとボリュームはそれぞれ0件だった。`/opt/acervo`のGit作業ツリーは`main...origin/main`で変更なし。`/srv/acervo-backups`は存在せず、最新バックアップはまだVM201へ搬入していない。復元操作、署名検証、ログイン、管理者MFA、再起動後の永続化は未実施である。
+
 ## 2026-09-28 7C-LIVE-Aの実機準備
 
 設計責任者から、`docs/LIVE_PREFLIGHT.md`の責任者・バックアップ運用・受入端末はすべて確定・承認済みとの回答を受けた。具体的な担当・端末・秘密値は公開リポジトリへ記載しない。ローカル環境から主ProxmoxホストへのSSHはネットワーク制限を越えた試行でも認証拒否となり、Codexから直接実機操作はできなかった。運用者が`root@pve:~#`で`qm status 200`を実行し、VM200の`status: running`を確認した。`qm guest exec 200 -- systemctl show -p WorkingDirectory --value acervo-daily-backup.service`は終了コード0で空行を返したが、読み取り専用の検索で`/opt/acervo/compose.production.yaml`を確認した。VM200の`docker ps`には`tunnel`、`proxy`、`web`、`db`の4コンテナがあり、`proxy`、`web`、`db`はhealthyだった。表示されたポートはコンテナ内部の80/443/2019、8000、5432で、ホストへの転送表記はなかった。
