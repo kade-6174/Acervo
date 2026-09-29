@@ -1,10 +1,14 @@
 # Project Status
 
-最終更新: 2026-09-29
+最終更新: 2026-09-30
 
 ## Current Task
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への空データ復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。7C-LIVE-Aの復元先ログイン・管理者MFA・永続化、7C-LIVE-B、Phase 1全体は未完了。
+
+## 2026-09-30 7C-LIVE-A復元試験の続き
+
+VM201で`acervo-restore`専用Compose projectのPostgreSQL 18.6を起動した。`up -d --wait db`は終了コード0で`acervo-restore-db-1`がhealthy、`docker ps`にはこの1コンテナだけが表示され、ホスト公開ポートはなかった。`5432/tcp`はコンテナ内ポートである。`docker volume ls`には`acervo-restore_postgres_data`だけがあり、写真ボリュームはまだない。PostgreSQLのpublic schemaの表数は`0`。`docker compose build restore`は終了コード0で成功した。バックアップの署名検証・復号・DB復元・ログイン・MFA・永続化は未実施。
 
 ## 2026-09-29 7C-LIVE-Aの完了判定を訂正
 
@@ -13,6 +17,22 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 運用者が主Proxmoxホストで`qm status 201`を実行し、VM201の停止を確認した。VM200の`/srv/acervo-backups`には9月27日、28日、29日のバックアップディレクトリがあり、最新候補は`acervo-20260929T090008Z-7454c88b9a7b`だった。別ホストのLXC110は`running`で、同backup IDの確定済みディレクトリにおける`sha256sum -c checksums.sha256`は`payload.tar.gz.age`と`metadata.json`の両方で`OK`だった。これは保存先のファイル整合性の確認であり、署名検証・復号・管理者データの有無・復元成功はまだ確認していない。VM201のコンテナ・ボリュームの現状確認を次に行う。
 
 主ProxmoxホストでVM201を起動し、`qm status 201`は`running`だった。起動直後の`qm guest exec`はゲストエージェント未起動で失敗したが、再試行で応答した。VM201に`/opt/acervo/compose.production.yaml`と`/etc/acervo/backup-signing/allowed_signers`が存在し、Dockerコンテナとボリュームはそれぞれ0件だった。`/opt/acervo`のGit作業ツリーは`main...origin/main`で変更なし。`/srv/acervo-backups`は存在せず、最新バックアップはまだVM201へ搬入していない。復元操作、署名検証、ログイン、管理者MFA、再起動後の永続化は未実施である。
+
+VM201の作業ツリーは当初`8a20529`で、`.env.production`の存在とLXC110（`192.168.11.22`）へのping成功を確認した。その後、運用者がVM201で`git merge --ff-only origin/main`を実行し、`8a20529`から`252824d`へfast-forwardした。`git log -1`でも`252824d`を確認した。コード更新後のCompose設定・イメージ・起動検証は未実施。暗号化バックアップのVM201への搬入方法を確認中である。
+
+別ホストLXC110の`/srv/acervo-backup/sftp/incoming`は`acervo-ingest:acervo-sftp`の専用領域で、`ssh`は`active`。対象backup IDのディレクトリには`checksums.sha256`（165B）、`metadata.json`（1113B）、`payload.tar.gz.age`（9316B）の3ファイルがあり、所有者・グループに読み取り権限がある。`acervo-ingest`は通常シェルを持たない。運用者は前回の搬入方法を覚えていないため、主ホストと別ホスト間の既存SSH認証を確認して転送手順を選ぶ。ここまでバックアップの内容、鍵、`.env.production`の値は表示していない。
+
+主Proxmoxホストから別Proxmoxホスト（`192.168.11.202`）への`BatchMode=yes`・厳格なホスト鍵検証付きSSHは、主ホストが相手のED25519ホスト鍵を未登録のため、認証前に`Host key verification failed`で停止した。接続・ファイル転送は成立していない。別ホストのコンソールとネットワーク経由で公開鍵指紋を照合してから信頼登録する。
+
+別ホストのコンソールで表示したED25519ホスト公開鍵のSHA-256指紋と、主ホストから`ssh-keyscan`で取得した同アドレスの指紋は一致した。指紋そのものは秘密値ではないが、公開リポジトリには記載しない。SSH認証の可否とバックアップ搬入は続けて確認する。
+
+指紋照合後、主ホストのroot用`known_hosts`に別ホストのED25519公開鍵を登録した。`BatchMode=yes`でのroot SSHは`Permission denied (publickey,password)`となり、無人用SSH認証は設定されていない。バックアップの転送や復元は未実施。運用者が対話的SSH認証を行えるか、秘密値を表示しない方法で確認する。
+
+主ホストから別ホストへ、運用者がパスワードを画面で入力する対話的SSHは成功し、`hostname`が`backup-pve`を返した。パスワードはチャット・コマンド引数へ含めていない。LXC110からSSHとQEMUゲストエージェントのstdin経由で非機密文字列`transfer-ok`をVM201へ渡す試験も終了コード0で成功した。次に同じ経路で暗号化済みバックアップだけをVM201へ搬入し、転送後チェックサムを確認する。復号とDB復元は未実施。
+
+VM201に`/srv/acervo-backups`を作成し、別ホストLXC110の確定済み`acervo-20260929T090008Z-7454c88b9a7b`を、主Proxmoxホストのディスクに保存せず、SSH・QEMUゲストエージェントのstdin経由でVM201へコピーした。VM201側の`tar`は終了コード0だった。転送後の3ファイル確認とチェックサム検証はこれから行う。暗号化payloadの内容・秘密値は表示していない。
+
+VM201で対象ディレクトリ内の3ファイルがすべて通常ファイルとして存在し、`sha256sum -c checksums.sha256`は`payload.tar.gz.age`と`metadata.json`の両方で`OK`、終了コード0だった。これは転送後のファイル整合性までの結果であり、署名検証、復号、管理者データ、ログイン・MFA、永続化はまだ確認していない。
 
 ## 2026-09-28 7C-LIVE-Aの実機準備
 
