@@ -28,6 +28,10 @@ Codexブラウザからの公開URLへのアクセスは`ERR_BLOCKED_BY_CLIENT`�
 
 作業ツリーで`python manage.py test --settings=config.settings.test`は262件すべて成功、`ruff check .`、`ruff format --check .`、`python manage.py check --settings=config.settings.test`、`makemigrations --check --dry-run`、`git diff --check`は成功した。変更は未コミット・未pushであり、GitHub Actions、VM200でのCompose再ビルド・再起動、実ブラウザでの直接ログインおよび重複リンク解消は未確認である。
 
+その後、修正を`36e9a19`としてコミットし、`3c9a3ad`とともにGitHubの`main`へpushした。VM200は未変更の作業ツリーで`8a20529`から`36e9a19`へfast-forwardし、Cloudflare用Composeでwebイメージを再ビルドして`up -d --wait`を実行した。終了コード0で、`db`、`web`、`proxy`、`tunnel`は稼働し、`db`、`web`、`proxy`はhealthyだった。更新後にコンテナ内の`python manage.py check --deploy`は問題0件で終了した。`/dev/sda`、VM201、LXC110は操作していない。
+
+運用者は公開URLで、ログイン画面の重複リンクが消えたこと、登録し直したパスキーによる直接ログインが成功することを確認した。更新後の公開URLをPowerShellで再確認する結果、ログアウト状態での`/management/`受入、MFA未設定または未完了の管理者拒否、別OS・端末での受入は未確認である。このため7C-LIVE-A、7C-LIVE全体、Phase 1全体はいずれも未完了である。
+
 ## 2026-09-28 チャット引継ぎとLIVE受入順序の整理
 
 `AGENTS.md`、`PROJECT_SPEC.md`、`PLAN.md`、`STATUS.md`の順に確認し、`git status`は変更なしの`main...origin/main`、HEADは`fb78906`だった。関連URLを調べ、現在のルーティングに標本・QR・保護写真の経路がなく、Phase 2〜5のモデル・登録・詳細機能が未実装であることを確認した。既存変更はなかった。
