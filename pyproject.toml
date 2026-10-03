@@ -32,7 +32,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["accounts*", "audit*", "config*", "core*", "management_portal*"]
+include = ["accounts*", "audit*", "config*", "core*", "management_portal*", "specimens*"]
 
 [tool.ruff]
 target-version = "py313"

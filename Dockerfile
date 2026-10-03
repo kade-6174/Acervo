@@ -16,6 +16,7 @@ COPY audit ./audit
 COPY config ./config
 COPY core ./core
 COPY management_portal ./management_portal
+COPY specimens ./specimens
 COPY manage.py ./manage.py
 COPY static ./static
 COPY templates ./templates

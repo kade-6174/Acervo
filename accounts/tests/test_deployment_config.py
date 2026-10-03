@@ -223,6 +223,7 @@ class ProductionMFASettingsTests(SimpleTestCase):
                 "POSTGRES_PASSWORD": "dummy-password",
                 "DJANGO_CSRF_TRUSTED_ORIGINS": "https://acervo.example.org",
                 "ACERVO_PUBLIC_BASE_URL": "https://acervo.example.org",
+                "ACERVO_SPECIMEN_CODE_PREFIX": "ACERVO",
                 "ACERVO_MFA_FERNET_KEYS": self.VALID_KEY,
                 "ACERVO_ENROLLMENT_POLICY": "none",
             }
@@ -246,6 +247,11 @@ class ProductionMFASettingsTests(SimpleTestCase):
         result = self._run_production_setup({"ACERVO_MFA_FERNET_KEYS": ""})
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ACERVO_MFA_FERNET_KEYS", result.stderr)
+
+    def test_production_requires_specimen_code_prefix(self):
+        result = self._run_production_setup(remove_env=("ACERVO_SPECIMEN_CODE_PREFIX",))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ACERVO_SPECIMEN_CODE_PREFIX", result.stderr)
 
     def test_production_fails_when_fernet_key_invalid(self):
         invalid_key = "invalid-fernet-key"
@@ -368,6 +374,7 @@ class ProductionMFASettingsTests(SimpleTestCase):
                 "POSTGRES_PASSWORD": "dummy-password",
                 "DJANGO_CSRF_TRUSTED_ORIGINS": "https://acervo.example.org",
                 "ACERVO_PUBLIC_BASE_URL": "https://acervo.example.org",
+                "ACERVO_SPECIMEN_CODE_PREFIX": "ACERVO",
                 "ACERVO_MFA_FERNET_KEYS": self.VALID_KEY,
                 "ACERVO_ENROLLMENT_POLICY": "none",
             }

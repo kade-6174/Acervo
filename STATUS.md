@@ -22,6 +22,14 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 VM200への保守アクセス確認中にSSHを一時起動したが、認証情報を使わずにゲストエージェント経由で作業を継続し、SSHは停止・自動起動無効の元状態へ復帰した。ProxmoxホストのSSHも同様に一時起動後、停止・自動起動無効へ復帰済みである。ディスク、DB、写真データの削除や初期化は行っていない。Phase 1Dの実装・自動テスト・PostgreSQL CI・production Compose・実ブラウザ受入は完了したが、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了とする。
 
+## 2026-10-03 Phase 2 標本データ中核の初期実装
+
+設計責任者の承認後、`specimens`アプリを追加した。`SpecimenSequence`、`Specimen`、`Taxon`、`TaxonSource`、`StorageLocation`、`SpecimenEvent`、`SpecimenPhoto`の初回migrationを作成した。標本番号は環境変数`ACERVO_SPECIMEN_CODE_PREFIX`と6桁以上の連番から生成し、本番では接頭辞の未設定を起動時に拒否する。既存のUser・認証・DBデータを変更するmigrationは含めない。
+
+サービス層では、行ロックと単一トランザクションにより標本作成時だけ番号を確定し、標本と初回履歴を同時に保存する。標本番号と詳細用UUIDv4はモデル上で変更不可とし、番号の再利用を防ぐ。貸出、返却、売却、廃棄、紛失、発見は状態と追記型の`SpecimenEvent`を同じトランザクションで変更し、不正な遷移と不正イベント種別を拒否する。未同定・採集日不明は許容する。
+
+`specimens/tests/`に通常作成、未同定、採番失敗時のロールバック、UUIDv4、番号不再利用、イベント追記専用、不正状態遷移、不正入力、SQLiteのDB制約、PostgreSQL専用の同時採番テストを追加した。ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が303件成功（PostgreSQL専用2件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`も成功した。PostgreSQL CI、production Compose、実ブラウザ受入は未実施である。Phase 2は未完了とし、次はCIでPostgreSQL同時採番と本番コンテナを確認する。
+
 ## 2026-09-30 7C-LIVE-A復元試験の続き
 
 VM201で`acervo-restore`専用Compose projectのPostgreSQL 18.6を起動した。`up -d --wait db`は終了コード0で`acervo-restore-db-1`がhealthy、`docker ps`にはこの1コンテナだけが表示され、ホスト公開ポートはなかった。`5432/tcp`はコンテナ内ポートである。`docker volume ls`には`acervo-restore_postgres_data`だけがあり、写真ボリュームはまだなかった。PostgreSQLのpublic schemaの表数は`0`。`docker compose build restore`は終了コード0で成功した。
