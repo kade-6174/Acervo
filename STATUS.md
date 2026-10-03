@@ -16,6 +16,12 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が290件成功（PostgreSQL専用1件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`も成功した。GitHub Actionsではコミット`57b7890`に対する`test (push)`が50秒、`production-container (push)`が4分でいずれも成功した。前者はCIのPostgreSQL 18上でテストを実行するため、同時降格テストを含むPostgreSQL検証の成功根拠とする。後者はproduction Compose検証を含む。実ブラウザ受入は未実施である。したがってPhase 1D、7C-LIVE-A、7C-LIVE-B、Phase 1全体はいずれも未完了とする。次は本番相当の管理画面を実ブラウザで受入し、結果を追記する。
 
+同日、VM200のCloudflare Tunnel本番構成で実ブラウザ受入を実施した。更新前に暗号化バックアップ`acervo-20261003T081532Z-8cfd9867a26e`（PostgreSQL 18）を作成し、保持整理では削除0件だった。作業ツリーが空であることを確認してコミット`36e9a19`から`afbd3ad`へfast-forwardし、Cloudflare用Compose設定検証、webイメージのbuild、`up -d --wait`を成功させた。`db`、`web`、`proxy`、`tunnel`はhealthy、コンテナ内`check --deploy`は警告なし、webのUIDは10001だった。
+
+通常PCの実HTTPSブラウザで、既存の管理者アカウントによるMFA後の`/management/`表示、利用者管理一覧、監査ログ一覧、ログアウト後の`/management/`直接アクセスのログイン画面へのredirectを確認した。監査ログは空状態を正しく表示し、パスワード、認証コード、MFA秘密を表示しない案内を確認した。実利用者の作成・変更・一時パスワード再発行は行っていない。学校回生警告の実表示は、現在の本番データの状態を変更せず、単体テストで確認済みである。
+
+VM200への保守アクセス確認中にSSHを一時起動したが、認証情報を使わずにゲストエージェント経由で作業を継続し、SSHは停止・自動起動無効の元状態へ復帰した。ProxmoxホストのSSHも同様に一時起動後、停止・自動起動無効へ復帰済みである。ディスク、DB、写真データの削除や初期化は行っていない。Phase 1Dの実装・自動テスト・PostgreSQL CI・production Compose・実ブラウザ受入は完了したが、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了とする。
+
 ## 2026-09-30 7C-LIVE-A復元試験の続き
 
 VM201で`acervo-restore`専用Compose projectのPostgreSQL 18.6を起動した。`up -d --wait db`は終了コード0で`acervo-restore-db-1`がhealthy、`docker ps`にはこの1コンテナだけが表示され、ホスト公開ポートはなかった。`5432/tcp`はコンテナ内ポートである。`docker volume ls`には`acervo-restore_postgres_data`だけがあり、写真ボリュームはまだなかった。PostgreSQLのpublic schemaの表数は`0`。`docker compose build restore`は終了コード0で成功した。
