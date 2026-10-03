@@ -9,6 +9,10 @@ class AuditLog(models.Model):
     class Action(models.TextChoices):
         ADMIN_MFA_RESET = "admin_mfa_reset", "別管理者によるMFAリセット"
         COMMAND_MFA_RESET = "command_mfa_reset", "サーバー管理コマンドによるMFAリセット"
+        USER_ROLE_CHANGED = "user_role_changed", "利用者role変更"
+        USER_ACTIVE_STATE_CHANGED = "user_active_state_changed", "利用者有効状態変更"
+        USER_CREATED = "user_created", "利用者作成"
+        USER_PASSWORD_REISSUED = "user_password_reissued", "利用者一時パスワード再発行"
 
     class Channel(models.TextChoices):
         MANAGEMENT_UI = "management_ui", "管理画面"

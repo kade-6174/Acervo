@@ -1,14 +1,168 @@
 # Project Status
 
-最終更新: 2026-09-30
+最終更新: 2026-10-03
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への空データ復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。7C-LIVE-Aの復元先ログイン・管理者MFA・永続化、7C-LIVE-B、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+
+## 2026-10-03 Phase 1D 残件のローカル実装
+
+学校回生方式の管理画面に、現在在籍中の有効adminが0人のときの強い警告を追加した。年度切替日の60日前からは、次年度にも在籍する有効adminがいない場合に後継管理者の設定と引き継ぎを促す。`none`方式ではこれらの学校回生向け警告を表示しない。警告は`/management/`と`/management/users/`で、既存の中央管理アクセス判定を通過した管理者にだけ表示する。
+
+`/management/audit-logs/`に最小AuditLog閲覧画面を追加した。管理者MFAゲートと`no-store`を適用し、直近100件を新しい順で表示する。日時、操作種別、実行者、対象、経路だけを表示し、一時パスワード、認証コード、MFA秘密などの秘密値を扱わない。利用者作成、role変更、有効状態変更、一時パスワード再発行、MFAリセットの既存記録を閲覧できる。
+
+変更ファイルは`management_portal/admin_warnings.py`、`management_portal/views.py`、`management_portal/urls.py`、`management_portal/templates/management_portal/index.html`、`management_portal/templates/management_portal/user_list.html`、`management_portal/templates/management_portal/audit_log_list.html`、`management_portal/tests/test_admin_warnings.py`、`management_portal/tests/test_user_administration_ui.py`、`accounts/tests/test_user_administration_concurrency.py`、および先行して未コミットだったPhase 1D利用者管理一式である。
+
+ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が290件成功（PostgreSQL専用1件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`も成功した。PostgreSQL専用の同時降格テストを追加したが、SQLiteではskipされるためPostgreSQL上では未実行である。production Composeと実ブラウザ受入も未実施である。したがってPhase 1D、7C-LIVE-A、7C-LIVE-B、Phase 1全体はいずれも未完了とする。次はPostgreSQLでの同時更新検証、production Compose、本番相当の管理画面受入を行い、結果を追記する。
 
 ## 2026-09-30 7C-LIVE-A復元試験の続き
 
-VM201で`acervo-restore`専用Compose projectのPostgreSQL 18.6を起動した。`up -d --wait db`は終了コード0で`acervo-restore-db-1`がhealthy、`docker ps`にはこの1コンテナだけが表示され、ホスト公開ポートはなかった。`5432/tcp`はコンテナ内ポートである。`docker volume ls`には`acervo-restore_postgres_data`だけがあり、写真ボリュームはまだない。PostgreSQLのpublic schemaの表数は`0`。`docker compose build restore`は終了コード0で成功した。バックアップの署名検証・復号・DB復元・ログイン・MFA・永続化は未実施。
+VM201で`acervo-restore`専用Compose projectのPostgreSQL 18.6を起動した。`up -d --wait db`は終了コード0で`acervo-restore-db-1`がhealthy、`docker ps`にはこの1コンテナだけが表示され、ホスト公開ポートはなかった。`5432/tcp`はコンテナ内ポートである。`docker volume ls`には`acervo-restore_postgres_data`だけがあり、写真ボリュームはまだなかった。PostgreSQLのpublic schemaの表数は`0`。`docker compose build restore`は終了コード0で成功した。
+
+復元設定の空出力先を作成し、`allowed_signers`が空でないことを確認した。運用者は前回復号に成功した修正済みage復元鍵を、主ホストの非表示入力からVM201の一時ファイルへ渡した。鍵値はチャット・コマンド本文・出力へ表示していない。一時ファイルをコンテナUID10001所有・mode0400とし、`age-keygen -y`の出力を破棄して鍵形式を確認した。復元設定の出力先は空で、復元前のDockerボリュームは新規DB用1件だけだった。
+
+`acervo-20260929T090008Z-7454c88b9a7b`をVM201の`acervo-restore` projectへ復元し、`restore_completed`と終了コード0を確認した。復元処理のコード上、署名付きmetadataと暗号化payloadのSHA-256を独立した`allowed_signers`で検証し、チェックサム、PostgreSQL major、空DB・空写真領域の判定を通過した後に復号・DB復元・写真展開・設定の別ディレクトリへのコピーを行う。個別の`signature=valid`行は今回の出力にはなかったため、署名検証の成功はこの制御フローと`restore_completed`から判断した。既存の`.env.production`は上書きしていない。復元した利用者数、ログイン・管理者MFA、再起動後の永続化はまだ未確認。一時age秘密鍵は削除手順を案内したが、完了結果は未確認。
+
+運用者がVM201上の一時age秘密鍵ファイルを削除し、終了コード0を確認した。復元DBの`accounts_user`は1件。復元出力の`.env.production`とVM201で現在使っている`.env.production`の`cmp -s`は終了コード1で一致しなかった。差分の設定項目名だけを確認するまで、VM201のWebは起動しない。設定値は表示していない。ログイン・管理者MFA・永続化は未確認。
+
+設定ファイルの差分を値を表示しないスクリプトで調べた。異なる項目名は`ACERVO_BACKUP_AGE_RECIPIENTS`、`ACERVO_DOMAIN`、`ACERVO_MFA_FERNET_KEYS`、`ACERVO_ORGANIZATION_NAME`、`ACERVO_PUBLIC_BASE_URL`、`ACERVO_SITE_NAME`、`CADDY_EMAIL`、`DJANGO_ALLOWED_HOSTS`、`DJANGO_CSRF_TRUSTED_ORIGINS`、`DJANGO_SECRET_KEY`、`POSTGRES_PASSWORD`。復元DBはVM201の現在のDBパスワードで初期化済みのため、認証受入では元のVM201設定を保存したうえで、復元した`DJANGO_SECRET_KEY`と`ACERVO_MFA_FERNET_KEYS`だけをVM201のWebへ一時適用する方針とした。元の設定へ戻せるまで、本番用の公開経路やTunnelは起動しない。値は表示していない。
+
+VM201の既存`.env.production`は`root:root`・mode `600`。`acervo-restore` projectのWebイメージをビルドし、終了コード0で成功した。Webコンテナはまだ起動していない。元設定を退避する手順の結果を確認してから、一時設定と認証受入へ進む。
+
+運用者はVM201の退避先にファイルがないことを確認したうえで、元の`.env.production`を`/root/acervo-vm201-env-before-acceptance`へ属性を保ってコピーした。コピーは終了コード0、退避ファイルは`root:root`・mode `600`。元設定の値は表示していない。復元した認証用鍵2項目の一時適用は結果待ち。
+
+復元した`DJANGO_SECRET_KEY`と`ACERVO_MFA_FERNET_KEYS`の行だけを、VM201の試験用`.env.production`へ一時適用した。スクリプトは適用前に元ファイルと退避コピーのバイト一致、双方で対象項目が各1件であることを検査し、`ACCEPTANCE_ENV_READY`と終了コード0を返した。適用後に変更が2項目だけであること、ファイル権限、Compose設定は確認待ち。値は表示していない。
+
+適用後の検証は`TWO_KEYS_ONLY_OK`と終了コード0で成功した。退避コピーとの変更行が認証用鍵2項目だけで、両項目が復元出力と一致することを値を表示せず確認した。その後、権限確認とCompose設定確認を行うコマンドが番号付きで同じ行に貼り付けられ、QEMU guest agentのタイムアウトになった。以後の`qm guest exec 201 -- true`と`qm agent 201 ping`は`QEMU guest agent is not running`で失敗した。一方、`qm status 201`は`running`、VM201のIPへのpingは2回とも成功した。VMは稼働しているがゲストエージェントが応答しない状態であり、原因は未確定。VM201コンソールからサービス状態の確認・再起動を案内する。適用後のファイル権限・Compose設定、Web起動、復元後ログイン・管理者MFA・永続化は未確認で、7C-LIVE-Aは未完了。
+
+VM201コンソールの画面で`systemctl show qemu-guest-agent -p ActiveState -p SubState -p Result`の結果は`Result=success`、`ActiveState=active`、`SubState=running`だった。これはゲスト内サービスの稼働を示すが、主ホストからの通信回復はまだ確認していない。サービス再起動後に`qm agent 201 ping`で確認する。
+
+VM201コンソールでのゲストエージェント再起動を案内した後、主ホストの`qm agent 201 ping`はエラーなく戻り、`qm guest exec 201 -- true`は終了コード0だった。再起動コマンド自体の結果は未受領だが、ゲストエージェント経由の操作は再開できる。直前のタイムアウト原因は未特定。認証用鍵2項目の一時適用後のファイル権限とCompose設定を次に確認する。
+
+VM201の一時適用後`.env.production`は`root:root`・mode `600`を保持し、`acervo-restore` projectのCompose `config --quiet`は終了コード0だった。設定値は表示していない。Web起動と復元先の認証・MFA受入は未実施。
+
+隔離した`acervo-restore` projectで`docker compose up -d --wait --no-recreate web`は終了コード0で成功した。既存DBは`Running`から`Healthy`、新規Webは`Started`から`Healthy`となり、試験用frontend networkとstatic volumeが作成された。proxyとTunnelは起動していない。`check --deploy`、公開ポート、復元後ログイン・管理者MFA・永続化はこれから確認する。
+
+VM201のWebで`python manage.py check --deploy`は問題0件・終了コード0。`docker ps`には`acervo-restore-web-1`と`acervo-restore-db-1`の2件のみで、どちらもhealthy。表示はコンテナ内部の`8000/tcp`と`5432/tcp`だけで、ホストへのポート公開はなかった。復元後の管理者・MFA登録の件数、実ログイン、再起動後の永続化は未確認。
+
+VM201の復元DBではadmin roleの利用者が1件、同roleのTOTP認証器が0件だった。これは復元時点のTOTP登録が存在しないことを示すが、他方式の認証器の有無は未確認。認証器の種類と管理者の状態を秘密値抜きで調べてから、復元先MFAの受入方法を決める。ログイン、MFA、永続化は未確認。
+
+復元DBのadmin role利用者に紐づく認証器の種類は空リスト`[]`で、利用者は`is_active=True`・`must_change_password=True`だった。したがって2026-09-29 09:00 UTCのバックアップは、管理者の初回パスワード変更とMFA登録より前の状態を含んでおり、現在の管理者のパスワード・MFAによるログイン受入には使えない。VM200の現状態と2026-09-30の新しいバックアップの有無を確認する。VM201の現復元データは上書きせず維持している。
+
+VM200の現DBではadmin role利用者は`is_active=True`・`must_change_password=False`で、認証器の種類は`totp`、`recovery_codes`、`webauthn`だった。VM200のバックアップ保存先には新しい`acervo-20260930T090018Z-3d7c28eabc85`が存在する。これが別ホストで保存確定・整合していることは未確認。旧VM201試験環境のDB・写真ボリュームは上書きせず、新しいバックアップは別の空Compose projectで受け入れる方針とする。
+
+主ホストから別ホスト`192.168.11.202`へのSSHはポート22の接続タイムアウトだった。運用者は別ホストが現在電源オフと確認し、Wake-on-LANによる起動を提案した。別ホストの新バックアップの現地チェックサムは未確認。主ホストの既存起動unitを調べてからWake-on-LANを行う。
+
+主ホストのtimer一覧には`acervo-backup-wake.timer`（毎日17:55 JST、当日17:55実行済み）と`acervo-backup-wol.timer`（毎日02:15 JST）が存在した。前者に対応する既存の`acervo-backup-wake.service`を手動起動し、別ホストの応答を確認する。
+
+運用者が主ホストで`systemctl start acervo-backup-wake.service`を実行し、`Result=success`・`ExecMainStatus=0`を確認した。サービス成功は起動信号の送信までを示し、別ホストの起動を証明しない。45秒後の`192.168.11.202`へのpingは2回とも応答なし。サービスの実行内容と遅延起動の可能性を確認する。最初の`systemctl show`は行が途中で分割されて失敗したが、1行で再実行して正常結果を得た。
+
+その後、運用者は保存用LXC110の`root@acervo-backup`コンソールでネットワーク設定を表示し、LXCの`eth0`に`192.168.11.22/24`が設定されていることを確認した。これはLXCへコンソールで到達できることを示すが、主ホストからの別物理ホスト`192.168.11.202`への疎通はまだ再確認していない。LXC内で新バックアップのチェックサムを直接確認する。
+
+主ホストの`acervo-backup-wake.service`は、別ホスト用にLANブロードキャストのUDP 9へWake-on-LANを送る設定だった。送信先MACは運用識別情報として公開Statusに記載しない。設定確認後の`192.168.11.202`へのpingも2回とも応答なし。起動・疎通の原因は未確定。
+
+保存用LXC110のコンソールで`acervo-20260930T090018Z-3d7c28eabc85`の`sha256sum -c checksums.sha256`を実行し、暗号化payloadとmetadataがともに`OK`だった。別ホストへの保存物のファイル整合性を確認したが、署名検証とVM201での復元は未実施。主ホストからLXCのIP`192.168.11.22`への直接通信を確認し、現時点で応答のない物理ホストIPを経由せず暗号化ファイルを取得できるか調べる。
+
+主ホストから別物理ホストの`192.168.11.202`へのpingは引き続き応答なしだったが、保存用LXC110の`192.168.11.22`には2回とも応答した。LXCへの直接SSHで暗号化済みバックアップを取得できるか、公開ホスト鍵とSSH認証設定を確認する。
+
+LXC110の`ssh`は`active`だが、実効設定は`permitrootlogin no`・`passwordauthentication no`だった。LXCのEd25519ホスト公開鍵指紋は確認したが、主ホストと照合・登録はしていない。root SSHを有効化せず、LXC側で検証済みのバックアップとVM200上の同backup IDがバイト一致することを確認したうえで、暗号化済み成果物をVM200から主ホストのメモリ経由でVM201へ転送する方法を検討する。これにより今回の新バックアップの物理的な取得経路はVM200となるため、別ホストからの実ファイル取得は未確認事項として明記する。
+
+LXC110とVM200の`acervo-20260930T090018Z-3d7c28eabc85`で`checksums.sha256`自体のSHA-256が一致した。VM200側でも`sha256sum -c checksums.sha256`が暗号化payloadとmetadataの両方で`OK`、LXC側も既に両方`OK`だった。同一の署名付き暗号化成果物がVM200と別ホストに存在することをバイトレベルのハッシュで確認した。別ホストからの実ファイル取得は今回まだできていないため、新バックアップのVM201への搬入はVM200から行い、この経路差を受入記録に残す。
+
+VM201の`/srv/acervo-backups/acervo-20260930T090018Z-3d7c28eabc85`が存在しないことを終了コード0で確認した。旧バックアップの保存ディレクトリや復元用DB・写真ボリュームは維持している。新バックアップの転送はこれから行う。
+
+主ホスト上のPythonプロセスでVM200の暗号化済みバックアップディレクトリをtar化してQEMU guest agentの標準出力から受け取り、主ホストのメモリからVM201のguest agent標準入力へ渡して展開した。`ENCRYPTED_BACKUP_TRANSFER_OK`を確認し、主ホストのディスクにコピーを残していない。VM201側ファイルの件数・チェックサムはこれから確認する。別ホストの保存物とは前段でハッシュ一致を確認済みだが、転送元はVM200だった。
+
+VM201上の新バックアップで`sha256sum -c checksums.sha256`は暗号化payloadとmetadataの両方が`OK`、終了コード0だった。旧`acervo-restore` projectのデータは削除せず、コンテナを停止して、新しい空のCompose projectで復元受入を続ける。署名検証・復号・新DB復元は未実施。
+
+VM201上の新バックアップを復元コンテナUID/GID10001の所有に変更した。旧`acervo-restore` projectのWebとDBは停止し、既存のDB・写真・静的資産の3ボリュームは維持されている。新しい`/srv/acervo-restored-settings-20260930`を未存在確認後にUID/GID10001・mode0700で作成した。Dockerボリューム一覧に新project用のものはなく、新しいDB・写真領域はまだ作成していない。
+
+新しい`acervo-acceptance` projectでPostgreSQL 18.6のDBコンテナを作成し、`up -d --wait db`は終了コード0・`Healthy`だった。DBのpublic schemaのテーブル数は復元前に`0`、終了コード0。次に署名検証用公開鍵、復元設定の空出力先、復号鍵の一時入力を確認して復元する。
+
+VM201の署名検証用`allowed_signers`は空でなく、`/srv/acervo-restored-settings-20260930`は空だった。Dockerボリュームは新projectのPostgreSQL用1件と旧projectの3件だけで、新projectの写真ボリュームは未作成。`acervo-acceptance`用のrestoreイメージは終了コード0でビルドできた。復号鍵はまだ配置しておらず、新バックアップの署名検証・復元は未実施。
+
+復元鍵用の一時ファイルが既に存在したため、未存在確認は終了コード1だった。それにもかかわらず、運用者は非表示入力で当該ファイルを更新した。鍵値は表示されず、UID/GID10001・mode0400への設定と`age-keygen -y`による形式検査は`IDENTITY_FORMAT_OK`・終了コード0で成功した。既存ファイルの由来は未確認だが、今回の入力で上書きされた。新バックアップの署名検証・復元と、直後の一時鍵削除は未実施。
+
+運用者が一時鍵を先に削除してから復元コマンドを実行したため、復元は終了コード1・`restore_target_unavailable`で停止した。復元処理はidentity file、写真領域、設定出力先のいずれかが利用できない場合に、署名検証や復号より前でこのエラーを返す。今回はidentity fileを削除したことが原因である。失敗時に新projectの`media_data`ボリュームは作成されたが、DB・写真・設定の復元は実施されていない。復元先DB、写真ボリューム、設定出力先が空であることを再確認してから、鍵を再入力し、復元完了後に必ず削除する単一手順を案内する。
+
+再確認では新projectのDBの表数は`0`、写真ボリュームは`MEDIA_EMPTY`だった。一方、鍵パス不存在と設定出力先空をまとめた検査は終了コード1だった。前回、存在しない鍵パスをDocker bind mountへ渡したため、Dockerが同パスに空ディレクトリを作成した可能性がある。対象のファイル種別と設定出力先を個別に調べてから、明示した空ディレクトリだけを削除して復元鍵を配置する。
+
+鍵パス`/root/acervo-acceptance-identity-20260930.txt`はmode0755の空ディレクトリ、設定出力先は`SETTINGS_EMPTY`だった。Dockerがbind mountのために作成した空ディレクトリと判断できる。DBと写真ボリュームも空であることを確認済み。この空ディレクトリのみを`rmdir`で削除して、同じパスへ一時鍵ファイルを再配置する。
+
+確認済みの空ディレクトリを`rmdir`で削除し、同パスが存在しないことを終了コード0で確認した。復元鍵の再入力、復元、鍵削除を順に連続実行する。
+
+運用者は非表示入力でage復元鍵を一時ファイルへ渡し、UID/GID10001・mode0400を設定した。`acervo-acceptance` projectへの復元は`restore_completed backup_id=acervo-20260930T090018Z-3d7c28eabc85 postgres_major=18`・終了コード0で成功した。復元処理により、独立保管の`allowed_signers`を使う署名検証、チェックサム照合、PostgreSQL majorと空DB・空写真領域の確認、復号、DB・写真・設定の復元が完了した。一時age鍵は直後に削除し、終了コード0だった。復元先のログイン、管理者MFA、再起動後のDB・写真永続化は未確認。
+
+復元設定の`DJANGO_SECRET_KEY`と`ACERVO_MFA_FERNET_KEYS`だけをVM201試験用`.env.production`へ一時適用し、`ACCEPTANCE_20260930_ENV_READY`・終了コード0を確認した。元のVM201設定は`/root/acervo-vm201-env-before-acceptance`へroot専用で退避済み。変更項目が2件だけであること、ファイル権限、Compose設定、Web起動、認証受入は未確認。
+
+退避元との違いが`DJANGO_SECRET_KEY`と`ACERVO_MFA_FERNET_KEYS`の2項目だけであり、各値が9月30日復元設定と一致することを`TWO_KEYS_ONLY_OK`で確認した。`acervo-acceptance` projectのCompose `config --quiet`は終了コード0だった。Web起動、復元DBの管理者・MFA状態、ログイン、管理者MFA、永続化は未確認。
+
+`acervo-acceptance` projectでWebイメージをビルドし、`up -d --wait --no-recreate web`は終了コード0で成功した。DBはhealthyを維持し、Webもhealthyになった。proxyとTunnelは起動していない。`check --deploy`、ホスト公開ポート、復元DBの管理者・MFA状態、ログイン、管理者MFA、永続化は未確認。
+
+復元後Webで`python manage.py check --deploy`は問題0件・終了コード0。稼働中コンテナは`acervo-acceptance-web-1`と`acervo-acceptance-db-1`の2件のみで双方healthy、表示された`8000/tcp`と`5432/tcp`はコンテナ内部ポートでホストへの公開はない。復元DBのadmin role利用者は`is_active=True`・`must_change_password=False`で、認証器の種類は`recovery_codes`、`totp`、`webauthn`だった。認証用Fernet鍵で実際のTOTP記録を復号できるか、ログイン・MFA・管理画面への到達、再起動後の永続化は未確認。
+
+復元DBのTOTP認証器を設定済みFernet鍵で復号できることを、秘密値を出さない`TOTP_DECRYPT_OK`・終了コード0で確認した。管理者の現在のパスワードと本人の認証アプリのコードを非表示入力で渡し、未ログイン拒否・パスワードログイン・TOTP認証・管理トップ到達・ログアウト後拒否をアプリの実ビューで確認する準備ができた。実行結果は未確認。
+
+非表示入力による実ログイン試験は終了コード1・ラベルなしの`AssertionError`で中断した。コード上、最初のラベルなしassertは標準入力が2行であること、次が認証コードが6桁の数字であることの検査である。`PASSWORD_MISMATCH`以降の認証判定へ到達した証拠はなく、パスワードやMFAの成否は未確認。秘密値は出力されていない。まず非機密の2行で主ホストからVM201 Webへの標準入力転送を確認する。
+
+主ホスト`pve`から`qm guest exec 201 --pass-stdin`を介してVM201のWebコンテナへ非機密の2行を渡す試験は、`out-data`が`2 [5, 6]`、`exitcode`が`0`で成功した。先の`AssertionError`は転送経路そのものの恒常的な不具合を示すものではない。実ログイン・TOTP・管理画面・ログアウト後拒否、再起動後のDBと写真ボリューム永続化は引き続き未確認。
+
+非表示入力した管理者パスワードと認証アプリの6桁コードを用いるVM201のDjangoビュー試験では、`PASSWORD_CHECK_OK`、`BEFORE_LOGIN_DENIED`、`PASSWORD_LOGIN_STAGE_OK`まで確認した。TOTP送信後は`TOTP_STAGE_FAILED`・終了コード1。失敗ラベルはHTTP statusとredirect先をまとめて判定したもので、コードの期限切れ、入力違い、想定と異なる画面遷移のいずれかは未特定。管理画面到達とログアウト後拒否は未確認。秘密値は出力されていない。入力用シェル変数の削除も貼付ログが乱れており完了確認が必要。
+
+運用者が主ホストで`unset`を実行し、両入力変数の不存在を`INPUT_VARIABLES_CLEARED`で確認した。新たに非表示入力したパスワードとTOTPコードで、VM201のDjangoビューによるログイン試験は終了コード0だった。`LOGIN 302 /accounts/mfa/authenticate/`、`MFA 302 /management/`、`MANAGEMENT 200`、`AFTER_LOGOUT 302 /accounts/login/`を確認した。これにより復元DBでのパスワード照合、TOTP通過、管理トップ到達、ログアウト後の拒否を確認した。PythonのDjangoテストクライアントによる内部ビュー試験であり、VM201からの実ブラウザ・公開HTTPS経路やCSRF送信の受入とは区別する。実行したシェル手順末尾で入力変数の`unset`を指定したが、変数不存在の独立確認は未実施。再起動後のDBと写真ボリューム永続化は未確認。
+
+再起動前のVM201で、復元DBの有効・初回変更済みadmin role利用者1件と紐づく認証器3件を確認した。写真用`/app/media`ボリュームへ固定文言の試験用マーカー`.vm201-persistence-probe-20260930`を排他的に作成し、`DB_BASELINE_OK MEDIA_MARKER_CREATED`・終了コード0を確認した。マーカーは再起動後の永続化確認後に削除する。既存写真の表示は標本・写真機能未実装のため対象外。
+
+運用者が主ホストで`qm reboot 201`を実行し、エラーなくプロンプトへ戻った。再起動後、`qm agent 201 ping`はエラーなし。VM201の`docker ps`では`acervo-acceptance-web-1`と`acervo-acceptance-db-1`がともにhealthyで、表示された`8000/tcp`と`5432/tcp`はコンテナ内部ポートのみ。DB状態と写真マーカーの再照合はこれから行う。
+
+再起動後のVM201で、有効・初回パスワード変更済みadmin role利用者1件と紐づく認証器3件が維持され、写真用ボリュームの試験マーカー内容も一致した。`DB_PERSISTED MEDIA_VOLUME_PERSISTED`・終了コード0を確認した。これはDBと写真用ボリュームの再起動後永続化の受入であり、標本写真の表示・認可確認を意味しない。試験マーカーの削除、試験用コンテナ停止、元`.env.production`への復帰はこれから行う。
+
+写真用ボリュームの試験マーカーは、内容一致と通常ファイル・非symlinkを確認してから削除し、`MEDIA_MARKER_REMOVED`・終了コード0だった。`acervo-acceptance`のWebとDBを`docker compose stop web db`で停止し、両コンテナの`Stopped`・終了コード0を確認した。DB・写真ボリュームは保持している。元`.env.production`への復帰は未実施。
+
+停止後、現行`.env.production`とroot専用退避ファイルの所有者・mode0600・認証用鍵2項目以外の全行一致を検査したうえで、退避内容を一時ファイル経由で原子的に戻した。`ORIGINAL_ENV_RESTORED`・終了コード0。復帰後の独立したバイト一致確認とCompose設定検証はこれから行う。復元設定の別ディレクトリと退避コピーはまだ残っている。
+
+元設定への復帰後、現行`.env.production`と退避ファイルの`cmp -s`によるバイト一致、現行ファイルのroot所有・mode0600、`acervo-acceptance`のCompose`config --quiet`を確認し、`RESTORED_ENV_VERIFIED`・終了コード0だった。試験用WebとDBは停止済みで、DB・写真ボリュームは保持している。復元設定出力の別ディレクトリと元設定の退避コピーは、不要な平文コピーとして整理する前に内容の種類を確認する。
+
+復元設定の出力先`/srv/acervo-restored-settings-20260930`には通常ファイル`.env.production`だけがあると確認し、そのファイルと空になったディレクトリを削除した。`RESTORED_SETTINGS_COPY_REMOVED`・終了コード0。元設定の退避コピーは、現行`.env.production`とのバイト一致、現行ファイルのroot所有・mode0600を再確認したうえで削除し、`SAVED_ENV_COPY_REMOVED`・終了コード0だった。暗号化バックアップと復元済みDB・写真ボリュームは削除していない。最終的なコンテナ停止・一時鍵不存在・ボリューム保持は独立確認待ち。
+
+最終確認は`VM201_ACCEPTANCE_CLEANUP_VERIFIED`・終了コード0で成功した。現行`.env.production`がroot所有・mode0600で残り、元設定の退避コピー、一時age復号鍵、2026-09-30復元設定の平文出力先はいずれも存在しない。VM201で稼働中のDockerコンテナはなく、暗号化バックアップと`acervo-acceptance`のPostgreSQL・写真用ボリュームは残っている。旧`acervo-restore` projectの停止済みデータも保持している。今回の写真用ボリューム確認は試験マーカーによるもので、マーカーは削除済み。標本モデル、QR、標本詳細、保護写真は未実装で、その復元後表示・認可は7C-LIVE-Bへ残す。VM201の実ブラウザ／HTTPS経路でのログイン・MFAは未確認。別ホストからVM201へ直接バックアップを取得した受入も未実施で、搬入元はハッシュ一致を確認したVM200だった。7C-LIVE-A、7C-LIVE-B、Phase 1全体は完了扱いにしない。
+
+直接の別ホスト取得経路を調べるため、主ホスト`pve`から保存用LXC110の`192.168.11.22`へpingを2回ずつ2度実行し、いずれも2送信・2受信・損失0%だった。これはIP疎通の確認だけで、SSH認証、ファイル取得、復元経路の成立はまだ示さない。VM200・VM201・保存済みデータは変更していない。
+
+保存用LXC110で実行する予定の権限確認`stat`が、誤って主ホスト`root@pve:~#`で実行され、対象パス不存在で失敗した。読み取り専用の確認で、主ホストやLXCのファイルは変更していない。LXC110のコンソールへ切り替えてから再実行する。
+
+LXC110の`root@acervo-backup:~#`で同じ権限確認を実行した。`incoming`は`acervo-ingest:acervo-sftp`所有・mode0750、当該バックアップディレクトリは同所有・mode0770、暗号化payload・metadata・checksumsの3ファイルは同所有・mode0640だった。所有者・グループには読み取り権限があり、内容や秘密値は表示していない。2026-09-29には主ホストから`backup-pve`へ対話的SSHし、`pct exec 110`経由で旧バックアップをVM201へ搬入した記録がある。今回の新バックアップでも同経路が使えるか、主ホストから別物理ホストのSSH到達性を確認する。
+
+主ホストで実行する予定のBatchMode・厳格ホスト鍵検証付きSSH確認が、誤って保存用LXC110の`root@acervo-backup:~#`で実行された。LXCには`192.168.11.202`のED25519ホスト鍵が未登録で、`Host key verification failed`・終了コード255で認証前に停止した。LXCの`known_hosts`は変更していない。主ホスト`pve`からのSSH到達性は未確認のまま。
+
+主ホスト`root@pve:~#`で同じBatchMode・厳格ホスト鍵検証付きSSH確認を実行した。`Permission denied (publickey,password)`・終了コード255となり、ネットワーク接続と既存ホスト鍵の検証は通ったが、非対話認証はできなかった。2026-09-29に使った対話的SSHでLXC110の暗号化成果物を読み出せるか確認する。認証設定は変更していない。
+
+主ホスト`pve`から別物理ホスト`backup-pve`へ厳格ホスト鍵検証付きの対話的SSHに成功し、その先の`pct exec 110`で新バックアップの暗号化payloadを読めることを`OFFSITE_READ_OK`で確認した。SSHパスワードは非表示入力で、チャット・コマンド引数に含めていない。ファイル内容は表示していない。次に保存先の3ファイルをVM201へストリームし、既存搬入物と一致するか照合する。
+
+同じ対話的SSHと`pct exec 110`を使い、LXC110の`payload.tar.gz.age`、`metadata.json`、`checksums.sha256`をtarストリームで主ホストのディスクに保存せずVM201の標準入力へ渡した。VM201上の既存搬入物と各ファイルをバイト単位で照合し、3ファイルの集合も一致して`OFFSITE_READBACK_THREE_FILES_MATCH`・終了コード0だった。これは別ホストからVM201への直接読み出し経路と保存物の同一性を確認したもので、今回の復元処理に投入したファイルの元の搬入元がVM200だった事実は変わらない。DB、写真ボリューム、試験環境の設定は変更していない。
+
+印刷したage鍵控えの照合を管理用Windows PCで開始した。修正済みデジタル控えのファイル存在だけを確認し、内容は表示していない。最初の`python -c`はPython本体が起動せず`Python`とだけ表示され、フルパスでのPython 3.13.14起動確認後の`-c`もPowerShellの引用符解釈で構文エラーとなった。どちらも非表示入力処理には到達せず、紙の鍵は入力していない。引用符の問題を避けるため、秘密値を含まない一時照合スクリプトを作成した。照合結果は未確認。
+
+管理用PCの一時照合スクリプトで、紙に印刷されたage秘密鍵を非表示入力し、修正済みデジタル控えの鍵行と定数時間比較した。結果は`PRINTED_KEY_MISMATCH`。鍵の本文は表示・保存していない。この1回だけでは紙の誤記と入力ミスを区別できないため、紙の控えを復元可能な鍵として扱わず、非表示入力で再確認する。一時スクリプトは照合中のため残っている。
+
+同じ紙の控えを再度非表示入力した結果、`PRINTED_KEY_MATCH`を確認した。少なくとも再入力された紙面の鍵行は、実バックアップ復号に成功した修正済みデジタル控えと一致する。初回不一致の原因は特定していない。鍵本文を表示・チャットへ貼付・ファイルへ保存せず、一時照合スクリプトは削除した。印刷物の保管状態や将来の四半期復元予定はこの照合では確認していない。
+
+運用者に次回の四半期VM201復元試験予定を確認したところ、日付は未定との回答だった。今回の復元試験結果を定期実施の予定確定として扱わず、次回日付と担当者の決定を運用課題として残す。
+
+## 2026-10-01 VM201実ブラウザー受入の省略と整理
+
+運用者はVM201の実ブラウザ／HTTPS経路での認証受入を今回省略すると決定した。公開経路を作る準備として、Cloudflare上にVM201専用の`Acervo-vm201-restore-test` Tunnelを作成し、接続トークンをVM201の`/opt/acervo/.env.cloudflare`へroot所有・mode0600で一時配置した。トークン値はチャット、コマンド引数、VM201の出力へ表示していない。Compose設定検証は`VM201_TUNNEL_COMPOSE_CONFIG_OK`・終了コード0で成功した。公開hostnameのroute/DNSは設定しておらず、VM201のproxy、Tunnel、受入用コンテナは起動していないため、VM201は外部公開されていない。
+
+省略決定後、運用者の明示承認によりCloudflare上の`Acervo-vm201-restore-test` Tunnelを削除した。CloudflareのTunnel一覧でVM200用`Acervo-vm200`だけが残ることを確認した。VM201の一時トークンファイルは所有者・mode・非symlinkを確認してから削除し、`VM201_TUNNEL_TOKEN_REMOVED`・終了コード0だった。さらに`VM201_BROWSER_ACCEPTANCE_NOT_CREATED`・終了コード0で、`.env.cloudflare`が残っていないこと、`acervo-browser-acceptance` projectのコンテナ・ボリュームが作成されていないことを確認した。既存の停止済み`acervo-acceptance`および`acervo-restore`のデータ、暗号化バックアップ、VM201の元`.env.production`には変更を加えていない。VM201の実ブラウザ／HTTPS経路での認証は未確認として残し、今回の省略を7C-LIVE-Aの完了根拠にはしない。
+
+## 2026-10-01 Phase 1D 利用者管理の初期実装
+
+運用者の次作業開始許可により、7C-LIVE-Aの未完了状態を変えずにPhase 1Dの最初の実装へ着手した。`accounts/user_administration.py`に、管理者による利用者の`role`と有効状態を変更するトランザクションサービスを追加した。操作対象と既存adminを行ロックし、更新後に有効adminが0人となる変更を拒否する。操作する管理者の有効状態、`role=admin`、初回パスワード変更済み、primary MFA登録も実行直前に再確認する。role変更と有効状態変更は、それぞれ秘密値を含まない追記専用`AuditLog`へ記録する。監査記録のaction追加には`audit` migration `0003_user_administration_actions`を加えた。
+
+`/management/users/`の一覧と`/management/users/<id>/`の変更画面を追加した。中央の管理アクセスmiddlewareに加え、POST直前の再判定、TOTPまたはWebAuthnの直近MFA再認証、チェックボックス、対象ユーザー名の一致を要求する。role、有効状態、最後の有効admin保護、CSRF、memberの直接URL拒否、監査ログに秘密入力を出さないこと、監査書込み失敗時の更新ロールバックをテストで確認した。ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が276件すべて成功、Ruff lint・format、Django check、migration差分確認、`git diff --check`も成功した。PostgreSQL上の並行更新、production Compose、実ブラウザ受入は未実施である。ユーザー作成・パスワード再発行の監査、年度切替の後継警告、監査ログの閲覧画面などはPhase 1Dの残件であり、Phase 1D、7C-LIVE-A、7C-LIVE-B、Phase 1全体はいずれも未完了。
+
+同日にPhase 1Dを続行し、`/management/users/new/`からの利用者作成と、`/management/users/<id>/password-reissue/`からの別利用者の一時パスワード再発行を追加した。いずれもPOST直前の管理アクセス再判定、TOTPまたはWebAuthnの直近MFA再認証、確認チェックを要求する。再発行では対象ユーザー名の一致を確認し、自分自身への再発行を拒否する。作成・再発行はトランザクション内で秘密値を含まない`AuditLog`を残す。監査書込みに失敗した場合は作成またはパスワード変更をロールバックする。一時パスワードは作成・再発行の直後の`no-store`応答でのみ表示し、監査ログ、メッセージ、DBの平文フィールドには保存しない。管理操作のうち利用者作成、role変更、有効状態変更、一時パスワード再発行を実装したが、年度切替の後継警告と監査ログ閲覧画面は未実装である。ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が284件すべて成功、Ruff lint・format、Django check、migration差分確認、`git diff --check`も成功した。PostgreSQL上の並行更新、production Compose、実ブラウザ受入は未実施である。Phase 1D、7C-LIVE-A、7C-LIVE-B、Phase 1全体はいずれも未完了。
 
 ## 2026-09-29 7C-LIVE-Aの完了判定を訂正
 
@@ -311,15 +465,15 @@ GitHub Actionsの品質確認は、別ホスト運用テスト4か所の100文�
 
 ## In Progress
 
-- なし
+- 7C-LIVE-AのVM201復元受入の残件整理。VM201の試験用コンテナは停止済みで、元設定へ復帰した。7C-LIVE-Aは未完了。
 
 ## Remaining
 
 - 本番公開hostnameは`specimens.kdf-biology.org`。Cloudflare route/DNS、HTTPS応答、HTTPからHTTPSへの転送、管理者のパスキー直接ログインと管理トップ表示は確認済み。対象外の端末・ブラウザ、同期パスキーの受入範囲は未確認である。
 - 公開設定、責任者、バックアップ運用、受入端末は運用者が確定・承認済み。担当者・秘密値・端末の詳細は公開リポジトリに記録しない。
-- 署名付き暗号化バックアップの別ホスト保存とVM201への空環境復元は成功した。別ホストの保持規則・容量監視・Discord失敗通知も手動で動作確認済み。現在の管理者を含む復元先でのログイン・管理者MFA・再起動後のDBと写真ボリューム永続化は未実施。印刷したage秘密鍵控えと修正済みデジタル控えの一致、実データ・写真を使う復元受入、四半期ごとの定期復元試験予定も未確認または未実施である。
+- 署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元は成功した。別ホストの保持規則・容量監視・Discord失敗通知も手動で動作確認済み。VM201の復元データを用いたDjangoビューのパスワードログイン・TOTP・管理トップ・ログアウト後拒否、再起動後のDB・写真用ボリューム永続化は確認済み。別ホストの保存物3ファイルをVM201へ直接ストリームして復元済み搬入物とのバイト一致も確認したが、元の復元入力はVM200から搬入した。印刷したage秘密鍵控えと修正済みデジタル控えは非表示入力で一致を確認した。VM201の実ブラウザ／HTTPS経路での認証と四半期ごとの定期復元試験予定は未確認。標本・保護写真の実データ復元受入は機能実装後の7C-LIVE-Bに残る。
 - 公開HTTPSではRecovery Codes生成、TOTP認証、パスキー登録と直接ログインを確認済み。「すべてコピー」、ローカルBlob保存、保存確認前の離脱警告、パスキー削除、同期パスキーとChrome以外の実運用対象ブラウザは未確認（`localhost`のWindows＋Chrome＋Windows Hello受入は完了）。
-- 後続Phaseのrole変更、最後の管理者の降格・無効化保護、管理操作本体、監査ログ閲覧は未着手。7C-LIVE-Aは復元先受入が残り、7C-LIVE-BとPhase 1全体も未完了。
+- Phase 1Dの利用者作成、role変更、有効状態変更、最後の有効admin保護、一時パスワード再発行と最小監査はローカル実装済み。年度切替の後継警告、監査ログ閲覧、PostgreSQL上の並行更新、production Compose、実ブラウザ受入は未実施。7C-LIVE-A、7C-LIVE-B、Phase 1全体はいずれも未完了。
 
 ## Tests
 

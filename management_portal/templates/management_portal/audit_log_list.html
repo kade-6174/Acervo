@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}監査ログ — Acervo{% endblock %}
+
+{% block content %}
+  <section class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <p class="text-uppercase text-secondary fw-semibold mb-2">Management</p>
+        <h1 class="h2 mb-3">監査ログ</h1>
+        <p class="text-secondary">直近100件の管理操作です。パスワード、認証コード、MFAの秘密情報は表示しません。</p>
+        <div class="table-responsive border rounded bg-white">
+          <table class="table align-middle mb-0">
+            <thead><tr><th scope="col">日時</th><th scope="col">操作</th><th scope="col">実行者</th><th scope="col">対象</th><th scope="col">経路</th></tr></thead>
+            <tbody>
+              {% for audit_log in audit_logs %}
+                <tr>
+                  <td>{{ audit_log.occurred_at|date:"Y年n月j日 H:i" }}</td>
+                  <td>{{ audit_log.get_action_display }}</td>
+                  <td>{{ audit_log.actor_username }}</td>
+                  <td>{{ audit_log.target_username }}</td>
+                  <td>{{ audit_log.get_channel_display }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-secondary">監査ログはまだありません。</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-4 mb-0"><a class="btn btn-outline-secondary" href="{% url 'management:index' %}">管理トップへ戻る</a></p>
+      </div>
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}利用者を作成 — Acervo{% endblock %}
+
+{% block content %}
+  <section class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-7">
+        <p class="text-uppercase text-secondary fw-semibold mb-2">Management</p>
+        <h1 class="h2 mb-3">利用者を作成</h1>
+        <div class="border rounded bg-white p-4">
+          <p class="text-secondary">作成後の一時パスワードは、この直後の画面で一度だけ表示します。安全な方法で本人に渡してください。</p>
+          <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+            {% for field in form %}
+              {% if field.name == "confirmed" %}
+                <div class="form-check mb-3">{{ field }}<label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+              {% else %}
+                <div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+              {% endif %}
+            {% endfor %}
+            <button class="btn btn-danger" type="submit">作成して一時パスワードを表示</button>
+            <a class="btn btn-outline-secondary" href="{% url 'management:user_list' %}">戻る</a>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

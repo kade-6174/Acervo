@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}利用者管理 — Acervo{% endblock %}
+
+{% block content %}
+  <section class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-9">
+        <p class="text-uppercase text-secondary fw-semibold mb-2">Management</p>
+        <h1 class="h2 mb-3">利用者管理</h1>
+        <p class="text-secondary">作成、roleと有効状態の変更、一時パスワード再発行ができます。重要な変更は次の画面で確認します。</p>
+        {% if administrator_warnings.no_current_enrolled_admin %}
+          <div class="alert alert-danger" role="alert">現役管理者がいません。現在在籍中の有効な管理者を少なくとも1人設定してください。</div>
+        {% endif %}
+        {% if administrator_warnings.successor_required %}
+          <div class="alert alert-warning" role="alert">年度切替の60日前です。次年度も在籍する有効な管理者を設定し、引き継ぎを確認してください。</div>
+        {% endif %}
+        <p><a class="btn btn-dark" href="{% url 'management:user_create' %}">利用者を作成</a></p>
+        <div class="table-responsive border rounded bg-white">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr><th scope="col">ユーザー名</th><th scope="col">role</th><th scope="col">状態</th><th scope="col"><span class="visually-hidden">操作</span></th></tr>
+            </thead>
+            <tbody>
+              {% for target in users %}
+                <tr>
+                  <td>{{ target.username }}</td>
+                  <td>{{ target.get_role_display }}</td>
+                  <td>{% if target.is_active %}有効{% else %}無効{% endif %}</td>
+                  <td class="text-end"><a class="btn btn-sm btn-outline-dark" href="{% url 'management:user_edit' target.pk %}">変更</a></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-secondary">利用者はいません。</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-4 mb-0"><a class="btn btn-outline-secondary" href="{% url 'management:index' %}">管理トップへ戻る</a></p>
+      </div>
+    </div>
+  </section>
+{% endblock %}
