@@ -14,7 +14,7 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 変更ファイルは`management_portal/admin_warnings.py`、`management_portal/views.py`、`management_portal/urls.py`、`management_portal/templates/management_portal/index.html`、`management_portal/templates/management_portal/user_list.html`、`management_portal/templates/management_portal/audit_log_list.html`、`management_portal/tests/test_admin_warnings.py`、`management_portal/tests/test_user_administration_ui.py`、`accounts/tests/test_user_administration_concurrency.py`、および先行して未コミットだったPhase 1D利用者管理一式である。
 
-ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が290件成功（PostgreSQL専用1件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`も成功した。PostgreSQL専用の同時降格テストを追加したが、SQLiteではskipされるためPostgreSQL上では未実行である。production Composeと実ブラウザ受入も未実施である。したがってPhase 1D、7C-LIVE-A、7C-LIVE-B、Phase 1全体はいずれも未完了とする。次はPostgreSQLでの同時更新検証、production Compose、本番相当の管理画面受入を行い、結果を追記する。
+ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が290件成功（PostgreSQL専用1件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`も成功した。GitHub Actionsではコミット`57b7890`に対する`test (push)`が50秒、`production-container (push)`が4分でいずれも成功した。前者はCIのPostgreSQL 18上でテストを実行するため、同時降格テストを含むPostgreSQL検証の成功根拠とする。後者はproduction Compose検証を含む。実ブラウザ受入は未実施である。したがってPhase 1D、7C-LIVE-A、7C-LIVE-B、Phase 1全体はいずれも未完了とする。次は本番相当の管理画面を実ブラウザで受入し、結果を追記する。
 
 ## 2026-09-30 7C-LIVE-A復元試験の続き
 
