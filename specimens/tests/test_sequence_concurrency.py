@@ -36,6 +36,7 @@ class SpecimenSequenceConcurrencyTests(TransactionTestCase):
             return specimen.specimen_code
         finally:
             close_old_connections()
+            connection.close()
 
     def test_concurrent_numbering_creates_distinct_codes(self):
         with ThreadPoolExecutor(max_workers=2) as executor:
@@ -82,6 +83,7 @@ class QRLabelConcurrencyTests(TransactionTestCase):
             return "assigned"
         finally:
             close_old_connections()
+            connection.close()
 
     def test_concurrent_assignment_allows_exactly_one_specimen(self):
         with ThreadPoolExecutor(max_workers=2) as executor:
@@ -112,6 +114,7 @@ class QRLabelConcurrencyTests(TransactionTestCase):
                 return error.code.value
         finally:
             close_old_connections()
+            connection.close()
 
     def test_concurrent_registration_assigns_one_qr_to_exactly_one_new_specimen(self):
         with ThreadPoolExecutor(max_workers=2) as executor:

@@ -16,6 +16,8 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が329件成功（PostgreSQL専用4件skip）、`ruff check .`、`ruff format --check .`、`python manage.py check --settings=config.settings.test`、`makemigrations --check --dry-run --settings=config.settings.test`、`git diff --check`が成功した。Phase 4専用では通常経路、確認時の採番なし、入力不正、権限不足、QR競合、写真の実形式・容量・画素数・枚数、EXIF除去、元ファイル名非使用、失敗時一時写真削除、保護写真の認証・認可を検証した。PostgreSQL上の同時QR登録テストはGitHub Actionsで未確認、本番Compose・VM200実ブラウザ受入も未実施である。コミット・push・VM200反映はGitHub Actions成功後にだけ行う。7C-LIVE-A、7C-LIVE-B、Phase 1全体はいずれも未完了とする。
 
+コミット`f5e7481`のGitHub Actions run 37113053029では、PostgreSQL上の329テスト本体は成功したが、並行テストのワーカー接続が残り、テスト用DB削除時に失敗した。本番反映は行っていない。`specimens/tests/test_sequence_concurrency.py`の各ワーカーで接続を明示的に閉じる修正を加え、ローカル再検証後に再度CIへ送る予定である。
+
 ## 2026-10-03 Phase 1D 残件のローカル実装
 
 学校回生方式の管理画面に、現在在籍中の有効adminが0人のときの強い警告を追加した。年度切替日の60日前からは、次年度にも在籍する有効adminがいない場合に後継管理者の設定と引き継ぎを促す。`none`方式ではこれらの学校回生向け警告を表示しない。警告は`/management/`と`/management/users/`で、既存の中央管理アクセス判定を通過した管理者にだけ表示する。
