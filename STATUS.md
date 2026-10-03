@@ -34,6 +34,16 @@ VM200への保守アクセス確認中にSSHを一時起動したが、認証情
 
 同日、VM200のCloudflare Tunnel本番構成へ反映した。更新前に暗号化バックアップ`acervo-20261003T084353Z-1472371ecd81`（PostgreSQL 18）を作成し、保持整理では直前の1件を削除した。標本番号接頭辞は、既に確定していた`KDF-BIO`を`.env.production`へ値を表示せず1件だけ設定した。作業ツリーが空であることを確認して`afbd3ad`から`cf8cf72`へfast-forwardし、Cloudflare用Compose設定検証、webイメージのbuild、`up -d --build --wait`を成功させた。`db`、`web`、`proxy`、`tunnel`はhealthy、コンテナ内`check --deploy`は警告なし、`specimens.0001_initial`は適用済み、VM200上の作業ツリーは空だった。実データの標本は作成していない。Phase 2の中核ルールは、ローカル・PostgreSQL CI・本番Composeで確認済みとして完了とする。QR、登録画面、標本詳細、写真は未実装であり、7C-LIVE-B、7C-LIVE-A、Phase 1全体は引き続き未完了とする。次はPhase 3のQR基盤を実装する。
 
+## 2026-10-03 Phase 3 QR基盤のローカル実装
+
+設計責任者の承認後、`QRBatch`と`QRLabel`を追加した。`QRLabel`は暗号学的乱数で生成するUUIDv4 token、`unused`・`assigned`・`retired`の状態、標本への任意の1対1関連、再印刷回数・時刻を持つ。DBの一意制約、状態と標本関連のcheck制約、サービス層のトランザクションと行ロックにより、1枚のQRの二重割当を防ぐ。tokenは作成後変更できず、無効化後も既存の標本への割当履歴を保持する。QR発行自体は標本番号を消費しない。
+
+`create_qr_batch`、`assign_qr_label`、`retire_qr_label`、`record_qr_reprint`を追加した。公開基底URLから`/q/<uuidv4>/`を生成し、`/q/<uuidv4>/`では未ログイン時に状態を明かさずログインへ戻す。現在在籍のmemberまたはadminだけがQRの次の操作へ進め、卒業生など権限のない利用者と不正UUIDには同じ404を返す。割当済み・無効QRから標本番号・同定情報などの標本内容は返さない。未使用QRの登録画面、割当済みQRの標本詳細画面は後続Phase 4・5で追加する。
+
+20mmラベルと15mm試験ラベルのPDF生成を追加した。QR画像のみを正方形の1ページへ描き、標本番号・標本名・採集地をPDFへ含めない。PDF生成にはPython 3.13対応、BSDライセンスの`reportlab==5.0.1`を固定依存へ追加し、既存の`qrcode==8.2`も直接依存として固定した。
+
+通常発行、UUIDの一意性・不変性、無効・不正入力、1標本へ複数QRの割当拒否、再印刷、PDFの形式・秘密値非記録、未ログイン、権限不足、不正UUID、割当済み・無効QRの情報非表示をテストした。PostgreSQL専用の同時割当テストも追加した。ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が315件成功（PostgreSQL専用3件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`も成功した。PostgreSQL CI、production Compose、実HTTPS／実印刷の確認は未実施である。Phase 3は未完了とし、次はCIで確認する。7C-LIVE-A、7C-LIVE-B、Phase 1全体は引き続き未完了とする。
+
 ## 2026-09-30 7C-LIVE-A復元試験の続き
 
 VM201で`acervo-restore`専用Compose projectのPostgreSQL 18.6を起動した。`up -d --wait db`は終了コード0で`acervo-restore-db-1`がhealthy、`docker ps`にはこの1コンテナだけが表示され、ホスト公開ポートはなかった。`5432/tcp`はコンテナ内ポートである。`docker volume ls`には`acervo-restore_postgres_data`だけがあり、写真ボリュームはまだなかった。PostgreSQLのpublic schemaの表数は`0`。`docker compose build restore`は終了コード0で成功した。

@@ -81,6 +81,27 @@ class StorageLocation(models.Model):
         return self.name
 
 
+class QRBatch(models.Model):
+    """同時に発行したQRラベルのまとまり。"""
+
+    requested_count = models.PositiveIntegerField("発行枚数")
+    note = models.TextField("備考", blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(requested_count__gt=0),
+                name="specimens_qr_batch_requested_count_positive",
+            )
+        ]
+        ordering = ["-created_at", "-pk"]
+
+    def __str__(self):
+        return f"QR batch {self.pk} ({self.requested_count})"
+
+
 class Specimen(models.Model):
     class Status(models.TextChoices):
         IN_COLLECTION = "in_collection", "所蔵中"
@@ -137,6 +158,55 @@ class Specimen(models.Model):
         super().clean()
         if not self.taxon_id and not self.identification_text.strip():
             raise ValidationError({"identification_text": "Taxon未指定時は同定情報が必要です。"})
+
+
+class QRLabel(models.Model):
+    """QRラベル1枚。tokenは公開URLの識別子であり、認可情報ではない。"""
+
+    class Status(models.TextChoices):
+        UNUSED = "unused", "未使用"
+        ASSIGNED = "assigned", "割当済み"
+        RETIRED = "retired", "無効"
+
+    batch = models.ForeignKey(QRBatch, on_delete=models.PROTECT, related_name="labels")
+    token = models.UUIDField(
+        "QR識別子", default=uuid.uuid4, unique=True, editable=False, db_index=True
+    )
+    status = models.CharField(max_length=16, choices=Status, default=Status.UNUSED)
+    specimen = models.OneToOneField(
+        Specimen,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="qr_label",
+    )
+    print_count = models.PositiveIntegerField(default=0)
+    last_printed_at = models.DateTimeField(null=True, blank=True)
+    retired_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(status="unused", specimen__isnull=True)
+                    | models.Q(status="assigned", specimen__isnull=False)
+                    | models.Q(status="retired")
+                ),
+                name="specimens_qr_label_status_specimen_consistent",
+            )
+        ]
+        ordering = ["pk"]
+
+    def __str__(self):
+        return str(self.token)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original = type(self).objects.filter(pk=self.pk).values("token").first()
+            if original and original["token"] != self.token:
+                raise ValidationError("QR識別子は変更できません。")
+        return super().save(*args, **kwargs)
 
 
 class SpecimenEvent(models.Model):
