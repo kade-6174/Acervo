@@ -11,6 +11,7 @@ from specimens.services import (
     assign_qr_label,
     create_qr_batch,
     create_specimen,
+    register_specimen_from_qr,
 )
 
 
@@ -96,3 +97,30 @@ class QRLabelConcurrencyTests(TransactionTestCase):
         self.assertEqual(results.count("qr_label_not_unused"), 1)
         self.assertEqual(label.status, QRLabel.Status.ASSIGNED)
         self.assertIn(label.specimen_id, {self.specimen_a.pk, self.specimen_b.pk})
+
+    def register_in_other_connection(self, identification_text):
+        close_old_connections()
+        try:
+            try:
+                return register_specimen_from_qr(
+                    token=self.token,
+                    created_by=User.objects.get(pk=self.user.pk),
+                    acquisition_method=Specimen.AcquisitionMethod.OTHER,
+                    identification_text=identification_text,
+                ).specimen_code
+            except SpecimenServiceError as error:
+                return error.code.value
+        finally:
+            close_old_connections()
+
+    def test_concurrent_registration_assigns_one_qr_to_exactly_one_new_specimen(self):
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(
+                executor.map(self.register_in_other_connection, ("同時登録A", "同時登録B"))
+            )
+
+        label = QRLabel.objects.get(token=self.token)
+        self.assertEqual(sum(result.startswith("ACERVO-") for result in results), 1)
+        self.assertEqual(results.count("qr_label_not_unused"), 1)
+        self.assertEqual(label.status, QRLabel.Status.ASSIGNED)
+        self.assertEqual(Specimen.objects.filter(pk=label.specimen_id).count(), 1)

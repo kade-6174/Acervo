@@ -4,7 +4,17 @@
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。Phase 4はローカル実装・検証まで完了し、コミット、GitHub Actions、VM200反映は未実施である。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+
+## 2026-10-03 Phase 4 スマホ標本登録のローカル実装
+
+未使用QRの`/q/<uuid>/`は、認可された利用者だけを登録入力画面へ遷移させる。入力値と再エンコード済みの一時写真はセッションに紐付け、確認画面の表示だけでは標本番号、QR状態、標本、履歴を変更しない。確定POSTではQR行をロックし、標本番号、標本、初回履歴、QR割当、写真レコードを同じトランザクションで確定する。競合して別の登録が先にQRを使った場合は409で失敗させ、標本番号とQRの二重利用を防ぐ。
+
+写真はJPEG・PNG・WebPだけを実デコードし、1枚10MB、8,000万画素、標本あたり10枚を上限とした。2,000万画素を超える画像は縦横比を保って縮小し、EXIFを除去してランダム名のJPEGとして保存する。確認中の写真も同じ再エンコード済み一時領域へ置き、確定の成功・失敗時に削除する。確定途中の保存失敗時は保存済みの最終写真も補償削除する。写真はCaddyの公開URLへ置かず、ログインと`can_use_qr`の認可を通るDjangoの保護ビューからだけ返す。
+
+変更ファイルは`config/settings/base.py`、`pyproject.toml`、`specimens/forms.py`、`specimens/services.py`、`specimens/urls.py`、`specimens/views.py`、`specimens/templates/specimens/register.html`、`specimens/templates/specimens/register_confirm.html`、`specimens/templates/specimens/registration_complete.html`、`specimens/tests/test_photo_processing.py`、`specimens/tests/test_qr.py`、`specimens/tests/test_sequence_concurrency.py`である。Pillow 12.3.0を、Django 5.2/Python 3.13で利用する直接依存として追加した。DBスキーマ変更はない。
+
+ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が329件成功（PostgreSQL専用4件skip）、`ruff check .`、`ruff format --check .`、`python manage.py check --settings=config.settings.test`、`makemigrations --check --dry-run --settings=config.settings.test`、`git diff --check`が成功した。Phase 4専用では通常経路、確認時の採番なし、入力不正、権限不足、QR競合、写真の実形式・容量・画素数・枚数、EXIF除去、元ファイル名非使用、失敗時一時写真削除、保護写真の認証・認可を検証した。PostgreSQL上の同時QR登録テストはGitHub Actionsで未確認、本番Compose・VM200実ブラウザ受入も未実施である。コミット・push・VM200反映はGitHub Actions成功後にだけ行う。7C-LIVE-A、7C-LIVE-B、Phase 1全体はいずれも未完了とする。
 
 ## 2026-10-03 Phase 1D 残件のローカル実装
 

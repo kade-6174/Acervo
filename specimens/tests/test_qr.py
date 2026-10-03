@@ -1,5 +1,6 @@
 import uuid
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -14,6 +15,7 @@ from specimens.services import (
     create_specimen,
     qr_url,
     record_qr_reprint,
+    register_specimen_from_qr,
     retire_qr_label,
 )
 
@@ -114,6 +116,23 @@ class QRServiceTests(TestCase):
         self.assertEqual(label.print_count, 1)
         self.assertIsNotNone(label.last_printed_at)
 
+    def test_registration_consumes_number_and_qr_only_on_success(self):
+        label = QRLabel.objects.get(
+            pk=create_qr_batch(requested_count=1, created_by=self.user).label_ids[0]
+        )
+        result = register_specimen_from_qr(
+            token=label.token,
+            created_by=self.user,
+            identification_text="QR登録",
+            acquisition_method=Specimen.AcquisitionMethod.OTHER,
+        )
+
+        label.refresh_from_db()
+        self.assertEqual(label.status, QRLabel.Status.ASSIGNED)
+        self.assertEqual(label.specimen_id, result.specimen_id)
+        specimen_code = Specimen.objects.get(pk=result.specimen_id).specimen_code
+        self.assertEqual(specimen_code, result.specimen_code)
+
 
 class QRRouteTests(TestCase):
     def setUp(self):
@@ -137,9 +156,11 @@ class QRRouteTests(TestCase):
         self.client.force_login(self.member)
         response = self.client.get(self.url())
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "未使用のQRコードです")
-        self.assertNotContains(response, "KDF-BIO")
+        self.assertRedirects(
+            response,
+            reverse("specimens:register", kwargs={"token": self.label.token}),
+            fetch_redirect_response=False,
+        )
         self.assertEqual(
             response.headers["Cache-Control"],
             "max-age=0, no-cache, no-store, must-revalidate, private",
@@ -171,3 +192,96 @@ class QRRouteTests(TestCase):
         retired = self.client.get(self.url())
         self.assertEqual(retired.status_code, 410)
         self.assertNotContains(retired, specimen.specimen_code, status_code=410)
+
+    def test_registration_confirmation_does_not_consume_number_or_qr(self):
+        self.client.force_login(self.member)
+        register_url = reverse("specimens:register", kwargs={"token": self.label.token})
+        confirm_url = reverse("specimens:register_confirm", kwargs={"token": self.label.token})
+
+        response = self.client.post(
+            register_url,
+            {
+                "identification_text": "確認用の標本",
+                "acquisition_method": Specimen.AcquisitionMethod.OTHER,
+                "collected_place": "観察場所",
+            },
+        )
+
+        self.assertRedirects(response, confirm_url, fetch_redirect_response=False)
+        self.assertEqual(Specimen.objects.count(), 0)
+        self.label.refresh_from_db()
+        self.assertEqual(self.label.status, QRLabel.Status.UNUSED)
+
+        response = self.client.get(confirm_url)
+        self.assertContains(response, "確認用の標本")
+        self.assertContains(response, "標本番号は、下の確定操作で初めて発行されます。")
+        self.assertEqual(Specimen.objects.count(), 0)
+
+    def test_registration_confirmation_commits_qr_specimen_event_and_photo(self):
+        self.client.force_login(self.member)
+        register_url = reverse("specimens:register", kwargs={"token": self.label.token})
+        confirm_url = reverse("specimens:register_confirm", kwargs={"token": self.label.token})
+        image = SimpleUploadedFile("private.png", _png_bytes(), content_type="image/png")
+        response = self.client.post(
+            register_url,
+            {
+                "identification_text": "確定用の標本",
+                "acquisition_method": Specimen.AcquisitionMethod.OTHER,
+                "photos": image,
+            },
+        )
+        self.assertRedirects(response, confirm_url, fetch_redirect_response=False)
+
+        confirmed = self.client.post(confirm_url)
+        self.assertEqual(confirmed.status_code, 200)
+        specimen = Specimen.objects.get()
+        self.label.refresh_from_db()
+        self.assertEqual(self.label.specimen, specimen)
+        self.assertEqual(self.label.status, QRLabel.Status.ASSIGNED)
+        self.assertEqual(specimen.events.count(), 1)
+        photo = specimen.photos.get()
+        self.assertEqual(photo.content_type, "image/jpeg")
+
+        photo_url = reverse(
+            "specimens:photo", kwargs={"detail_uuid": specimen.detail_uuid, "photo_id": photo.pk}
+        )
+        self.assertEqual(self.client.get(photo_url).status_code, 200)
+        self.client.force_login(self.graduate)
+        self.assertEqual(self.client.get(photo_url).status_code, 404)
+
+    def test_registration_rejects_invalid_photo_without_creating_rows(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("specimens:register", kwargs={"token": self.label.token}),
+            {
+                "identification_text": "不正画像",
+                "acquisition_method": Specimen.AcquisitionMethod.OTHER,
+                "photos": SimpleUploadedFile("bad.svg", b"<svg/>", content_type="image/svg+xml"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "JPEG、PNG、WebP")
+        self.assertEqual(Specimen.objects.count(), 0)
+        self.label.refresh_from_db()
+        self.assertEqual(self.label.status, QRLabel.Status.UNUSED)
+
+    def test_graduate_cannot_open_registration_or_temporary_photo(self):
+        self.client.force_login(self.graduate)
+        register_url = reverse("specimens:register", kwargs={"token": self.label.token})
+        temporary_url = reverse(
+            "specimens:temporary_photo", kwargs={"token": self.label.token, "index": 0}
+        )
+
+        self.assertEqual(self.client.get(register_url).status_code, 404)
+        self.assertEqual(self.client.get(temporary_url).status_code, 404)
+
+
+def _png_bytes():
+    from io import BytesIO
+
+    from PIL import Image
+
+    output = BytesIO()
+    Image.new("RGB", (10, 10), "blue").save(output, "PNG")
+    return output.getvalue()

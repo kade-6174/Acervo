@@ -24,6 +24,7 @@ dependencies = [
     "django-environ==0.14.0",
     "gunicorn==26.2.0",
     "psycopg[binary]==3.3.5",
+    "Pillow==12.3.0",
     "qrcode==8.2",
     "reportlab==5.0.1",
 ]

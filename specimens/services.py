@@ -1,18 +1,22 @@
 """画面に依存しない標本採番と状態遷移。"""
 
+import uuid
 from dataclasses import dataclass
 from enum import StrEnum
 from io import BytesIO
 
 import qrcode
 from django.conf import settings
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.db import transaction
 from django.utils import timezone
+from PIL import Image, UnidentifiedImageError
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
-from .models import QRBatch, QRLabel, Specimen, SpecimenEvent, SpecimenSequence
+from .models import QRBatch, QRLabel, Specimen, SpecimenEvent, SpecimenPhoto, SpecimenSequence
 
 
 class SpecimenServiceErrorCode(StrEnum):
@@ -23,6 +27,10 @@ class SpecimenServiceErrorCode(StrEnum):
     QR_LABEL_NOT_FOUND = "qr_label_not_found"
     QR_LABEL_NOT_UNUSED = "qr_label_not_unused"
     SPECIMEN_ALREADY_HAS_QR_LABEL = "specimen_already_has_qr_label"
+    INVALID_PHOTO = "invalid_photo"
+    PHOTO_TOO_LARGE = "photo_too_large"
+    PHOTO_TOO_MANY_PIXELS = "photo_too_many_pixels"
+    PHOTO_LIMIT_REACHED = "photo_limit_reached"
 
 
 class SpecimenServiceError(Exception):
@@ -49,6 +57,22 @@ class QRBatchResult:
 class QRLabelAssignmentResult:
     label_id: int
     specimen_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class SpecimenRegistrationResult:
+    specimen_id: int
+    specimen_code: str
+    qr_label_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class TemporaryPhoto:
+    """確認画面までだけ保持する、再エンコード済み画像。"""
+
+    path: str
+    width: int
+    height: int
 
 
 def _specimen_code(number: int) -> str:
@@ -183,6 +207,45 @@ def assign_qr_label(*, token, specimen_id: int) -> QRLabelAssignmentResult:
 
 
 @transaction.atomic
+def register_specimen_from_qr(
+    *, token, created_by, photo_uploads=(), temporary_photos=(), **fields
+):
+    """未使用QRだけで、標本・番号・QR割当・写真を確定する。"""
+    temporary_paths = [photo.path for photo in temporary_photos]
+    saved_paths: list[str] = []
+    try:
+        label = QRLabel.objects.select_for_update().filter(token=token).first()
+        if label is None:
+            raise SpecimenServiceError(SpecimenServiceErrorCode.QR_LABEL_NOT_FOUND)
+        if label.status != QRLabel.Status.UNUSED or label.specimen_id is not None:
+            raise SpecimenServiceError(SpecimenServiceErrorCode.QR_LABEL_NOT_UNUSED)
+        specimen = create_specimen(created_by=created_by, **fields)
+        label.specimen = specimen
+        label.status = QRLabel.Status.ASSIGNED
+        label.full_clean()
+        label.save(update_fields=["specimen", "status"])
+        for upload in photo_uploads:
+            photo = add_specimen_photo(specimen_id=specimen.pk, upload=upload)
+            saved_paths.append(photo.file_path)
+        for temporary_photo in temporary_photos:
+            with default_storage.open(temporary_photo.path, "rb") as upload:
+                photo = _add_normalized_photo(
+                    specimen=specimen,
+                    image_bytes=upload.read(),
+                    width=temporary_photo.width,
+                    height=temporary_photo.height,
+                )
+                saved_paths.append(photo.file_path)
+        return SpecimenRegistrationResult(specimen.pk, specimen.specimen_code, label.pk)
+    except Exception:
+        for path in saved_paths:
+            default_storage.delete(path)
+        raise
+    finally:
+        discard_temporary_photos(temporary_paths)
+
+
+@transaction.atomic
 def retire_qr_label(*, token) -> QRLabel:
     """ラベルを無効化する。既存の標本への割当履歴は保持する。"""
 
@@ -225,3 +288,83 @@ def build_qr_labels_pdf(*, labels, size_mm: int) -> bytes:
         document.showPage()
     document.save()
     return output.getvalue()
+
+
+def normalize_photo(upload) -> tuple[bytes, int, int]:
+    """許可画像を実デコードし、必要なら縮小してEXIFなしJPEGにする。"""
+    if upload.size > settings.ACERVO_PHOTO_MAX_UPLOAD_BYTES:
+        raise SpecimenServiceError(SpecimenServiceErrorCode.PHOTO_TOO_LARGE)
+    try:
+        with Image.open(upload) as source:
+            source.load()
+            if source.format not in {"JPEG", "PNG", "WEBP"}:
+                raise SpecimenServiceError(SpecimenServiceErrorCode.INVALID_PHOTO)
+            width, height = source.size
+            pixels = width * height
+            if pixels > settings.ACERVO_PHOTO_MAX_SOURCE_PIXELS:
+                raise SpecimenServiceError(SpecimenServiceErrorCode.PHOTO_TOO_MANY_PIXELS)
+            image = source.convert("RGB")
+    except (UnidentifiedImageError, OSError):
+        raise SpecimenServiceError(SpecimenServiceErrorCode.INVALID_PHOTO) from None
+    if pixels > settings.ACERVO_PHOTO_MAX_STORED_PIXELS:
+        scale = (settings.ACERVO_PHOTO_MAX_STORED_PIXELS / pixels) ** 0.5
+        width, height = max(1, int(width * scale)), max(1, int(height * scale))
+        image = image.resize((width, height), Image.Resampling.LANCZOS)
+    output = BytesIO()
+    image.save(output, format="JPEG", quality=88, optimize=True)
+    return output.getvalue(), width, height
+
+
+def save_temporary_photos(uploads) -> tuple[TemporaryPhoto, ...]:
+    """確認前の画像を、安全な一時領域へ再エンコードして保存する。"""
+    uploads = tuple(uploads)
+    if len(uploads) > settings.ACERVO_PHOTO_MAX_PER_SPECIMEN:
+        raise SpecimenServiceError(SpecimenServiceErrorCode.PHOTO_LIMIT_REACHED)
+    normalized = [normalize_photo(upload) for upload in uploads]
+    temporary_paths: list[str] = []
+    try:
+        results = []
+        for image_bytes, width, height in normalized:
+            path = f"registration-tmp/{uuid.uuid4()}.jpg"
+            default_storage.save(path, ContentFile(image_bytes))
+            temporary_paths.append(path)
+            results.append(TemporaryPhoto(path=path, width=width, height=height))
+        return tuple(results)
+    except Exception:
+        discard_temporary_photos(temporary_paths)
+        raise
+
+
+def discard_temporary_photos(paths) -> None:
+    """確認中止・失敗時の一時画像を削除する。"""
+    for path in paths:
+        if isinstance(path, str) and path.startswith("registration-tmp/"):
+            default_storage.delete(path)
+
+
+@transaction.atomic
+def add_specimen_photo(*, specimen_id: int, upload) -> SpecimenPhoto:
+    specimen = Specimen.objects.select_for_update().filter(pk=specimen_id).first()
+    if specimen is None:
+        raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_NOT_FOUND)
+    if specimen.photos.count() >= settings.ACERVO_PHOTO_MAX_PER_SPECIMEN:
+        raise SpecimenServiceError(SpecimenServiceErrorCode.PHOTO_LIMIT_REACHED)
+    image_bytes, width, height = normalize_photo(upload)
+
+    return _add_normalized_photo(
+        specimen=specimen, image_bytes=image_bytes, width=width, height=height
+    )
+
+
+def _add_normalized_photo(
+    *, specimen: Specimen, image_bytes: bytes, width: int, height: int
+) -> SpecimenPhoto:
+    path = f"specimens/{specimen.detail_uuid}/{uuid.uuid4()}.jpg"
+    default_storage.save(path, ContentFile(image_bytes))
+    try:
+        return SpecimenPhoto.objects.create(
+            specimen=specimen, file_path=path, content_type="image/jpeg", width=width, height=height
+        )
+    except Exception:
+        default_storage.delete(path)
+        raise

@@ -1,0 +1,3 @@
+{% extends "base.html" %}
+{% block title %}登録内容の確認 | {{ acervo_site_name }}{% endblock %}
+{% block content %}<section class="container py-4" style="max-width:42rem"><h1 class="h3">登録内容の確認</h1><p>標本番号は、下の確定操作で初めて発行されます。</p>{% if error %}<p class="alert alert-danger">{{ error }}</p>{% else %}<dl>{% for label, value in summary %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>{% if photos %}<h2 class="h5">写真</h2>{% for index in photos %}<img class="img-thumbnail mb-2" src="{% url 'specimens:temporary_photo' token=token index=index %}" alt="登録予定の写真 {{ forloop.counter }}">{% endfor %}{% endif %}<form method="post">{% csrf_token %}<button class="btn btn-primary" type="submit">登録を確定する</button></form>{% endif %}</section>{% endblock %}
