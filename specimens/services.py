@@ -136,7 +136,7 @@ _ALLOWED_TRANSITIONS = {
 
 @transaction.atomic
 def record_specimen_event(
-    *, specimen_id: int, event_type: str, created_by, note: str = ""
+    *, specimen_id: int, event_type: str, created_by, note: str = "", occurred_on=None
 ) -> StateChangeResult:
     """状態と連動する履歴を原子的に追加する。"""
 
@@ -146,12 +146,15 @@ def record_specimen_event(
     if specimen is None:
         raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_NOT_FOUND)
     next_status = _STATE_FOR_EVENT.get(event_type, specimen.status)
-    if next_status != specimen.status and next_status not in _ALLOWED_TRANSITIONS[specimen.status]:
+    if event_type in _STATE_FOR_EVENT and (
+        next_status == specimen.status or next_status not in _ALLOWED_TRANSITIONS[specimen.status]
+    ):
         raise SpecimenServiceError(SpecimenServiceErrorCode.INVALID_STATE_TRANSITION)
     event = SpecimenEvent.objects.create(
         specimen=specimen,
         event_type=event_type,
         note=note,
+        occurred_on=occurred_on or timezone.localdate(),
         created_by=created_by,
     )
     previous_status = specimen.status
@@ -344,16 +347,33 @@ def discard_temporary_photos(paths) -> None:
 
 @transaction.atomic
 def add_specimen_photo(*, specimen_id: int, upload) -> SpecimenPhoto:
+    return add_specimen_photos(specimen_id=specimen_id, uploads=[upload])[0]
+
+
+@transaction.atomic
+def add_specimen_photos(*, specimen_id: int, uploads) -> tuple[SpecimenPhoto, ...]:
+    """複数写真を、上限確認からDB記録までまとめて追加する。"""
     specimen = Specimen.objects.select_for_update().filter(pk=specimen_id).first()
     if specimen is None:
         raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_NOT_FOUND)
-    if specimen.photos.count() >= settings.ACERVO_PHOTO_MAX_PER_SPECIMEN:
+    uploads = tuple(uploads)
+    if specimen.photos.count() + len(uploads) > settings.ACERVO_PHOTO_MAX_PER_SPECIMEN:
         raise SpecimenServiceError(SpecimenServiceErrorCode.PHOTO_LIMIT_REACHED)
-    image_bytes, width, height = normalize_photo(upload)
-
-    return _add_normalized_photo(
-        specimen=specimen, image_bytes=image_bytes, width=width, height=height
-    )
+    normalized = [normalize_photo(upload) for upload in uploads]
+    saved_paths: list[str] = []
+    try:
+        photos = []
+        for image_bytes, width, height in normalized:
+            photo = _add_normalized_photo(
+                specimen=specimen, image_bytes=image_bytes, width=width, height=height
+            )
+            saved_paths.append(photo.file_path)
+            photos.append(photo)
+        return tuple(photos)
+    except Exception:
+        for path in saved_paths:
+            default_storage.delete(path)
+        raise
 
 
 def _add_normalized_photo(

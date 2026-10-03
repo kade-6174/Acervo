@@ -17,3 +17,15 @@ def can_use_qr(user) -> bool:
         EnrollmentStatus.ENROLLED,
         EnrollmentStatus.NOT_APPLICABLE,
     }
+
+
+def can_view_specimens(user) -> bool:
+    """有効な利用者は、卒業後も標本を閲覧・検索できる。"""
+
+    return user.is_authenticated and user.is_active
+
+
+def can_edit_specimens(user) -> bool:
+    """登録・更新・写真・履歴の追加は現役memberまたはadminに限る。"""
+
+    return can_use_qr(user)

@@ -16,6 +16,7 @@
         <a class="fs-4 fw-semibold text-decoration-none text-dark" href="{% url 'core:home' %}">{{ acervo_site_name }}</a>
         {% if user.is_authenticated %}
           <div class="d-flex flex-wrap gap-2 align-items-center">
+            <a class="btn btn-outline-secondary" href="{% url 'specimens:list' %}">標本を探す</a>
             <a class="btn btn-outline-secondary" href="{% url 'mfa_index' %}">セキュリティ設定</a>
             {% if user.role == "admin" %}<a class="btn btn-outline-dark" href="{% url 'management:index' %}">管理</a>{% endif %}
             <form method="post" action="{% url 'account_logout' %}">

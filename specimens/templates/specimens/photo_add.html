@@ -1,0 +1,3 @@
+{% extends "base.html" %}
+{% block title %}写真を追加 | {{ acervo_site_name }}{% endblock %}
+{% block content %}<section class="container py-4" style="max-width:42rem"><h1 class="h3">{{ specimen.specimen_code }}へ写真を追加</h1><form method="post" enctype="multipart/form-data" class="vstack gap-3">{% csrf_token %}<div><label class="form-label" for="{{ form.photos.id_for_label }}">{{ form.photos.label }}</label>{{ form.photos }}{{ form.photos.errors }}</div><button class="btn btn-primary" type="submit">写真を保存</button></form></section>{% endblock %}

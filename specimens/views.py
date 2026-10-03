@@ -1,17 +1,26 @@
 """QR公開URLの安全な入口。"""
 
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
 
-from .access import can_use_qr
-from .forms import SpecimenRegistrationForm
-from .models import QRLabel, SpecimenPhoto, StorageLocation
+from .access import can_edit_specimens, can_use_qr, can_view_specimens
+from .forms import (
+    SpecimenEditForm,
+    SpecimenEventForm,
+    SpecimenPhotoForm,
+    SpecimenRegistrationForm,
+)
+from .models import QRLabel, Specimen, SpecimenPhoto, StorageLocation
 from .services import (
     SpecimenServiceError,
     TemporaryPhoto,
+    add_specimen_photos,
     discard_temporary_photos,
+    record_specimen_event,
     register_specimen_from_qr,
     save_temporary_photos,
 )
@@ -25,6 +34,111 @@ def _session_photos(data) -> tuple[TemporaryPhoto, ...]:
     return tuple(TemporaryPhoto(**photo) for photo in data.get("photos", []))
 
 
+def _specimen_or_404(detail_uuid):
+    specimen = (
+        Specimen.objects.select_related("taxon", "storage_location", "created_by")
+        .filter(detail_uuid=detail_uuid)
+        .first()
+    )
+    if specimen is None:
+        raise Http404
+    return specimen
+
+
+@never_cache
+@login_required
+def specimen_list(request):
+    if not can_view_specimens(request.user):
+        raise Http404
+    query = request.GET.get("q", "").strip()
+    status = request.GET.get("status", "")
+    specimens = Specimen.objects.select_related("taxon", "storage_location")
+    if query:
+        specimens = specimens.filter(
+            Q(specimen_code__icontains=query)
+            | Q(identification_text__icontains=query)
+            | Q(taxon__scientific_name__icontains=query)
+            | Q(taxon__japanese_name__icontains=query)
+            | Q(collected_place__icontains=query)
+            | Q(collector__icontains=query)
+        )
+    if status in Specimen.Status.values:
+        specimens = specimens.filter(status=status)
+    page = Paginator(specimens, 25).get_page(request.GET.get("page"))
+    return render(
+        request,
+        "specimens/list.html",
+        {"page": page, "query": query, "status": status, "status_choices": Specimen.Status.choices},
+    )
+
+
+@never_cache
+@login_required
+def specimen_detail(request, detail_uuid):
+    if not can_view_specimens(request.user):
+        raise Http404
+    specimen = _specimen_or_404(detail_uuid)
+    return render(
+        request,
+        "specimens/detail.html",
+        {
+            "specimen": specimen,
+            "events": specimen.events.select_related("created_by").all(),
+            "photos": specimen.photos.all(),
+            "can_edit": can_edit_specimens(request.user),
+        },
+    )
+
+
+@never_cache
+@login_required
+def specimen_edit(request, detail_uuid):
+    if not can_edit_specimens(request.user):
+        raise Http404
+    specimen = _specimen_or_404(detail_uuid)
+    form = SpecimenEditForm(request.POST or None, instance=specimen)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        return redirect("specimens:detail", detail_uuid=specimen.detail_uuid)
+    return render(request, "specimens/edit.html", {"form": form, "specimen": specimen})
+
+
+@never_cache
+@login_required
+def specimen_event(request, detail_uuid):
+    if not can_edit_specimens(request.user):
+        raise Http404
+    specimen = _specimen_or_404(detail_uuid)
+    form = SpecimenEventForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            record_specimen_event(
+                specimen_id=specimen.pk, created_by=request.user, **form.cleaned_data
+            )
+        except SpecimenServiceError as error:
+            form.add_error("event_type", _event_error_message(error))
+        else:
+            return redirect("specimens:detail", detail_uuid=specimen.detail_uuid)
+    return render(request, "specimens/event.html", {"form": form, "specimen": specimen})
+
+
+@never_cache
+@login_required
+def specimen_photo_add(request, detail_uuid):
+    if not can_edit_specimens(request.user):
+        raise Http404
+    specimen = _specimen_or_404(detail_uuid)
+    form = SpecimenPhotoForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            add_specimen_photos(specimen_id=specimen.pk, uploads=form.cleaned_data["photos"])
+        except SpecimenServiceError as error:
+            form.add_error("photos", _photo_error_message(error))
+        else:
+            return redirect("specimens:detail", detail_uuid=specimen.detail_uuid)
+    return render(request, "specimens/photo_add.html", {"form": form, "specimen": specimen})
+
+
 @never_cache
 @login_required
 def qr_resolve(request, token):
@@ -33,16 +147,18 @@ def qr_resolve(request, token):
     標本の内容や標本番号はPhase 5までここから返さない。
     """
 
-    if not can_use_qr(request.user):
+    if not can_view_specimens(request.user):
         raise Http404
-    label = QRLabel.objects.filter(token=token).only("status").first()
+    label = QRLabel.objects.select_related("specimen").filter(token=token).first()
     if label is None:
         raise Http404
     if label.status == QRLabel.Status.RETIRED:
         return render(request, "specimens/qr_unavailable.html", status=410)
     if label.status == QRLabel.Status.UNUSED:
+        if not can_edit_specimens(request.user):
+            raise Http404
         return redirect("specimens:register", token=token)
-    return render(request, "specimens/qr_assigned.html")
+    return redirect("specimens:detail", detail_uuid=label.specimen.detail_uuid)
 
 
 @never_cache
@@ -151,7 +267,7 @@ def temporary_photo(request, token, index):
 @never_cache
 @login_required
 def photo(request, detail_uuid, photo_id):
-    if not can_use_qr(request.user):
+    if not can_view_specimens(request.user):
         raise Http404
     item = SpecimenPhoto.objects.filter(pk=photo_id, specimen__detail_uuid=detail_uuid).first()
     if item is None:
@@ -179,6 +295,12 @@ def _registration_error_message(error):
     if error.code == "qr_label_not_unused":
         return "このQRコードは、ほかの登録で使用済みになりました。最初からやり直してください。"
     return "登録を確定できませんでした。最初からやり直してください。"
+
+
+def _event_error_message(error):
+    if error.code == "invalid_state_transition":
+        return "この標本の現在の状態では、その履歴を追加できません。"
+    return "履歴を追加できませんでした。"
 
 
 def _session_value(value):

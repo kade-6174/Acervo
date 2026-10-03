@@ -174,7 +174,7 @@ class QRRouteTests(TestCase):
         self.assertEqual(denied.status_code, 404)
         self.assertEqual(invalid.status_code, 404)
 
-    def test_assigned_and_retired_qr_do_not_expose_specimen_details(self):
+    def test_assigned_qr_redirects_to_detail_and_retired_qr_does_not_expose_details(self):
         specimen = create_specimen(
             created_by=self.member,
             identification_text="非公開の同定情報",
@@ -184,9 +184,11 @@ class QRRouteTests(TestCase):
         self.client.force_login(self.member)
 
         assigned = self.client.get(self.url())
-        self.assertContains(assigned, "割り当て済みのQRコードです")
-        self.assertNotContains(assigned, specimen.specimen_code)
-        self.assertNotContains(assigned, "非公開の同定情報")
+        self.assertRedirects(
+            assigned,
+            reverse("specimens:detail", kwargs={"detail_uuid": specimen.detail_uuid}),
+            fetch_redirect_response=False,
+        )
 
         retire_qr_label(token=self.label.token)
         retired = self.client.get(self.url())
@@ -247,7 +249,7 @@ class QRRouteTests(TestCase):
         )
         self.assertEqual(self.client.get(photo_url).status_code, 200)
         self.client.force_login(self.graduate)
-        self.assertEqual(self.client.get(photo_url).status_code, 404)
+        self.assertEqual(self.client.get(photo_url).status_code, 200)
 
     def test_registration_rejects_invalid_photo_without_creating_rows(self):
         self.client.force_login(self.member)

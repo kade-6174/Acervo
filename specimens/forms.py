@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Specimen, StorageLocation
+from .models import Specimen, SpecimenEvent, StorageLocation
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -30,5 +30,51 @@ class SpecimenRegistrationForm(forms.Form):
     photos = MultipleFileField(
         label="写真",
         required=False,
+        widget=MultipleFileInput(attrs={"accept": "image/jpeg,image/png,image/webp"}),
+    )
+
+
+class SpecimenEditForm(forms.ModelForm):
+    class Meta:
+        model = Specimen
+        fields = [
+            "taxon",
+            "identification_text",
+            "acquisition_method",
+            "collected_on",
+            "collected_place",
+            "collector",
+            "storage_location",
+            "note",
+        ]
+        widgets = {
+            "collected_on": forms.DateInput(attrs={"type": "date"}),
+            "note": forms.Textarea(attrs={"rows": 3}),
+        }
+
+
+class SpecimenEventForm(forms.Form):
+    event_type = forms.ChoiceField(
+        label="履歴種別",
+        choices=[
+            choice
+            for choice in SpecimenEvent.Type.choices
+            if choice[0]
+            not in {
+                SpecimenEvent.Type.COLLECTION,
+                SpecimenEvent.Type.PURCHASE,
+                SpecimenEvent.Type.DONATION,
+            }
+        ],
+    )
+    occurred_on = forms.DateField(
+        label="日付", required=False, widget=forms.DateInput(attrs={"type": "date"})
+    )
+    note = forms.CharField(label="備考", required=False, widget=forms.Textarea(attrs={"rows": 3}))
+
+
+class SpecimenPhotoForm(forms.Form):
+    photos = MultipleFileField(
+        label="追加する写真",
         widget=MultipleFileInput(attrs={"accept": "image/jpeg,image/png,image/webp"}),
     )

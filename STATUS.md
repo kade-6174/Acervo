@@ -22,6 +22,14 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 2026-10-04、VM200のCloudflare Tunnel本番構成へ反映した。更新前にPostgreSQL 18の暗号化バックアップ`acervo-20261003T093926Z-bc8c5fc25f2e`を作成し、保持規則により古い1世代を削除した。`378a51f`から`ffb0b7f`へfast-forwardし、Cloudflare用Compose設定検証、webイメージの再ビルド、`up -d --build --wait`を成功させた。`db`、`web`、`proxy`、`tunnel`はhealthy、コンテナ内`check --deploy`は警告なし、webのUIDは10001、既存の`specimens.0001_initial`と`specimens.0002_qrbatch_qrlabel_and_more`は適用済み、VM200上の作業ツリーは空だった。Phase 4はDBスキーマ変更を含まない。実データ、実QR、実写真、スマートフォンの実機受入は行っておらず、Phase 5以降と7C-LIVE-Bへ残す。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
 
+## 2026-10-04 Phase 5 検索・詳細・履歴のローカル実装
+
+標本番号、同定情報、学名・和名、採集地、採集者を対象にしたキーワード検索と状態による絞り込み、一覧、詳細画面を追加した。詳細・写真のURLにはDB連番IDや標本番号ではなく、標本固有のランダムUUIDv4だけを使う。割当済みQRは、閲覧を許可された利用者をその標本詳細へ遷移させる。
+
+有効な卒業生memberも検索、詳細、保護写真を閲覧できる一方、編集、履歴追加、写真追加は現在在籍のmemberまたはadminだけに制限した。認可は全エンドポイントでサーバー側判定し、権限不足や推測したUUIDには404を返す。標本の編集では標本番号、詳細UUID、状態を変更できない。状態変更を伴う履歴は既存の行ロック・トランザクションサービスで記録し、同じ状態への重複遷移や不正遷移を拒否する。複数写真の追加は上限・実形式をすべて確認してから同じトランザクションで保存する。
+
+変更ファイルは`templates/base.html`、`specimens/access.py`、`specimens/forms.py`、`specimens/services.py`、`specimens/urls.py`、`specimens/views.py`、`specimens/templates/specimens/list.html`、`specimens/templates/specimens/detail.html`、`specimens/templates/specimens/edit.html`、`specimens/templates/specimens/event.html`、`specimens/templates/specimens/photo_add.html`、`specimens/tests/test_qr.py`、`specimens/tests/test_views.py`である。ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が335件成功（PostgreSQL専用4件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`が成功した。PostgreSQL CI、本番Compose、VM200反映、実ブラウザ受入は未実施である。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+
 ## 2026-10-03 Phase 1D 残件のローカル実装
 
 学校回生方式の管理画面に、現在在籍中の有効adminが0人のときの強い警告を追加した。年度切替日の60日前からは、次年度にも在籍する有効adminがいない場合に後継管理者の設定と引き継ぎを促す。`none`方式ではこれらの学校回生向け警告を表示しない。警告は`/management/`と`/management/users/`で、既存の中央管理アクセス判定を通過した管理者にだけ表示する。
