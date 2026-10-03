@@ -28,7 +28,11 @@ VM200への保守アクセス確認中にSSHを一時起動したが、認証情
 
 サービス層では、行ロックと単一トランザクションにより標本作成時だけ番号を確定し、標本と初回履歴を同時に保存する。標本番号と詳細用UUIDv4はモデル上で変更不可とし、番号の再利用を防ぐ。貸出、返却、売却、廃棄、紛失、発見は状態と追記型の`SpecimenEvent`を同じトランザクションで変更し、不正な遷移と不正イベント種別を拒否する。未同定・採集日不明は許容する。
 
-`specimens/tests/`に通常作成、未同定、採番失敗時のロールバック、UUIDv4、番号不再利用、イベント追記専用、不正状態遷移、不正入力、SQLiteのDB制約、PostgreSQL専用の同時採番テストを追加した。ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が303件成功（PostgreSQL専用2件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`も成功した。PostgreSQL CI、production Compose、実ブラウザ受入は未実施である。Phase 2は未完了とし、次はCIでPostgreSQL同時採番と本番コンテナを確認する。
+`specimens/tests/`に通常作成、未同定、採番失敗時のロールバック、UUIDv4、番号不再利用、イベント追記専用、不正状態遷移、不正入力、SQLiteのDB制約、PostgreSQL専用の同時採番テストを追加した。ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が303件成功（PostgreSQL専用2件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`も成功した。
+
+コミット`cf8cf72`に対するGitHub Actionsでは、PostgreSQL 18上の`test (push)`が53秒、`production-container (push)`が4分でいずれも成功した。同時採番テストを含むPostgreSQL検証と、本番コンテナ検証の成功を確認した。
+
+同日、VM200のCloudflare Tunnel本番構成へ反映した。更新前に暗号化バックアップ`acervo-20261003T084353Z-1472371ecd81`（PostgreSQL 18）を作成し、保持整理では直前の1件を削除した。標本番号接頭辞は、既に確定していた`KDF-BIO`を`.env.production`へ値を表示せず1件だけ設定した。作業ツリーが空であることを確認して`afbd3ad`から`cf8cf72`へfast-forwardし、Cloudflare用Compose設定検証、webイメージのbuild、`up -d --build --wait`を成功させた。`db`、`web`、`proxy`、`tunnel`はhealthy、コンテナ内`check --deploy`は警告なし、`specimens.0001_initial`は適用済み、VM200上の作業ツリーは空だった。実データの標本は作成していない。Phase 2の中核ルールは、ローカル・PostgreSQL CI・本番Composeで確認済みとして完了とする。QR、登録画面、標本詳細、写真は未実装であり、7C-LIVE-B、7C-LIVE-A、Phase 1全体は引き続き未完了とする。次はPhase 3のQR基盤を実装する。
 
 ## 2026-09-30 7C-LIVE-A復元試験の続き
 
