@@ -1,10 +1,10 @@
 # Project Status
 
-最終更新: 2026-10-03
+最終更新: 2026-10-04
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）を完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。Phase 4はローカル実装・検証まで完了し、コミット、GitHub Actions、VM200反映は未実施である。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4を完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。Phase 4はローカル実装・検証、PostgreSQL CI、本番Compose反映まで完了した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
 ## 2026-10-03 Phase 4 スマホ標本登録のローカル実装
 
@@ -17,6 +17,10 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が329件成功（PostgreSQL専用4件skip）、`ruff check .`、`ruff format --check .`、`python manage.py check --settings=config.settings.test`、`makemigrations --check --dry-run --settings=config.settings.test`、`git diff --check`が成功した。Phase 4専用では通常経路、確認時の採番なし、入力不正、権限不足、QR競合、写真の実形式・容量・画素数・枚数、EXIF除去、元ファイル名非使用、失敗時一時写真削除、保護写真の認証・認可を検証した。PostgreSQL上の同時QR登録テストはGitHub Actionsで未確認、本番Compose・VM200実ブラウザ受入も未実施である。コミット・push・VM200反映はGitHub Actions成功後にだけ行う。7C-LIVE-A、7C-LIVE-B、Phase 1全体はいずれも未完了とする。
 
 コミット`f5e7481`のGitHub Actions run 37113053029では、PostgreSQL上の329テスト本体は成功したが、並行テストのワーカー接続が残り、テスト用DB削除時に失敗した。本番反映は行っていない。`specimens/tests/test_sequence_concurrency.py`の各ワーカーで接続を明示的に閉じる修正を加え、ローカル再検証後に再度CIへ送る予定である。
+
+コミット`ffb0b7f`のGitHub Actions run 37113444348では、PostgreSQL 18上の329テスト、Ruff、Django check、マイグレーション、直接HTTPS／Cloudflare Tunnel Compose、暗号化バックアップと空環境復元を含む`test`・`production-container`が全成功した。先行runの失敗はテスト本体ではなくテストDB削除時の接続残りであり、このrunで解消を確認した。
+
+2026-10-04、VM200のCloudflare Tunnel本番構成へ反映した。更新前にPostgreSQL 18の暗号化バックアップ`acervo-20261003T093926Z-bc8c5fc25f2e`を作成し、保持規則により古い1世代を削除した。`378a51f`から`ffb0b7f`へfast-forwardし、Cloudflare用Compose設定検証、webイメージの再ビルド、`up -d --build --wait`を成功させた。`db`、`web`、`proxy`、`tunnel`はhealthy、コンテナ内`check --deploy`は警告なし、webのUIDは10001、既存の`specimens.0001_initial`と`specimens.0002_qrbatch_qrlabel_and_more`は適用済み、VM200上の作業ツリーは空だった。Phase 4はDBスキーマ変更を含まない。実データ、実QR、実写真、スマートフォンの実機受入は行っておらず、Phase 5以降と7C-LIVE-Bへ残す。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
 
 ## 2026-10-03 Phase 1D 残件のローカル実装
 
