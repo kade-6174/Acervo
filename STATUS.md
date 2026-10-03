@@ -42,7 +42,9 @@ VM200への保守アクセス確認中にSSHを一時起動したが、認証情
 
 20mmラベルと15mm試験ラベルのPDF生成を追加した。QR画像のみを正方形の1ページへ描き、標本番号・標本名・採集地をPDFへ含めない。PDF生成にはPython 3.13対応、BSDライセンスの`reportlab==5.0.1`を固定依存へ追加し、既存の`qrcode==8.2`も直接依存として固定した。
 
-通常発行、UUIDの一意性・不変性、無効・不正入力、1標本へ複数QRの割当拒否、再印刷、PDFの形式・秘密値非記録、未ログイン、権限不足、不正UUID、割当済み・無効QRの情報非表示をテストした。PostgreSQL専用の同時割当テストも追加した。ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が315件成功（PostgreSQL専用3件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`も成功した。PostgreSQL CI、production Compose、実HTTPS／実印刷の確認は未実施である。Phase 3は未完了とし、次はCIで確認する。7C-LIVE-A、7C-LIVE-B、Phase 1全体は引き続き未完了とする。
+通常発行、UUIDの一意性・不変性、無効・不正入力、1標本へ複数QRの割当拒否、再印刷、PDFの形式・秘密値非記録、未ログイン、権限不足、不正UUID、割当済み・無効QRの情報非表示をテストした。PostgreSQL専用の同時割当テストも追加した。ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が315件成功（PostgreSQL専用3件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`も成功した。コミット`378a51f`に対するGitHub Actionsでは、PostgreSQL 18上の`test (push)`が1分、`production-container (push)`が4分でいずれも成功した。
+
+同日、VM200のCloudflare Tunnel本番構成へ反映した。更新前バックアップ`acervo-20261003T090608Z-43e4e0654a15`（PostgreSQL 18）を作成し、保持整理では直前の1件を削除した。更新前に設定ファイルのグループ読取権限が不足してバックアップが一度失敗したが、内容を表示せず、所有者root・バックアップコンテナのGID 10001・mode 640へ復旧した後のバックアップ作成は成功した。`cf8cf72`から`378a51f`へfast-forwardし、Cloudflare用Compose設定検証、webイメージbuild、`up -d --build --wait`を成功させた。`db`、`web`、`proxy`、`tunnel`はhealthy、`check --deploy`は警告なし、`specimens.0002_qrbatch_qrlabel_and_more`は適用済み、VM200上の作業ツリーは空だった。実データの標本・QRラベル、実HTTPSのQR読取、実印刷は未実施である。Phase 3の実装・PostgreSQL CI・本番Compose反映は完了とする。7C-LIVE-A、7C-LIVE-B、Phase 1全体は引き続き未完了とする。次はPhase 4のスマホ標本登録を実装する。
 
 ## 2026-09-30 7C-LIVE-A復元試験の続き
 
