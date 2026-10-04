@@ -4,7 +4,7 @@
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5を完了。Phase 6はローカル実装・検証済みで、PostgreSQL CIと本番Compose反映は未実施。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6を完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
 ## 2026-10-03 Phase 4 スマホ標本登録のローカル実装
 
@@ -38,7 +38,9 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 分類候補画面はまずローカル分類を検索し、候補がない場合だけ環境設定`ACERVO_TAXON_EXTERNAL_SEARCH_ENABLED=true`でGBIFの候補を2秒上限で照会する。外部通信の停止・タイムアウト時も手入力登録を妨げない。外部候補を明示採用した場合だけ根拠URL、引用、確認日を`TaxonSource`へ保存する。分類検索・採用・手入力は現在在籍のmemberまたはadminに限定し、卒業生には404を返す。画面はデジタル庁デザインシステムの検索、フォーム、リスト、アクセシビリティ指針を参照して、ラベル、補助説明、エラー、意味のある状態表示を設けた。
 
-変更ファイルは`.env.production.example`、`config/settings/base.py`、`specimens/forms.py`、`specimens/models.py`、`specimens/services.py`、`specimens/views.py`、`specimens/urls.py`、`specimens/management/commands/import_japanese_butterfly_taxa.py`、`specimens/migrations/0003_taxondataset_taxondatasetrecord_taxondatasetrevision.py`、分類画面テンプレート、テストである。ローカルSQLiteでは全342テスト成功（PostgreSQL専用4件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`が成功した。PostgreSQL CI、本番Compose、VM200でのマイグレーションと実データ取込みはGitHub Actions成功後にだけ実施する。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+変更ファイルは`.env.production.example`、`config/settings/base.py`、`specimens/forms.py`、`specimens/models.py`、`specimens/services.py`、`specimens/views.py`、`specimens/urls.py`、`specimens/management/commands/import_japanese_butterfly_taxa.py`、`specimens/migrations/0003_taxondataset_taxondatasetrecord_taxondatasetrevision.py`、分類画面テンプレート、テストである。ローカルSQLiteでは再試行修正後の全343テスト成功（PostgreSQL専用4件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`が成功した。初回CI run 37199916776はPostgreSQLのテスト内で固定IDを仮定したため失敗したが、実装ではなくテストの連番依存を除去した。run 37200658624と再試行修正のrun 37201415140では、PostgreSQL 18上のテスト、Ruff、Django check、直接HTTPS／Cloudflare Tunnel Compose、暗号化バックアップと空環境復元を含む`test`・`production-container`が全成功した。
+
+2026-10-04、VM200のCloudflare Tunnel本番構成へ反映した。更新前バックアップ`acervo-20261004T120716Z-c85888476c64`と、再試行修正前の更新前バックアップ`acervo-20261004T121934Z-e53839d3235b`（いずれもPostgreSQL 18）を作成し、それぞれ保持規則により古い1世代を削除した。VM200を`fc878f9`から`76ab114`、続けて`594114c`へfast-forwardし、Cloudflare用Compose設定検証、webイメージの再ビルド、`up -d --build --wait`を成功させた。`specimens.0003_taxondataset_taxondatasetrecord_taxondatasetrevision`まで適用済みで、`db`、`web`、`proxy`、`tunnel`はhealthy、`check --deploy`は警告なし、作業ツリーは空だった。初回取込み時にWayback Machineから一時的に接続拒否されたが、DB書込み前の失敗でデータは残らなかった。再試行対応後に取込みを成功させ、データセット1件、5科、328種、版`2010–2013`、ライセンス`CC BY 3.0`、取込み履歴1件を確認した。実ブラウザでの分類候補検索・外部候補採用・出典表示の受入は未実施であり、7C-LIVE-Bへ残す。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
 
 ## 2026-10-03 Phase 1D 残件のローカル実装
 
