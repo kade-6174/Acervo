@@ -1,6 +1,7 @@
 """QR公開URLの安全な入口。"""
 
 import uuid
+from io import BytesIO
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -26,7 +27,10 @@ from .services import (
     TemporaryPhoto,
     add_specimen_photos,
     adopt_external_taxon_candidate,
+    build_qr_labels_pdf,
+    build_specimen_label_pdf,
     discard_temporary_photos,
+    record_qr_reprint,
     record_specimen_event,
     register_specimen_from_qr,
     save_temporary_photos,
@@ -159,6 +163,36 @@ def specimen_detail(request, detail_uuid):
             "can_edit": can_edit_specimens(request.user),
         },
     )
+
+
+@never_cache
+@login_required
+def specimen_label_pdf(request, detail_uuid):
+    if not can_use_qr(request.user):
+        raise Http404
+    specimen = _specimen_or_404(detail_uuid)
+    response = FileResponse(
+        BytesIO(build_specimen_label_pdf(specimen=specimen)),
+        content_type="application/pdf",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{specimen.specimen_code}-label.pdf"'
+    return response
+
+
+@never_cache
+@login_required
+def specimen_qr_label_pdf(request, detail_uuid):
+    if not can_use_qr(request.user):
+        raise Http404
+    specimen = _specimen_or_404(detail_uuid)
+    label = QRLabel.objects.filter(specimen=specimen, status=QRLabel.Status.ASSIGNED).first()
+    if label is None:
+        raise Http404
+    pdf = build_qr_labels_pdf(labels=[label], size_mm=20)
+    record_qr_reprint(token=label.token)
+    response = FileResponse(BytesIO(pdf), content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{specimen.specimen_code}-qr.pdf"'
+    return response
 
 
 @never_cache

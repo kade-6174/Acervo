@@ -13,6 +13,7 @@ class AuditLog(models.Model):
         USER_ACTIVE_STATE_CHANGED = "user_active_state_changed", "利用者有効状態変更"
         USER_CREATED = "user_created", "利用者作成"
         USER_PASSWORD_REISSUED = "user_password_reissued", "利用者一時パスワード再発行"
+        SPECIMEN_CSV_EXPORTED = "specimen_csv_exported", "標本CSV出力"
 
     class Channel(models.TextChoices):
         MANAGEMENT_UI = "management_ui", "管理画面"

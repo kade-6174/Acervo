@@ -10,6 +10,12 @@ urlpatterns = [
     path("taxa/adopt-external/", views.taxon_adopt_external, name="taxon_adopt_external"),
     path("specimens/", views.specimen_list, name="list"),
     path("specimens/<uuid:detail_uuid>/", views.specimen_detail, name="detail"),
+    path("specimens/<uuid:detail_uuid>/label.pdf", views.specimen_label_pdf, name="label_pdf"),
+    path(
+        "specimens/<uuid:detail_uuid>/qr-label.pdf",
+        views.specimen_qr_label_pdf,
+        name="qr_label_pdf",
+    ),
     path("specimens/<uuid:detail_uuid>/edit/", views.specimen_edit, name="edit"),
     path("specimens/<uuid:detail_uuid>/events/", views.specimen_event, name="event"),
     path("specimens/<uuid:detail_uuid>/photos/add/", views.specimen_photo_add, name="photo_add"),

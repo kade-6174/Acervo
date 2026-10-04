@@ -1,3 +1,5 @@
+import csv
+from io import StringIO
 from time import time
 from urllib.parse import urlencode
 
@@ -9,7 +11,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
-from django.http import Http404, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -27,6 +29,7 @@ from accounts.user_administration import (
     update_user_administration_by_admin,
 )
 from audit.models import AuditLog
+from specimens.models import Specimen
 
 from .admin_warnings import get_administrator_warnings
 
@@ -229,6 +232,73 @@ def audit_log_list(request):
 
     audit_logs = AuditLog.objects.select_related("actor", "target").all()[:100]
     return render(request, "management_portal/audit_log_list.html", {"audit_logs": audit_logs})
+
+
+@never_cache
+@require_GET
+def specimen_csv_export(request):
+    """管理者用標本CSV。レスポンスを作成してから出力操作だけを監査する。"""
+
+    output = StringIO(newline="")
+    writer = csv.writer(output, lineterminator="\r\n")
+    writer.writerow(
+        [
+            "標本番号",
+            "学名",
+            "和名",
+            "同定情報",
+            "状態",
+            "入手方法",
+            "採集日",
+            "採集地",
+            "採集者",
+            "保管場所",
+            "備考",
+            "登録日",
+        ]
+    )
+    specimens = Specimen.objects.select_related("taxon", "storage_location").order_by(
+        "specimen_code"
+    )
+    for specimen in specimens:
+        writer.writerow([_csv_cell(value) for value in _specimen_csv_row(specimen)])
+    AuditLog.objects.create(
+        action=AuditLog.Action.SPECIMEN_CSV_EXPORTED,
+        channel=AuditLog.Channel.MANAGEMENT_UI,
+        actor=request.user,
+        actor_username=request.user.username,
+        target=None,
+        target_username="",
+    )
+    response = HttpResponse("\ufeff" + output.getvalue(), content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="specimens.csv"'
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _specimen_csv_row(specimen: Specimen) -> tuple[str, ...]:
+    return (
+        specimen.specimen_code,
+        specimen.taxon.scientific_name if specimen.taxon_id else "",
+        specimen.taxon.japanese_name if specimen.taxon_id else "",
+        specimen.identification_text,
+        specimen.get_status_display(),
+        specimen.get_acquisition_method_display(),
+        specimen.collected_on.isoformat() if specimen.collected_on else "",
+        specimen.collected_place,
+        specimen.collector,
+        specimen.storage_location.name if specimen.storage_location_id else "",
+        specimen.note,
+        specimen.created_at.date().isoformat(),
+    )
+
+
+def _csv_cell(value: str) -> str:
+    """表計算ソフトが数式として評価する値を、文字列として出力する。"""
+
+    if value.lstrip().startswith(("=", "+", "-", "@")):
+        return f"'{value}"
+    return value
 
 
 @never_cache

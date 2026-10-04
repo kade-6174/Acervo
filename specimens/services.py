@@ -18,6 +18,8 @@ from django.utils import timezone
 from PIL import Image, UnidentifiedImageError
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfgen import canvas
 
 from .models import (
@@ -384,6 +386,47 @@ def build_qr_labels_pdf(*, labels, size_mm: int) -> bytes:
         document.showPage()
     document.save()
     return output.getvalue()
+
+
+def build_specimen_label_pdf(*, specimen: Specimen) -> bytes:
+    """標本情報を記した、1標本1ページの保護用ラベルPDFを生成する。"""
+
+    output = BytesIO()
+    width, height = 70 * mm, 35 * mm
+    document = canvas.Canvas(output, pagesize=(width, height), pageCompression=1)
+    document.setTitle(specimen.specimen_code)
+    pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
+    font_name = "HeiseiKakuGo-W5"
+    taxon_name = str(specimen.taxon) if specimen.taxon_id else specimen.identification_text
+    rows = (
+        ("標本番号", specimen.specimen_code),
+        ("分類", taxon_name or "未同定"),
+        ("採集日", specimen.collected_on.isoformat() if specimen.collected_on else "不明"),
+        ("採集地", specimen.collected_place or "不明"),
+        ("採集者", specimen.collector or "不明"),
+    )
+    top = height - 6 * mm
+    document.setFont(font_name, 10)
+    document.drawString(5 * mm, top, specimen.specimen_code)
+    document.setStrokeColorRGB(0.65, 0.65, 0.65)
+    document.line(5 * mm, top - 2 * mm, width - 5 * mm, top - 2 * mm)
+    document.setFillColorRGB(0.1, 0.1, 0.1)
+    y = top - 6 * mm
+    for label, value in rows[1:]:
+        document.setFont(font_name, 6)
+        document.drawString(5 * mm, y, label)
+        document.setFont(font_name, 7)
+        document.drawString(18 * mm, y, _label_text(value, 38))
+        y -= 5 * mm
+    document.showPage()
+    document.save()
+    return output.getvalue()
+
+
+def _label_text(value: str, maximum_length: int) -> str:
+    """ラベルの物理サイズを超える値を、改変せず表示上だけ省略する。"""
+
+    return value if len(value) <= maximum_length else f"{value[: maximum_length - 1]}…"
 
 
 def normalize_photo(upload) -> tuple[bytes, int, int]:

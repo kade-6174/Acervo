@@ -4,7 +4,7 @@
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6を完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6を完了。Phase 7はローカル実装とローカル検証を完了し、GitHub Actions、本番反映、実ブラウザ受入は未実施。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
 ## 2026-10-03 Phase 4 スマホ標本登録のローカル実装
 
@@ -41,6 +41,16 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 変更ファイルは`.env.production.example`、`config/settings/base.py`、`specimens/forms.py`、`specimens/models.py`、`specimens/services.py`、`specimens/views.py`、`specimens/urls.py`、`specimens/management/commands/import_japanese_butterfly_taxa.py`、`specimens/migrations/0003_taxondataset_taxondatasetrecord_taxondatasetrevision.py`、分類画面テンプレート、テストである。ローカルSQLiteでは再試行修正後の全343テスト成功（PostgreSQL専用4件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`が成功した。初回CI run 37199916776はPostgreSQLのテスト内で固定IDを仮定したため失敗したが、実装ではなくテストの連番依存を除去した。run 37200658624と再試行修正のrun 37201415140では、PostgreSQL 18上のテスト、Ruff、Django check、直接HTTPS／Cloudflare Tunnel Compose、暗号化バックアップと空環境復元を含む`test`・`production-container`が全成功した。
 
 2026-10-04、VM200のCloudflare Tunnel本番構成へ反映した。更新前バックアップ`acervo-20261004T120716Z-c85888476c64`と、再試行修正前の更新前バックアップ`acervo-20261004T121934Z-e53839d3235b`（いずれもPostgreSQL 18）を作成し、それぞれ保持規則により古い1世代を削除した。VM200を`fc878f9`から`76ab114`、続けて`594114c`へfast-forwardし、Cloudflare用Compose設定検証、webイメージの再ビルド、`up -d --build --wait`を成功させた。`specimens.0003_taxondataset_taxondatasetrecord_taxondatasetrevision`まで適用済みで、`db`、`web`、`proxy`、`tunnel`はhealthy、`check --deploy`は警告なし、作業ツリーは空だった。初回取込み時にWayback Machineから一時的に接続拒否されたが、DB書込み前の失敗でデータは残らなかった。再試行対応後に取込みを成功させ、データセット1件、5科、328種、版`2010–2013`、ライセンス`CC BY 3.0`、取込み履歴1件を確認した。実ブラウザでの分類候補検索・外部候補採用・出典表示の受入は未実施であり、7C-LIVE-Bへ残す。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+
+## 2026-10-04 Phase 7 PDF・CSVのローカル実装
+
+標本詳細から、現在在籍のmemberまたはadminだけが70mm×35mmの標本ラベルPDFを取得できるようにした。ラベルには標本番号、分類または同定情報、採集日、採集地、採集者を収め、保護されたDjangoビューから添付として返す。割当済みQRの20mmラベルPDFも同じ権限に限定して再印刷でき、成功した再印刷だけが既存のQR token・割当を変えずに再印刷回数と時刻を記録する。卒業生memberは両PDFを取得できない。
+
+管理ポータルにadmin限定の標本CSV出力を追加した。既存の中央MFAゲートを通し、生成したCSVはBOM付きUTF-8・添付・`nosniff`で返す。標本番号、分類、同定情報、状態、入手・採集・保管・備考・登録日の各列について、先頭または先頭空白後が`=`、`+`、`-`、`@`となる値へアポストロフィを付け、表計算ソフトの数式評価を防ぐ。出力成功時だけ既存の追記専用`AuditLog`へ、実行者と「標本CSV出力」の操作種別を記録する。監査ログにCSV本文や秘密値は保存しない。`audit`の小規模な選択肢追加migrationを含むが、標本・QR・認証の構造や不変条件は変更していない。
+
+変更ファイルは`audit/models.py`、`audit/migrations/0004_specimen_csv_export_action.py`、`management_portal/views.py`、`management_portal/urls.py`、`management_portal/templates/management_portal/index.html`、`management_portal/tests/test_specimen_csv_export.py`、`specimens/services.py`、`specimens/views.py`、`specimens/urls.py`、`specimens/templates/specimens/detail.html`、`specimens/tests/test_views.py`である。デジタル庁デザインシステムは、既存の白・黒・グレー基調と、操作名が明確なボタン、ラベル・補助説明を保つための参考に留め、コードや資産は取り込んでいない。
+
+ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が347件成功（PostgreSQL専用4件skip）、`ruff check .`、`ruff format --check .`、`python manage.py check --settings=config.settings.test`、`makemigrations --check --dry-run --settings=config.settings.test`、`git diff --check`が成功した。Phase 7専用では、標本ラベルPDF・QR再印刷PDFの応答形式と再印刷記録、卒業生のPDF拒否、memberのCSV拒否、CSV出力の監査記録、`=`・空白後`@`・`+`・`-`で始まるセルの無害化を確認した。GitHub Actions、本番Compose、VM200反映、実ブラウザでのPDF印刷・CSV確認は未実施である。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
 
 ## 2026-10-03 Phase 1D 残件のローカル実装
 
