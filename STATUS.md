@@ -4,7 +4,7 @@
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6を完了。Phase 7はローカル実装とローカル検証を完了し、GitHub Actions、本番反映、実ブラウザ受入は未実施。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7を完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
 ## 2026-10-03 Phase 4 スマホ標本登録のローカル実装
 
@@ -50,7 +50,9 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 変更ファイルは`audit/models.py`、`audit/migrations/0004_specimen_csv_export_action.py`、`management_portal/views.py`、`management_portal/urls.py`、`management_portal/templates/management_portal/index.html`、`management_portal/tests/test_specimen_csv_export.py`、`specimens/services.py`、`specimens/views.py`、`specimens/urls.py`、`specimens/templates/specimens/detail.html`、`specimens/tests/test_views.py`である。デジタル庁デザインシステムは、既存の白・黒・グレー基調と、操作名が明確なボタン、ラベル・補助説明を保つための参考に留め、コードや資産は取り込んでいない。
 
-ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が347件成功（PostgreSQL専用4件skip）、`ruff check .`、`ruff format --check .`、`python manage.py check --settings=config.settings.test`、`makemigrations --check --dry-run --settings=config.settings.test`、`git diff --check`が成功した。Phase 7専用では、標本ラベルPDF・QR再印刷PDFの応答形式と再印刷記録、卒業生のPDF拒否、memberのCSV拒否、CSV出力の監査記録、`=`・空白後`@`・`+`・`-`で始まるセルの無害化を確認した。GitHub Actions、本番Compose、VM200反映、実ブラウザでのPDF印刷・CSV確認は未実施である。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が347件成功（PostgreSQL専用4件skip）、`ruff check .`、`ruff format --check .`、`python manage.py check --settings=config.settings.test`、`makemigrations --check --dry-run --settings=config.settings.test`、`git diff --check`が成功した。Phase 7専用では、標本ラベルPDF・QR再印刷PDFの応答形式と再印刷記録、卒業生のPDF拒否、memberのCSV拒否、CSV出力の監査記録、`=`・空白後`@`・`+`・`-`で始まるセルの無害化を確認した。コミット`f517f15`のGitHub Actions run 37202579808では、PostgreSQL 18上のテスト、Ruff、Django check、直接HTTPS／Cloudflare Tunnel Compose、暗号化バックアップと空環境復元を含む`test`・`production-container`が全成功した。
+
+2026-10-05、VM200のCloudflare Tunnel本番構成へ反映した。更新前バックアップ`acervo-20261004T133905Z-c3a85e5c1fde`（PostgreSQL 18）を作成し、保持規則により古い1世代を削除した。VM200を`594114c`から`f517f15`へfast-forwardし、Cloudflare用Compose設定検証、webイメージの再ビルド、`up -d --build --wait`を成功させた。`audit.0004_specimen_csv_export_action`まで適用済みで、`db`、`web`、`proxy`、`tunnel`はhealthy、`check --deploy`は警告なし、webのUIDは10001、作業ツリーは空だった。実ブラウザでのPDF印刷・CSVダウンロード受入は未実施であり、7C-LIVE-Bへ残す。Phase 7の実装・PostgreSQL CI・本番Compose反映は完了とする。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
 
 ## 2026-10-03 Phase 1D 残件のローカル実装
 
