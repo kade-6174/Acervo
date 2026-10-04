@@ -1,10 +1,10 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import User
-from specimens.management.commands.import_japanese_butterfly_taxa import _SpeciesListParser
+from specimens.management.commands.import_japanese_butterfly_taxa import _fetch, _SpeciesListParser
 from specimens.models import Taxon, TaxonSource
 from specimens.services import (
     TaxonCandidate,
@@ -118,3 +118,24 @@ class JapaneseButterflyParserTests(TestCase):
         self.assertEqual(entry.original_publication_year, 1767)
         self.assertEqual(entry.japanese_name, "アゲハ")
         self.assertEqual(entry.source_key, "species-100")
+
+    def test_fetch_retries_transient_connection_failure(self):
+        response = MagicMock()
+        response.read.return_value = b"<html></html>"
+        response.__enter__.return_value = response
+        with (
+            patch(
+                "specimens.management.commands.import_japanese_butterfly_taxa.urlopen",
+                side_effect=[OSError("temporary"), response],
+            ) as mocked_open,
+            patch(
+                "specimens.management.commands.import_japanese_butterfly_taxa.time.sleep"
+            ) as mocked_sleep,
+        ):
+            result = _fetch(
+                "https://web.archive.org/web/20210505224155/https://binran.lepimages.jp/"
+            )
+
+        self.assertEqual(result, "<html></html>")
+        self.assertEqual(mocked_open.call_count, 2)
+        mocked_sleep.assert_called_once_with(1)

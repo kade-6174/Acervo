@@ -1,8 +1,10 @@
 """日本産蝶類和名学名便覧の分類データだけを、明示実行で取り込む。"""
 
 import re
+import time
 from dataclasses import dataclass
 from html.parser import HTMLParser
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from django.core.management.base import BaseCommand, CommandError
@@ -107,8 +109,16 @@ def _entry_from_parts(source_key, italics, text_parts):
 
 def _fetch(url):
     request = Request(url, headers={"User-Agent": "Acervo/0.1 butterfly taxonomy importer"})
-    with urlopen(request, timeout=20) as response:  # noqa: S310 - command receives an HTTPS archive URL
-        return response.read().decode("utf-8")
+    for attempt in range(3):
+        try:
+            with urlopen(request, timeout=20) as response:  # noqa: S310 - fixed archive HTTPS URL
+                return response.read().decode("utf-8")
+        except (HTTPError, URLError, OSError, UnicodeDecodeError) as error:
+            if attempt == 2:
+                raise CommandError(
+                    "保存版へ接続できませんでした。時間を置いてから再実行してください。"
+                ) from error
+            time.sleep(attempt + 1)
 
 
 def _family_urls(index_html, archive_url):
