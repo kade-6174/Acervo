@@ -1,10 +1,13 @@
 """QR公開URLの安全な入口。"""
 
+import uuid
+
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.cache import never_cache
 
 from .access import can_edit_specimens, can_use_qr, can_view_specimens
@@ -13,16 +16,21 @@ from .forms import (
     SpecimenEventForm,
     SpecimenPhotoForm,
     SpecimenRegistrationForm,
+    TaxonManualForm,
+    TaxonSearchForm,
 )
-from .models import QRLabel, Specimen, SpecimenPhoto, StorageLocation
+from .models import QRLabel, Specimen, SpecimenPhoto, StorageLocation, TaxonDataset
 from .services import (
     SpecimenServiceError,
+    TaxonCandidate,
     TemporaryPhoto,
     add_specimen_photos,
+    adopt_external_taxon_candidate,
     discard_temporary_photos,
     record_specimen_event,
     register_specimen_from_qr,
     save_temporary_photos,
+    search_taxon_candidates,
 )
 
 
@@ -70,6 +78,69 @@ def specimen_list(request):
         "specimens/list.html",
         {"page": page, "query": query, "status": status, "status_choices": Specimen.Status.choices},
     )
+
+
+@never_cache
+@login_required
+def taxon_search(request):
+    if not can_edit_specimens(request.user):
+        raise Http404
+    form = TaxonSearchForm(request.GET or None)
+    local_candidates = ()
+    external_candidates = ()
+    candidate_keys = {}
+    if form.is_valid() and form.cleaned_data["query"]:
+        local_candidates, external_candidates = search_taxon_candidates(form.cleaned_data["query"])
+        if external_candidates:
+            stored = {}
+            for candidate in external_candidates:
+                key = uuid.uuid4().hex
+                candidate_keys[key] = candidate
+                stored[key] = {
+                    "scientific_name": candidate.scientific_name,
+                    "japanese_name": candidate.japanese_name,
+                    "rank": candidate.rank,
+                    "source_url": candidate.source_url,
+                    "citation": candidate.citation,
+                }
+            request.session["external-taxon-candidates"] = stored
+    return render(
+        request,
+        "specimens/taxon_search.html",
+        {
+            "form": form,
+            "local_candidates": local_candidates,
+            "external_candidates": [(key, candidate) for key, candidate in candidate_keys.items()],
+            "datasets": TaxonDataset.objects.all(),
+        },
+    )
+
+
+@never_cache
+@login_required
+def taxon_adopt_external(request):
+    if not can_edit_specimens(request.user) or request.method != "POST":
+        raise Http404
+    stored = request.session.get("external-taxon-candidates", {})
+    payload = stored.get(request.POST.get("candidate_key", ""))
+    if not payload:
+        raise Http404
+    candidate = TaxonCandidate(external=True, **payload)
+    taxon = adopt_external_taxon_candidate(candidate)
+    request.session.pop("external-taxon-candidates", None)
+    return redirect(f"{reverse('specimens:taxon_search')}?created={taxon.pk}")
+
+
+@never_cache
+@login_required
+def taxon_manual_create(request):
+    if not can_edit_specimens(request.user):
+        raise Http404
+    form = TaxonManualForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        taxon = form.save()
+        return redirect(f"{reverse('specimens:taxon_search')}?created={taxon.pk}")
+    return render(request, "specimens/taxon_manual.html", {"form": form})
 
 
 @never_cache
@@ -191,7 +262,7 @@ def register(request, token):
                 }
                 return redirect("specimens:register_confirm", token=token)
     else:
-        form = SpecimenRegistrationForm()
+        form = SpecimenRegistrationForm(initial={"taxon": request.GET.get("taxon")})
     return render(request, "specimens/register.html", {"form": form, "token": token})
 
 
@@ -313,6 +384,7 @@ def _session_value(value):
 
 def _registration_summary(fields):
     labels = {
+        "taxon": "分類",
         "identification_text": "同定情報",
         "acquisition_method": "入手方法",
         "collected_on": "採集日",

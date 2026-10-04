@@ -1,22 +1,35 @@
 """画面に依存しない標本採番と状態遷移。"""
 
+import json
 import uuid
 from dataclasses import dataclass
 from enum import StrEnum
 from io import BytesIO
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 import qrcode
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 from PIL import Image, UnidentifiedImageError
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
-from .models import QRBatch, QRLabel, Specimen, SpecimenEvent, SpecimenPhoto, SpecimenSequence
+from .models import (
+    QRBatch,
+    QRLabel,
+    Specimen,
+    SpecimenEvent,
+    SpecimenPhoto,
+    SpecimenSequence,
+    Taxon,
+    TaxonSource,
+)
 
 
 class SpecimenServiceErrorCode(StrEnum):
@@ -73,6 +86,86 @@ class TemporaryPhoto:
     path: str
     width: int
     height: int
+
+
+@dataclass(frozen=True, slots=True)
+class TaxonCandidate:
+    """ローカルまたは外部照会で得た、採用前の分類候補。"""
+
+    scientific_name: str
+    japanese_name: str
+    rank: str
+    source_url: str = ""
+    citation: str = ""
+    external: bool = False
+
+
+def search_taxon_candidates(query: str) -> tuple[tuple[Taxon, ...], tuple[TaxonCandidate, ...]]:
+    """ローカルを優先し、必要時だけGBIF候補を短時間照会する。"""
+
+    normalized = query.strip()
+    if not normalized:
+        return (), ()
+    local = tuple(
+        Taxon.objects.filter(
+            models.Q(scientific_name__icontains=normalized)
+            | models.Q(japanese_name__icontains=normalized)
+        )[:20]
+    )
+    if local or not settings.ACERVO_TAXON_EXTERNAL_SEARCH_ENABLED:
+        return local, ()
+    return (), _search_gbif_taxa(normalized)
+
+
+def _search_gbif_taxa(query: str) -> tuple[TaxonCandidate, ...]:
+    """GBIF Species APIの候補だけを取得する。外部障害は空結果へフォールバックする。"""
+
+    endpoint = "https://api.gbif.org/v1/species/search?" + urlencode({"q": query, "limit": 10})
+    request = Request(endpoint, headers={"User-Agent": "Acervo/0.1 taxon lookup"})
+    try:
+        with urlopen(request, timeout=2) as response:  # noqa: S310 - 固定したGBIF HTTPS URLのみ
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, UnicodeDecodeError):
+        return ()
+
+    candidates = []
+    for item in payload.get("results", []):
+        scientific_name = str(item.get("scientificName") or item.get("canonicalName") or "").strip()
+        if not scientific_name:
+            continue
+        key = item.get("key")
+        source_url = f"https://www.gbif.org/species/{key}" if isinstance(key, int) else ""
+        candidates.append(
+            TaxonCandidate(
+                scientific_name=scientific_name,
+                japanese_name="",
+                rank=str(item.get("rank") or "").strip(),
+                source_url=source_url,
+                citation="GBIF Backbone Taxonomy",
+                external=True,
+            )
+        )
+    return tuple(candidates)
+
+
+@transaction.atomic
+def adopt_external_taxon_candidate(candidate: TaxonCandidate) -> Taxon:
+    """利用者が明示採用した外部候補だけをローカル分類と根拠へ保存する。"""
+
+    if not candidate.external or not candidate.scientific_name:
+        raise ValueError("外部候補だけを採用できます。")
+    taxon = Taxon.objects.create(
+        scientific_name=candidate.scientific_name,
+        japanese_name=candidate.japanese_name,
+        rank=candidate.rank,
+    )
+    TaxonSource.objects.create(
+        taxon=taxon,
+        source_url=candidate.source_url,
+        citation=candidate.citation,
+        checked_on=timezone.localdate(),
+    )
+    return taxon
 
 
 def _specimen_code(number: int) -> str:

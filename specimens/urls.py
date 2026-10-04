@@ -5,6 +5,9 @@ from . import views
 app_name = "specimens"
 
 urlpatterns = [
+    path("taxa/", views.taxon_search, name="taxon_search"),
+    path("taxa/manual/", views.taxon_manual_create, name="taxon_manual_create"),
+    path("taxa/adopt-external/", views.taxon_adopt_external, name="taxon_adopt_external"),
     path("specimens/", views.specimen_list, name="list"),
     path("specimens/<uuid:detail_uuid>/", views.specimen_detail, name="detail"),
     path("specimens/<uuid:detail_uuid>/edit/", views.specimen_edit, name="edit"),

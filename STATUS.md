@@ -4,7 +4,7 @@
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5を完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。Phase 4とPhase 5はローカル実装・検証、PostgreSQL CI、本番Compose反映まで完了した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5を完了。Phase 6はローカル実装・検証済みで、PostgreSQL CIと本番Compose反映は未実施。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
 ## 2026-10-03 Phase 4 スマホ標本登録のローカル実装
 
@@ -29,6 +29,16 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 有効な卒業生memberも検索、詳細、保護写真を閲覧できる一方、編集、履歴追加、写真追加は現在在籍のmemberまたはadminだけに制限した。認可は全エンドポイントでサーバー側判定し、権限不足や推測したUUIDには404を返す。標本の編集では標本番号、詳細UUID、状態を変更できない。状態変更を伴う履歴は既存の行ロック・トランザクションサービスで記録し、同じ状態への重複遷移や不正遷移を拒否する。複数写真の追加は上限・実形式をすべて確認してから同じトランザクションで保存する。
 
 変更ファイルは`templates/base.html`、`specimens/access.py`、`specimens/forms.py`、`specimens/services.py`、`specimens/urls.py`、`specimens/views.py`、`specimens/templates/specimens/list.html`、`specimens/templates/specimens/detail.html`、`specimens/templates/specimens/edit.html`、`specimens/templates/specimens/event.html`、`specimens/templates/specimens/photo_add.html`、`specimens/tests/test_qr.py`、`specimens/tests/test_views.py`である。ローカルSQLiteでは`python manage.py test --settings=config.settings.test`が335件成功（PostgreSQL専用4件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`が成功した。コミット`fc878f9`のGitHub Actions run 37133060241では、PostgreSQL 18上のテスト、Ruff、Django check、直接HTTPS／Cloudflare Tunnel Compose、暗号化バックアップと空環境復元を含む`test`・`production-container`が全成功した。2026-10-04、更新前バックアップ`acervo-20261004T090145Z-8942e3885f7d`（PostgreSQL 18）を作成し、保持規則により古い1世代を削除した。VM200を`ffb0b7f`から`fc878f9`へfast-forwardし、Cloudflare用Compose設定検証、webイメージの再ビルド、`up -d --build --wait`を成功させた。`db`、`web`、`proxy`、`tunnel`はhealthy、コンテナ内`check --deploy`は警告なし、webのUIDは10001、既存の`specimens.0001_initial`と`specimens.0002_qrbatch_qrlabel_and_more`は適用済み、VM200上の作業ツリーは空だった。実ブラウザ受入と実データによる検索・編集・履歴・写真追加は未実施であり、7C-LIVE-Bへ残す。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+
+## 2026-10-04 Phase 6 分類候補検索・蝶類初期データのローカル実装
+
+`TaxonDataset`、`TaxonDatasetRecord`、`TaxonDatasetRevision`を追加した。データセットは名称、版、ライセンス、保存版URL、取得日、画面・出力で使う出典表記を保持し、レコードはデータセットごとの科・属・種の階層、和名、学名、学名著者、原記載年、根拠URLを保持する。将来の訂正・新版は既存データを上書きせず別データセットと取込み履歴として保存できる。既存標本、QR、認証の構造は変更していない。
+
+`import_japanese_butterfly_taxa`管理コマンドは、明示実行時だけWayback Machine 2021-05-05保存版の「日本産蝶類和名学名便覧」を取得し、写真・サイトデザインを扱わず、分類データだけを冪等に取り込む。5科・328種以外を検出した場合は保存せず中止する。保存時はデータ版`2010–2013`、CC BY 3.0、保存版URL、指定された出典表記を保存する。保存版の読取り検証では5科・328種を検出した。
+
+分類候補画面はまずローカル分類を検索し、候補がない場合だけ環境設定`ACERVO_TAXON_EXTERNAL_SEARCH_ENABLED=true`でGBIFの候補を2秒上限で照会する。外部通信の停止・タイムアウト時も手入力登録を妨げない。外部候補を明示採用した場合だけ根拠URL、引用、確認日を`TaxonSource`へ保存する。分類検索・採用・手入力は現在在籍のmemberまたはadminに限定し、卒業生には404を返す。画面はデジタル庁デザインシステムの検索、フォーム、リスト、アクセシビリティ指針を参照して、ラベル、補助説明、エラー、意味のある状態表示を設けた。
+
+変更ファイルは`.env.production.example`、`config/settings/base.py`、`specimens/forms.py`、`specimens/models.py`、`specimens/services.py`、`specimens/views.py`、`specimens/urls.py`、`specimens/management/commands/import_japanese_butterfly_taxa.py`、`specimens/migrations/0003_taxondataset_taxondatasetrecord_taxondatasetrevision.py`、分類画面テンプレート、テストである。ローカルSQLiteでは全342テスト成功（PostgreSQL専用4件skip）、Ruff lint・format、Django check、migration差分確認、`git diff --check`が成功した。PostgreSQL CI、本番Compose、VM200でのマイグレーションと実データ取込みはGitHub Actions成功後にだけ実施する。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
 
 ## 2026-10-03 Phase 1D 残件のローカル実装
 

@@ -58,6 +58,77 @@ class TaxonSource(models.Model):
         return self.citation or self.source_url or f"TaxonSource {self.pk}"
 
 
+class TaxonDataset(models.Model):
+    """出典・版・利用条件を固定した分類データセット。"""
+
+    slug = models.SlugField(unique=True)
+    title = models.CharField("データ名", max_length=255)
+    version = models.CharField("データ版", max_length=128)
+    license_name = models.CharField("ライセンス", max_length=128)
+    source_url = models.URLField("保存版URL")
+    retrieved_on = models.DateField("取得日")
+    attribution = models.TextField("出典表記")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["title", "version", "pk"]
+
+    def __str__(self):
+        return f"{self.title} ({self.version})"
+
+
+class TaxonDatasetRecord(models.Model):
+    """一つの版における科・属・種の階層。将来版と混同しない。"""
+
+    class Rank(models.TextChoices):
+        FAMILY = "family", "科"
+        GENUS = "genus", "属"
+        SPECIES = "species", "種"
+
+    dataset = models.ForeignKey(TaxonDataset, on_delete=models.PROTECT, related_name="records")
+    source_key = models.CharField("出典内識別子", max_length=128)
+    parent = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="children"
+    )
+    rank = models.CharField("分類階級", max_length=16, choices=Rank)
+    scientific_name = models.CharField("学名", max_length=255)
+    japanese_name = models.CharField("和名", max_length=255, blank=True)
+    scientific_author = models.CharField("学名著者", max_length=255, blank=True)
+    original_publication_year = models.PositiveSmallIntegerField("原記載年", null=True, blank=True)
+    source_url = models.URLField("根拠URL", blank=True)
+    taxon = models.ForeignKey(Taxon, null=True, blank=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["dataset", "source_key"], name="specimens_taxon_dataset_record_unique_key"
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(parent=models.F("pk")),
+                name="specimens_taxon_dataset_record_not_own_parent",
+            ),
+        ]
+        ordering = ["rank", "scientific_name", "pk"]
+
+    def __str__(self):
+        return self.scientific_name
+
+
+class TaxonDatasetRevision(models.Model):
+    """取込み・訂正の追跡記録。データセット本体を上書きしない。"""
+
+    dataset = models.ForeignKey(TaxonDataset, on_delete=models.PROTECT, related_name="revisions")
+    note = models.TextField("変更内容")
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-imported_at", "-pk"]
+
+    def __str__(self):
+        return f"{self.dataset}: {self.imported_at:%Y-%m-%d}"
+
+
 class StorageLocation(models.Model):
     name = models.CharField("名称", max_length=255)
     parent = models.ForeignKey(

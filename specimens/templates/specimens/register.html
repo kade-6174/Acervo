@@ -4,6 +4,7 @@
 <section class="container py-4" style="max-width: 42rem;">
   <h1 class="h3">標本登録</h1>
   <p class="text-secondary">標本番号は確定ボタンを押すまで発行されません。</p>
+  <p><a href="{% url 'specimens:taxon_search' %}">分類候補を検索・登録する</a></p>
   <form method="post" enctype="multipart/form-data" class="vstack gap-3">
     {% csrf_token %}
     {% for field in form %}<div><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}

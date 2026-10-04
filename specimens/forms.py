@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Specimen, SpecimenEvent, StorageLocation
+from .models import Specimen, SpecimenEvent, StorageLocation, Taxon
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -16,6 +16,9 @@ class MultipleFileField(forms.FileField):
 
 
 class SpecimenRegistrationForm(forms.Form):
+    taxon = forms.ModelChoiceField(
+        label="分類", queryset=Taxon.objects.all(), required=False, empty_label="未選択"
+    )
     identification_text = forms.CharField(label="同定情報", max_length=500, required=False)
     acquisition_method = forms.ChoiceField(label="入手方法", choices=Specimen.AcquisitionMethod)
     collected_on = forms.DateField(
@@ -78,3 +81,23 @@ class SpecimenPhotoForm(forms.Form):
         label="追加する写真",
         widget=MultipleFileInput(attrs={"accept": "image/jpeg,image/png,image/webp"}),
     )
+
+
+class TaxonSearchForm(forms.Form):
+    query = forms.CharField(label="分類名", max_length=255, required=False)
+
+
+class TaxonManualForm(forms.ModelForm):
+    class Meta:
+        model = Taxon
+        fields = ["scientific_name", "japanese_name", "rank", "parent"]
+        widgets = {"parent": forms.Select()}
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not (
+            (cleaned_data.get("scientific_name") or "").strip()
+            or (cleaned_data.get("japanese_name") or "").strip()
+        ):
+            raise forms.ValidationError("学名または和名を入力してください。")
+        return cleaned_data
