@@ -74,8 +74,8 @@ class TaxonomyViewsTests(TestCase):
             reverse("specimens:taxon_manual_create"),
             {"scientific_name": "Papilio xuthus", "japanese_name": "アゲハ", "rank": "species"},
         )
-        self.assertRedirects(response, reverse("specimens:taxon_search") + "?created=1")
-        self.assertTrue(Taxon.objects.filter(scientific_name="Papilio xuthus").exists())
+        taxon = Taxon.objects.get(scientific_name="Papilio xuthus")
+        self.assertRedirects(response, f"{reverse('specimens:taxon_search')}?created={taxon.pk}")
 
     def test_external_candidate_adoption_uses_server_side_session_data(self):
         self.client.force_login(self.member)
@@ -96,7 +96,8 @@ class TaxonomyViewsTests(TestCase):
             {"candidate_key": key},
         )
 
-        self.assertRedirects(response, reverse("specimens:taxon_search") + "?created=1")
+        taxon = Taxon.objects.get(scientific_name="Papilio xuthus")
+        self.assertRedirects(response, f"{reverse('specimens:taxon_search')}?created={taxon.pk}")
         self.assertEqual(TaxonSource.objects.get().citation, "GBIF Backbone Taxonomy")
 
 
