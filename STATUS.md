@@ -8,7 +8,7 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 ## 2026-10-07 PWA読取カメラの操作改善（ローカル作業）
 
-運用者の要望により、QR読取開始時は画面側カメラを優先し、読取中に前面・背面を切り替えるボタンを追加した。切替前に既存カメラを解放し、切替失敗時は元の向きで再起動する。停止・画面離脱・非表示・遅れて届いたカメラ許可の際にも映像を解放する。Service Workerの静的資産キャッシュ版を更新し、既存PWAに新しい読取JSを取得させる。変更ファイルは`static/js/qr-scan.js`、`static/js/service-worker.js`、`templates/core/qr_scan.html`、`core/tests/pwa_js_test.cjs`、`core/tests/test_views.py`、`README.md`である。DB migrationはない。ローカルJSの3テストでは前面優先、両方向切替、切替失敗時の復旧、停止・遅延許可時の解放を確認した。ローカルSQLiteの全358テストは成功（PostgreSQL専用4件skip）、Ruff lint・format、Django check、migration差分なし、`git diff --check`も成功した。GitHub Actions、VM200反映、iPhone実機での前面・背面切替の再受入は未実施。Android実機受入はMVP完成後へ延期したままとする。
+運用者の要望により、QR読取開始時は画面側カメラを優先し、読取中に前面・背面を切り替えるボタンを追加した。切替前に既存カメラを解放し、切替失敗時は元の向きで再起動する。停止・画面離脱・非表示・遅れて届いたカメラ許可の際にも映像を解放する。Service Workerの静的資産キャッシュ版を更新し、既存PWAに新しい読取JSを取得させる。変更ファイルは`static/js/qr-scan.js`、`static/js/service-worker.js`、`templates/core/qr_scan.html`、`core/tests/pwa_js_test.cjs`、`core/tests/test_views.py`、`README.md`である。DB migrationはない。ローカルJSの3テストでは前面優先、両方向切替、切替失敗時の復旧、停止・遅延許可時の解放を確認した。ローカルSQLiteの全358テストは成功（PostgreSQL専用4件skip）、Ruff lint・format、Django check、migration差分なし、`git diff --check`も成功した。コミット`cdc77a4`のGitHub Actions run 37489490658では、PostgreSQL上の`test`と直接HTTPS・Tunnel構成、暗号化バックアップ・空環境復元を含む`production-container`が全成功した。VM200反映、iPhone実機での前面・背面切替の再受入は未実施。Android実機受入はMVP完成後へ延期したままとする。
 
 ## 2026-10-07 Phase 9 QRラベル管理画面の最初の実装
 
