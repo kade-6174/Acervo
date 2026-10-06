@@ -4,7 +4,7 @@
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映まで完了した。iPhoneではホーム画面への追加・閲覧とテストQR読取を確認したが、Android実機受入が未実施のためPhase 8は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映まで完了した。iPhoneではホーム画面への追加・閲覧とPWA内カメラでのテストQR読取を確認したが、Android実機受入が未実施のためPhase 8は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
 ## 2026-10-06 Phase 8 PWAのローカル実装
 
@@ -14,7 +14,7 @@ Manifest、192px・512pxの自己配信アイコン、standalone表示、Service
 
 変更ファイルは`core/views.py`、`core/urls.py`、`core/tests/test_views.py`、`core/tests/pwa_js_test.cjs`、`templates/base.html`、`templates/core/home.html`、`templates/core/qr_scan.html`、`static/js/pwa-register.js`、`static/js/service-worker.js`、`static/js/qr-scan.js`、`static/pwa/`、`static/vendor/jsqr/`、`scripts/generate_pwa_icons.py`、`.github/workflows/ci.yml`、`.github/scripts/verify-production-compose.sh`、`pyproject.toml`、`THIRD_PARTY_NOTICES.md`、`README.md`である。DB migrationはない。ローカルSQLiteでは全350テスト成功（PostgreSQL専用4件skip）、Node.jsのPWA用2テスト成功、Ruff lint・format、Django check、migration差分確認、`git diff --check`が成功した。Node.jsテストでは静的資産以外をService Workerが保存しないこと、同一サイトのUUIDv4以外のQRを拒否することを検証した。コミット`947abfb`のGitHub Actions run 37483145390では`test`と`production-container`が全成功し、PostgreSQLテスト、PWA用Node.jsテスト、直接HTTPS／Cloudflare Tunnel構成、本番コンテナ、PWA資産の疎通、暗号化バックアップと空環境復元を確認した。
 
-2026-10-07、VM200のCloudflare Tunnel本番構成へ反映した。更新前にPostgreSQL 18の暗号化バックアップ`acervo-20261006T150121Z-1289e8db6bcd`を作成し、保持規則により古い1世代を削除した。`f517f15`から`947abfb`へfast-forwardし、Cloudflare用Compose設定検証、webイメージの再ビルド、`up -d --build --wait`が成功した。コンテナ内`check --deploy`は警告なし、`migrate --check`は未適用migrationなし、`db`、`web`、`proxy`はhealthy、`tunnel`は稼働中、webのUIDは10001、VM200の作業ツリーは空だった。DB migrationの追加はない。iPhoneではホーム画面への追加と閲覧を確認し、DBに登録していない同一サイトのUUIDv4形式テストQRを読み取ると404画面へ遷移した。これはテストQRの未登録による期待結果であり、本番データは変更していない。ただし、読取がPWA内カメラ経由か端末の標準カメラ経由かは未確認。Android端末は手元になく、ホーム画面追加とHTTPS上のカメラ読取は未実施である。Phase 8は未完了とし、7C-LIVE-A、7C-LIVE-B、Phase 1全体も未完了のままとする。
+2026-10-07、VM200のCloudflare Tunnel本番構成へ反映した。更新前にPostgreSQL 18の暗号化バックアップ`acervo-20261006T150121Z-1289e8db6bcd`を作成し、保持規則により古い1世代を削除した。`f517f15`から`947abfb`へfast-forwardし、Cloudflare用Compose設定検証、webイメージの再ビルド、`up -d --build --wait`が成功した。コンテナ内`check --deploy`は警告なし、`migrate --check`は未適用migrationなし、`db`、`web`、`proxy`はhealthy、`tunnel`は稼働中、webのUIDは10001、VM200の作業ツリーは空だった。DB migrationの追加はない。iPhoneではホーム画面への追加と閲覧を確認し、ホーム画面から開いたAcervo内の「QRコードを読み取る」で、DBに登録していない同一サイトのUUIDv4形式テストQRを読み取ると404画面へ遷移した。これはテストQRの未登録による期待結果であり、本番データは変更していない。Android端末は手元になく、ホーム画面追加とHTTPS上のカメラ読取は未実施である。Phase 8は未完了とし、7C-LIVE-A、7C-LIVE-B、Phase 1全体も未完了のままとする。
 
 ## 2026-10-03 Phase 4 スマホ標本登録のローカル実装
 
