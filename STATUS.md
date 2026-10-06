@@ -10,7 +10,7 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 管理者MFAゲート配下の`/management/qr-batches/`で、1〜100枚の未使用QRを一括発行し、発行履歴と20mm角・1ページ1枚の印刷用PDFを取得できるようにした。無効化済みQRはPDFから除外する。入力確認、発行と監査記録の同一トランザクション、PDF生成成功後だけの印刷回数・監査記録更新を実装した。QRのUUID、標本番号、割当状態、認証方式は変更していない。変更ファイルは`audit/models.py`、`audit/migrations/0005_qr_batch_actions.py`、`management_portal/views.py`、`management_portal/urls.py`、`management_portal/templates/management_portal/index.html`、`management_portal/templates/management_portal/qr_batch_list.html`、`management_portal/tests/test_qr_batches.py`である。監査操作の選択肢追加以外にDB構造変更はない。
 
-ローカルSQLiteではQR管理画面の8テストと全358テストが成功（PostgreSQL専用4件skip）。通常発行、権限不足、MFA未完了、入力不正、監査失敗時のロールバック、PDF生成失敗時の印刷記録なし、無効QRの除外を確認した。PWA用Node.jsの2テスト、Ruff lint・format、Django check、migration差分なし、`git diff --check`も成功した。PostgreSQL上のテスト、GitHub Actions、本番Compose反映、実印刷・実QRによる登録は未実施。Phase 9の残りであるQR無効化、保管場所・設定、標本無効化・完全削除なども未実装であり、Phase 9全体は未完了とする。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+ローカルSQLiteではQR管理画面の8テストと全358テストが成功（PostgreSQL専用4件skip）。通常発行、権限不足、MFA未完了、入力不正、監査失敗時のロールバック、PDF生成失敗時の印刷記録なし、無効QRの除外を確認した。PWA用Node.jsの2テスト、Ruff lint・format、Django check、migration差分なし、`git diff --check`も成功した。コミット`1bb2110`のGitHub Actions run 37487839855では、PostgreSQL上の`test`と直接HTTPS・Tunnel構成、バックアップ・空環境復元を含む`production-container`が全成功した。VM200本番Compose反映、実印刷・実QRによる登録は未実施。Phase 9の残りであるQR無効化、保管場所・設定、標本無効化・完全削除なども未実装であり、Phase 9全体は未完了とする。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
 
 ## 2026-10-06 Phase 8 PWAのローカル実装
 
