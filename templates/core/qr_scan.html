@@ -6,9 +6,10 @@
 {% block content %}
   <section class="container py-4" style="max-width: 42rem;">
     <h1 class="h3">QRコードを読み取る</h1>
-    <p class="text-secondary">カメラの使用を許可し、AcervoのQRラベルを枠内に入れてください。</p>
+    <p class="text-secondary">最初は画面側のカメラを使います。必要なら背面カメラへ切り替え、AcervoのQRラベルを枠内に入れてください。</p>
     <div class="d-flex flex-wrap gap-2 mb-3">
       <button id="start-scan" class="btn btn-dark" type="button">カメラを起動</button>
+      <button id="switch-camera" class="btn btn-outline-dark" type="button" disabled>カメラを切り替え</button>
       <button id="stop-scan" class="btn btn-outline-secondary" type="button" disabled>停止</button>
     </div>
     <video id="scan-video" class="w-100 rounded border bg-dark" autoplay muted playsinline hidden aria-label="QRコードのカメラ映像"></video>

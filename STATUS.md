@@ -6,6 +6,10 @@
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。Phase 9はQRラベル一括発行・PDF取得の管理画面をローカル実装・検証中で、全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
+## 2026-10-07 PWA読取カメラの操作改善（ローカル作業）
+
+運用者の要望により、QR読取開始時は画面側カメラを優先し、読取中に前面・背面を切り替えるボタンを追加した。切替前に既存カメラを解放し、切替失敗時は元の向きで再起動する。停止・画面離脱・非表示・遅れて届いたカメラ許可の際にも映像を解放する。Service Workerの静的資産キャッシュ版を更新し、既存PWAに新しい読取JSを取得させる。変更ファイルは`static/js/qr-scan.js`、`static/js/service-worker.js`、`templates/core/qr_scan.html`、`core/tests/pwa_js_test.cjs`、`core/tests/test_views.py`、`README.md`である。DB migrationはない。ローカルJSの3テストでは前面優先、両方向切替、切替失敗時の復旧、停止・遅延許可時の解放を確認した。ローカルSQLiteの全358テストは成功（PostgreSQL専用4件skip）、Ruff lint・format、Django check、migration差分なし、`git diff --check`も成功した。GitHub Actions、VM200反映、iPhone実機での前面・背面切替の再受入は未実施。Android実機受入はMVP完成後へ延期したままとする。
+
 ## 2026-10-07 Phase 9 QRラベル管理画面の最初の実装
 
 管理者MFAゲート配下の`/management/qr-batches/`で、1〜100枚の未使用QRを一括発行し、発行履歴と20mm角・1ページ1枚の印刷用PDFを取得できるようにした。無効化済みQRはPDFから除外する。入力確認、発行と監査記録の同一トランザクション、PDF生成成功後だけの印刷回数・監査記録更新を実装した。QRのUUID、標本番号、割当状態、認証方式は変更していない。変更ファイルは`audit/models.py`、`audit/migrations/0005_qr_batch_actions.py`、`management_portal/views.py`、`management_portal/urls.py`、`management_portal/templates/management_portal/index.html`、`management_portal/templates/management_portal/qr_batch_list.html`、`management_portal/tests/test_qr_batches.py`である。監査操作の選択肢追加以外にDB構造変更はない。

@@ -4,6 +4,7 @@
   const startButton = document.getElementById("start-scan");
   if (!startButton) return;
   const stopButton = document.getElementById("stop-scan");
+  const switchButton = document.getElementById("switch-camera");
   const video = document.getElementById("scan-video");
   const canvas = document.getElementById("scan-canvas");
   const imageInput = document.getElementById("scan-image");
@@ -13,16 +14,71 @@
   let stream = null;
   let frame = null;
   let lastScan = 0;
+  let requestId = 0;
+  let currentFacing = "user";
 
-  function stopCamera() {
+  function releaseCamera() {
     if (frame !== null) cancelAnimationFrame(frame);
     frame = null;
     if (stream) stream.getTracks().forEach((track) => track.stop());
     stream = null;
     video.srcObject = null;
     video.hidden = true;
+  }
+
+  function stopCamera() {
+    requestId += 1;
+    releaseCamera();
+    currentFacing = "user";
     startButton.disabled = false;
     stopButton.disabled = true;
+    switchButton.disabled = true;
+    switchButton.textContent = "カメラを切り替え";
+  }
+
+  async function openCamera(facing, exact = false) {
+    const thisRequest = ++requestId;
+    // 同時に二つのカメラを開けない端末があるため、先に現在の映像を解放する。
+    releaseCamera();
+    startButton.disabled = true;
+    stopButton.disabled = false;
+    switchButton.disabled = true;
+    status.textContent = "カメラを起動しています。";
+    try {
+      const nextStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { [exact ? "exact" : "ideal"]: facing } }, audio: false,
+      });
+      if (thisRequest !== requestId || document.hidden) {
+        nextStream.getTracks().forEach((track) => track.stop());
+        if (thisRequest === requestId) stopCamera();
+        return "cancelled";
+      }
+      stream = nextStream;
+      video.srcObject = stream;
+      video.hidden = false;
+      await video.play();
+      if (thisRequest !== requestId) {
+        nextStream.getTracks().forEach((track) => track.stop());
+        return "cancelled";
+      }
+      if (document.hidden) {
+        stopCamera();
+        return "cancelled";
+      }
+      const actualFacing = stream.getVideoTracks()[0]?.getSettings?.().facingMode;
+      currentFacing = actualFacing === "user" || actualFacing === "environment" ? actualFacing : facing;
+      switchButton.textContent = currentFacing === "user"
+        ? "背面カメラに切り替え" : "画面側のカメラに切り替え";
+      stopButton.disabled = false;
+      switchButton.disabled = false;
+      status.textContent = "QRラベルをカメラに向けてください。";
+      frame = requestAnimationFrame(scanFrame);
+      return "started";
+    } catch {
+      if (thisRequest !== requestId) return "cancelled";
+      stopCamera();
+      return "failed";
+    }
   }
 
   function acceptedPath(value) {
@@ -90,25 +146,21 @@
       status.textContent = "この環境ではカメラを利用できません。HTTPSで開くか、QRの写真を選択してください。";
       return;
     }
-    startButton.disabled = true;
-    status.textContent = "カメラを起動しています。";
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } }, audio: false,
-      });
-      if (document.hidden) {
-        stopCamera();
-        return;
-      }
-      video.srcObject = stream;
-      video.hidden = false;
-      await video.play();
-      stopButton.disabled = false;
-      status.textContent = "QRラベルをカメラに向けてください。";
-      frame = requestAnimationFrame(scanFrame);
-    } catch {
-      stopCamera();
+    if (await openCamera("user") === "failed") {
       status.textContent = "カメラを起動できませんでした。権限を確認するか、QRの写真を選択してください。";
+    }
+  });
+
+  switchButton.addEventListener("click", async () => {
+    if (!stream) return;
+    const previousFacing = currentFacing;
+    const nextFacing = previousFacing === "user" ? "environment" : "user";
+    if (await openCamera(nextFacing, true) === "failed") {
+      if (await openCamera(previousFacing) === "started") {
+        status.textContent = "カメラを切り替えられませんでした。元のカメラで続けます。";
+      } else {
+        status.textContent = "カメラを起動できませんでした。権限を確認してください。";
+      }
     }
   });
 
@@ -143,7 +195,7 @@
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && stream) stopCamera();
+    if (document.hidden) stopCamera();
   });
   window.addEventListener("pagehide", stopCamera);
 })();

@@ -54,7 +54,9 @@ class HomeViewTests(TestCase):
         self.user.cohort_number = 33
         self.user.save(update_fields=["cohort_number"])
         self.client.force_login(self.user)
-        self.assertContains(self.client.get(url), "カメラを起動")
+        response = self.client.get(url)
+        self.assertContains(response, "カメラを起動")
+        self.assertContains(response, 'id="switch-camera"')
         self.user.cohort_number = 30
         self.user.save(update_fields=["cohort_number"])
         self.assertEqual(self.client.get(url).status_code, 404)
