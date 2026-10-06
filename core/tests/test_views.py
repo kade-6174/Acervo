@@ -57,6 +57,12 @@ class HomeViewTests(TestCase):
         response = self.client.get(url)
         self.assertContains(response, "カメラを起動")
         self.assertContains(response, 'id="switch-camera"')
+        self.assertContains(response, "カメラが使えない場合はQRの写真を選択")
+        self.assertContains(
+            response,
+            '<input class="form-control" type="file" id="scan-image" accept="image/*">',
+            html=True,
+        )
         self.user.cohort_number = 30
         self.user.save(update_fields=["cohort_number"])
         self.assertEqual(self.client.get(url).status_code, 404)

@@ -4,7 +4,11 @@
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。追加のカメラ切替機能はVM200へ反映し、iPhoneでの動作確認を完了した。写真選択欄に`capture="environment"`があるため、iPhoneでは写真を選ぶ代わりに撮影画面が開くことを確認した。案内文との不整合は未修正。Phase 9のQRラベル一括発行・PDF取得はローカル・CI・VM200本番Compose反映まで完了したが、Phase 9全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。追加のカメラ切替機能はVM200へ反映し、iPhoneでの動作確認を完了した。iPhoneで撮影画面が開く写真選択欄の不整合はローカルで修正・検証済みで、CI・本番反映・iPhone再確認は未実施。Phase 9のQRラベル一括発行・PDF取得はローカル・CI・VM200本番Compose反映まで完了したが、Phase 9全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+
+## 2026-10-07 QR写真選択の案内と動作の整合
+
+`templates/core/qr_scan.html`の写真ファイル入力から`capture="environment"`を外し、端末の保存済み画像を選択できる入力にした。`core/tests/test_views.py`に、写真選択の案内と画像ファイル入力の属性を確かめる回帰テストを追加した。カメラ読取・前面背面切替のJavaScriptとDB schemaは変更していない。ローカルSQLiteの全358テストは成功（PostgreSQL専用4件skip）。PWA用Node.jsの3テスト、Ruff lint・format、Django check、migration差分なし、`git diff --check`も成功した。最初に既定Pythonで試したDjango・Ruffの確認は依存未導入で実行できなかったため、既存`.venv`で再実行して成功した。GitHub Actions、VM200反映、iPhoneでの保存済み写真選択は未確認。Android実機受入はMVP完成後へ延期したまま。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了とする。
 
 ## 2026-10-07 PWA読取カメラの操作改善
 
