@@ -101,7 +101,11 @@ def request(path, headers=None):
     return response, body
 
 
-for path in ("/health/", "/static/css/acervo.css", "/accounts/login/"):
+for path in (
+    "/health/", "/static/css/acervo.css", "/accounts/login/",
+    "/manifest.webmanifest", "/service-worker.js", "/static/pwa/icon-192.png",
+    "/static/pwa/offline.html", "/static/vendor/jsqr/jsQR.js",
+):
     response, _ = request(path)
     assert response.status == 200, (path, response.status)
 
@@ -123,7 +127,11 @@ import urllib.request
 
 base_url = "http://proxy:8080"
 headers = {"Host": "acervo.localhost"}
-for path in ("/health/", "/static/css/acervo.css", "/accounts/login/"):
+for path in (
+    "/health/", "/static/css/acervo.css", "/accounts/login/",
+    "/manifest.webmanifest", "/service-worker.js", "/static/pwa/icon-192.png",
+    "/static/pwa/offline.html", "/static/vendor/jsqr/jsQR.js",
+):
     request = urllib.request.Request(f"{base_url}{path}", headers=headers)
     with urllib.request.urlopen(request, timeout=10) as response:
         assert response.status == 200, (path, response.status)
