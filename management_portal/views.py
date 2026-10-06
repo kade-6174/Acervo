@@ -10,9 +10,10 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
+from django.db.models import F
 from django.http import Http404, HttpResponse, HttpResponseRedirect
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
@@ -29,7 +30,8 @@ from accounts.user_administration import (
     update_user_administration_by_admin,
 )
 from audit.models import AuditLog
-from specimens.models import Specimen
+from specimens.models import QRBatch, QRLabel, Specimen
+from specimens.services import build_qr_labels_pdf, create_qr_batch
 
 from .admin_warnings import get_administrator_warnings
 
@@ -88,6 +90,18 @@ class UserCreationForm(forms.Form):
         )
         self.fields["cohort_number"].widget.attrs["class"] = "form-control"
         self.fields["role"].widget.attrs["class"] = "form-select"
+        self.fields["confirmed"].widget.attrs["class"] = "form-check-input"
+
+
+class QRBatchCreationForm(forms.Form):
+    requested_count = forms.IntegerField(label="発行枚数", min_value=1, max_value=100)
+    note = forms.CharField(label="備考", max_length=500, required=False)
+    confirmed = forms.BooleanField(label="発行内容を確認した", required=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["requested_count"].widget.attrs["class"] = "form-control"
+        self.fields["note"].widget = forms.Textarea(attrs={"class": "form-control", "rows": 2})
         self.fields["confirmed"].widget.attrs["class"] = "form-check-input"
 
 
@@ -232,6 +246,71 @@ def audit_log_list(request):
 
     audit_logs = AuditLog.objects.select_related("actor", "target").all()[:100]
     return render(request, "management_portal/audit_log_list.html", {"audit_logs": audit_logs})
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def qr_batch_list(request):
+    """管理者が未使用QRを発行し、過去の発行単位を確認する。"""
+
+    form = QRBatchCreationForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            result = create_qr_batch(
+                requested_count=form.cleaned_data["requested_count"],
+                note=form.cleaned_data["note"],
+                created_by=request.user,
+            )
+            AuditLog.objects.create(
+                action=AuditLog.Action.QR_BATCH_CREATED,
+                channel=AuditLog.Channel.MANAGEMENT_UI,
+                actor=request.user,
+                actor_username=request.user.username,
+                target=None,
+                target_username="",
+            )
+        messages.success(request, f"QRラベルを{len(result.label_ids)}枚発行しました。")
+        return redirect("management:qr_batch_list")
+    batches = QRBatch.objects.select_related("created_by").all()[:50]
+    return render(
+        request,
+        "management_portal/qr_batch_list.html",
+        {"form": form, "batches": batches},
+    )
+
+
+@never_cache
+@require_GET
+def qr_batch_pdf(request, batch_id):
+    """無効化されていないQRだけを20mmラベルPDFへ出力する。"""
+
+    batch = get_object_or_404(QRBatch, pk=batch_id)
+    with transaction.atomic():
+        labels = list(
+            QRLabel.objects.select_for_update()
+            .filter(batch=batch)
+            .exclude(status=QRLabel.Status.RETIRED)
+            .order_by("pk")
+        )
+        if not labels:
+            raise Http404
+        pdf = build_qr_labels_pdf(labels=labels, size_mm=20)
+        QRLabel.objects.filter(pk__in=[label.pk for label in labels]).update(
+            print_count=F("print_count") + 1,
+            last_printed_at=timezone.now(),
+        )
+        AuditLog.objects.create(
+            action=AuditLog.Action.QR_BATCH_PDF_EXPORTED,
+            channel=AuditLog.Channel.MANAGEMENT_UI,
+            actor=request.user,
+            actor_username=request.user.username,
+            target=None,
+            target_username="",
+        )
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="qr-batch-{batch.pk}.pdf"'
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @never_cache

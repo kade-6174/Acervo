@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}QRラベル発行 — Acervo{% endblock %}
+
+{% block content %}
+  <section class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-9">
+        <p class="text-uppercase text-secondary fw-semibold mb-2">Management</p>
+        <h1 class="h2 mb-3">QRラベル発行</h1>
+        <p class="text-secondary">未使用のQRラベルを発行します。標本番号は登録を確定するまで採番されません。PDFは20mm角、1ページに1枚です。無効化したQRはPDFへ含めません。</p>
+        {% include "management_portal/_messages.html" %}
+        <form method="post" class="border rounded bg-white p-4 mb-4">
+          {% csrf_token %}
+          {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.requested_count.id_for_label }}">{{ form.requested_count.label }}</label>
+            {{ form.requested_count }}
+            <p class="form-text">1回につき1〜100枚まで発行できます。</p>
+            {% if form.requested_count.errors %}<div class="text-danger" role="alert">{{ form.requested_count.errors }}</div>{% endif %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+            {{ form.note }}
+            {% if form.note.errors %}<div class="text-danger" role="alert">{{ form.note.errors }}</div>{% endif %}
+          </div>
+          <div class="form-check mb-3">
+            {{ form.confirmed }}
+            <label class="form-check-label" for="{{ form.confirmed.id_for_label }}">{{ form.confirmed.label }}</label>
+            {% if form.confirmed.errors %}<div class="text-danger" role="alert">{{ form.confirmed.errors }}</div>{% endif %}
+          </div>
+          <button class="btn btn-dark" type="submit">QRラベルを発行</button>
+        </form>
+        <h2 class="h4">発行履歴</h2>
+        <div class="table-responsive border rounded bg-white">
+          <table class="table align-middle mb-0">
+            <thead><tr><th scope="col">発行日時</th><th scope="col">枚数</th><th scope="col">発行者</th><th scope="col">備考</th><th scope="col">印刷</th></tr></thead>
+            <tbody>
+              {% for batch in batches %}
+                <tr>
+                  <td>{{ batch.created_at|date:"Y-m-d H:i" }}</td>
+                  <td>{{ batch.requested_count }}</td>
+                  <td>{{ batch.created_by.username }}</td>
+                  <td>{{ batch.note|default:"—" }}</td>
+                  <td><a class="btn btn-outline-dark btn-sm" href="{% url 'management:qr_batch_pdf' batch_id=batch.pk %}">PDFを取得</a></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-secondary">まだ発行していません。</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-4 mb-0"><a class="btn btn-outline-secondary" href="{% url 'management:index' %}">管理トップへ戻る</a></p>
+      </div>
+    </div>
+  </section>
+{% endblock %}
