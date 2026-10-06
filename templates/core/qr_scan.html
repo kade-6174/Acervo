@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}QRコードを読み取る | {{ acervo_site_name }}{% endblock %}
+
+{% block content %}
+  <section class="container py-4" style="max-width: 42rem;">
+    <h1 class="h3">QRコードを読み取る</h1>
+    <p class="text-secondary">カメラの使用を許可し、AcervoのQRラベルを枠内に入れてください。</p>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <button id="start-scan" class="btn btn-dark" type="button">カメラを起動</button>
+      <button id="stop-scan" class="btn btn-outline-secondary" type="button" disabled>停止</button>
+    </div>
+    <video id="scan-video" class="w-100 rounded border bg-dark" autoplay muted playsinline hidden aria-label="QRコードのカメラ映像"></video>
+    <canvas id="scan-canvas" hidden></canvas>
+    <p id="scan-status" role="status" aria-live="polite">カメラを起動してください。</p>
+    <div class="border-top pt-3 mt-4">
+      <label class="form-label" for="scan-image">カメラが使えない場合はQRの写真を選択</label>
+      <input class="form-control" type="file" id="scan-image" accept="image/*" capture="environment">
+      <p class="form-text">端末の標準カメラでもQRを読み取れます。読み取り後は同じログイン・権限判定を通ります。</p>
+    </div>
+  </section>
+{% endblock %}
+
+{% block extra_body %}
+  <script src="{% static 'vendor/jsqr/jsQR.js' %}"></script>
+  <script src="{% static 'js/qr-scan.js' %}"></script>
+{% endblock %}

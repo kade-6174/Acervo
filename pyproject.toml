@@ -15,6 +15,7 @@ license-files = [
     "THIRD_PARTY_NOTICES.md",
     "static/vendor/bootstrap/LICENSE",
     "static/vendor/htmx/LICENSE",
+    "static/vendor/jsqr/LICENSE",
 ]
 authors = [{ name = "kade_6174" }]
 dependencies = [

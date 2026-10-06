@@ -16,6 +16,7 @@
 |---|---:|---|---|---|
 | Bootstrap | 5.3.8 | MIT | [twbs/bootstrap v5.3.8](https://github.com/twbs/bootstrap/releases/tag/v5.3.8) | [static/vendor/bootstrap/LICENSE](static/vendor/bootstrap/LICENSE) |
 | htmx | 2.0.10 | 0BSD | [bigskysoftware/htmx v2.0.10](https://github.com/bigskysoftware/htmx/releases/tag/v2.0.10) | [static/vendor/htmx/LICENSE](static/vendor/htmx/LICENSE) |
+| jsQR | 1.4.0 | Apache-2.0 | [cozmo/jsQR](https://github.com/cozmo/jsQR) | [static/vendor/jsqr/LICENSE](static/vendor/jsqr/LICENSE) |
 
 上記のライセンスファイルは変更・削除しません。
 

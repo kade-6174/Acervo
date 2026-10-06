@@ -5,7 +5,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="標本・収蔵品・アーカイブを管理するAcervo">
+    <meta name="theme-color" content="#212529">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>{% block title %}{{ acervo_site_name }}{% endblock %}</title>
+    <link rel="manifest" href="{% url 'core:manifest' %}">
+    <link rel="icon" type="image/png" href="{% static 'pwa/icon-192.png' %}">
+    <link rel="apple-touch-icon" href="{% static 'pwa/icon-192.png' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/acervo.css' %}">
     <script src="{% static 'vendor/htmx/htmx.min.js' %}" defer></script>
@@ -31,6 +37,7 @@
     </header>
     <main>{% block content %}{% endblock %}</main>
     <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/pwa-register.js' %}" defer></script>
     {% block extra_body %}{% endblock %}
   </body>
 </html>

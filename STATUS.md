@@ -4,7 +4,15 @@
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7を完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7を完了。Phase 8はローカル実装・検証済みで、GitHub Actions、本番反映、iPhone/Android実機受入は未実施。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+
+## 2026-10-06 Phase 8 PWAのローカル実装
+
+Manifest、192px・512pxの自己配信アイコン、standalone表示、Service Worker、オフライン案内を追加した。Service Workerは固定した静的資産と案内HTMLだけを保存し、標本詳細・写真・検索・CSV・API・管理画面や利用者情報を保存しない。オンライン画面の通信が失敗した場合に案内だけを返し、オフライン登録や後同期は提供しない。利用者ホームの主導線をQR読取とし、現在在籍のmemberまたはadminだけにアプリ内読取画面を許可する。
+
+カメラ映像または選択した写真からQRを端末内で読み取る。固定版`jsQR 1.4.0`をApache-2.0ライセンスとともに自己配信する。公式npm配布物のSHA-512整合性を確認し、同梱JSのSHA-256は`bc40c8a15196236b2314db0856f72ca0b49980cd5413b8c852a7349f5fee0859`。読み取った文字列は現在のサイトと同じオリジンの`/q/<uuidv4>/`形式だけに制限する。QR到達後も既存のサーバー側ログイン・在籍・role判定を通す。端末カメラが使えない場合は写真選択または標準カメラから同じURLへ進める。
+
+変更ファイルは`core/views.py`、`core/urls.py`、`core/tests/test_views.py`、`core/tests/pwa_js_test.cjs`、`templates/base.html`、`templates/core/home.html`、`templates/core/qr_scan.html`、`static/js/pwa-register.js`、`static/js/service-worker.js`、`static/js/qr-scan.js`、`static/pwa/`、`static/vendor/jsqr/`、`scripts/generate_pwa_icons.py`、`.github/workflows/ci.yml`、`pyproject.toml`、`THIRD_PARTY_NOTICES.md`、`README.md`である。DB migrationはない。ローカルSQLiteでは全350テスト成功（PostgreSQL専用4件skip）、Node.jsのPWA用2テスト成功、Ruff lint・format、Django check、migration差分確認、`git diff --check`が成功した。Node.jsテストでは静的資産以外をService Workerが保存しないこと、同一サイトのUUIDv4以外のQRを拒否することを検証した。iPhone/Androidのホーム画面追加、HTTPSカメラ許可、QR実読取は端末が必要なため未確認。GitHub ActionsとVM200反映も未実施。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
 
 ## 2026-10-03 Phase 4 スマホ標本登録のローカル実装
 
