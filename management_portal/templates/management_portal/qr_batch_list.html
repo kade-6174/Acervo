@@ -29,7 +29,7 @@
             <label class="form-check-label" for="{{ form.confirmed.id_for_label }}">{{ form.confirmed.label }}</label>
             {% if form.confirmed.errors %}<div class="text-danger" role="alert">{{ form.confirmed.errors }}</div>{% endif %}
           </div>
-          <button class="btn btn-dark" type="submit">QRラベルを発行</button>
+          <button id="qr-batch-submit" class="btn btn-dark" type="submit" disabled>QRラベルを発行</button>
         </form>
         <h2 class="h4">発行履歴</h2>
         <div class="table-responsive border rounded bg-white">
@@ -54,4 +54,15 @@
       </div>
     </div>
   </section>
+  <script>
+    const confirmedCheckbox = document.getElementById("{{ form.confirmed.id_for_label }}");
+    const submitButton = document.getElementById("qr-batch-submit");
+
+    const updateSubmitButton = () => {
+      submitButton.disabled = !confirmedCheckbox.checked;
+    };
+
+    confirmedCheckbox.addEventListener("change", updateSubmitButton);
+    updateSubmitButton();
+  </script>
 {% endblock %}

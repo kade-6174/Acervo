@@ -101,6 +101,22 @@ class QRBatchManagementTests(TestCase):
         self.assertFalse(QRBatch.objects.exists())
         self.assertFalse(AuditLog.objects.exists())
 
+    def test_issue_button_starts_disabled_until_confirmation_is_checked(self):
+        self.login_admin()
+
+        response = self.client.get(self.list_url)
+
+        self.assertContains(
+            response,
+            '<button id="qr-batch-submit" class="btn btn-dark" type="submit" disabled>',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            "submitButton.disabled = !confirmedCheckbox.checked;",
+            html=False,
+        )
+
     def test_audit_failure_rolls_back_issue(self):
         self.login_admin()
         with patch("management_portal.views.AuditLog.objects.create", side_effect=IntegrityError):
