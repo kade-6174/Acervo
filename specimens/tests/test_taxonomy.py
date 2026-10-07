@@ -2,10 +2,12 @@ from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
+from specimens.forms import SpecimenRegistrationForm, TaxonManualForm
 from specimens.management.commands.import_japanese_butterfly_taxa import _fetch, _SpeciesListParser
-from specimens.models import Taxon, TaxonSource
+from specimens.models import Taxon, TaxonDataset, TaxonDatasetRecord, TaxonSource
 from specimens.services import (
     TaxonCandidate,
     adopt_external_taxon_candidate,
@@ -70,9 +72,16 @@ class TaxonomyViewsTests(TestCase):
             response = self.client.get(reverse("specimens:taxon_search"), {"query": "候補なし"})
 
         self.assertContains(response, "手入力で登録")
+        family = Taxon.objects.create(scientific_name="Papilionidae", rank="family")
+        genus = Taxon.objects.create(scientific_name="Papilio", rank="genus", parent=family)
         response = self.client.post(
             reverse("specimens:taxon_manual_create"),
-            {"scientific_name": "Papilio xuthus", "japanese_name": "アゲハ", "rank": "species"},
+            {
+                "scientific_name": "Papilio xuthus",
+                "japanese_name": "アゲハ",
+                "rank": "species",
+                "parent": genus.pk,
+            },
         )
         taxon = Taxon.objects.get(scientific_name="Papilio xuthus")
         self.assertRedirects(response, f"{reverse('specimens:taxon_search')}?created={taxon.pk}")
@@ -99,6 +108,127 @@ class TaxonomyViewsTests(TestCase):
         taxon = Taxon.objects.get(scientific_name="Papilio xuthus")
         self.assertRedirects(response, f"{reverse('specimens:taxon_search')}?created={taxon.pk}")
         self.assertEqual(TaxonSource.objects.get().citation, "GBIF Backbone Taxonomy")
+
+
+class ButterflyHierarchyFormTests(TestCase):
+    def setUp(self):
+        dataset = TaxonDataset.objects.create(
+            slug="japanese-butterflies-binran-2010-2013",
+            title="日本産蝶類和名学名便覧",
+            version="2010–2013",
+            license_name="CC BY 3.0",
+            source_url="https://example.invalid/butterflies",
+            retrieved_on=timezone.localdate(),
+            attribution="テスト用の出典表記",
+        )
+        self.family_taxon = Taxon.objects.create(
+            scientific_name="Papilionidae", japanese_name="アゲハチョウ科", rank="family"
+        )
+        self.genus_taxon = Taxon.objects.create(
+            scientific_name="Papilio", rank="genus", parent=self.family_taxon
+        )
+        self.species_taxon = Taxon.objects.create(
+            scientific_name="Papilio xuthus",
+            japanese_name="アゲハ",
+            rank="species",
+            parent=self.genus_taxon,
+        )
+        self.family = TaxonDatasetRecord.objects.create(
+            dataset=dataset,
+            source_key="family-Papilionidae",
+            rank=TaxonDatasetRecord.Rank.FAMILY,
+            scientific_name="Papilionidae",
+            japanese_name="アゲハチョウ科",
+            taxon=self.family_taxon,
+        )
+        self.genus = TaxonDatasetRecord.objects.create(
+            dataset=dataset,
+            source_key="genus-Papilionidae-Papilio",
+            parent=self.family,
+            rank=TaxonDatasetRecord.Rank.GENUS,
+            scientific_name="Papilio",
+            taxon=self.genus_taxon,
+        )
+        self.species = TaxonDatasetRecord.objects.create(
+            dataset=dataset,
+            source_key="species-100",
+            parent=self.genus,
+            rank=TaxonDatasetRecord.Rank.SPECIES,
+            scientific_name="Papilio xuthus",
+            japanese_name="アゲハ",
+            taxon=self.species_taxon,
+        )
+
+    def test_registration_uses_the_deepest_selected_japanese_butterfly_taxon(self):
+        form = SpecimenRegistrationForm(
+            {
+                "butterfly_family": self.family.pk,
+                "butterfly_genus": self.genus.pk,
+                "butterfly_species": self.species.pk,
+                "acquisition_method": "other",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["taxon"], self.species_taxon)
+        self.assertNotIn("butterfly_species", form.cleaned_data)
+        family_labels = [str(label) for _, label in form.fields["butterfly_family"].choices]
+        self.assertIn("アゲハチョウ科（Papilionidae）", family_labels)
+
+    def test_registration_rejects_a_species_outside_the_selected_genus(self):
+        other_genus_taxon = Taxon.objects.create(
+            scientific_name="Graphium", rank="genus", parent=self.family_taxon
+        )
+        other_genus = TaxonDatasetRecord.objects.create(
+            dataset=self.family.dataset,
+            source_key="genus-Papilionidae-Graphium",
+            parent=self.family,
+            rank=TaxonDatasetRecord.Rank.GENUS,
+            scientific_name="Graphium",
+            taxon=other_genus_taxon,
+        )
+        form = SpecimenRegistrationForm(
+            {
+                "butterfly_family": self.family.pk,
+                "butterfly_genus": other_genus.pk,
+                "butterfly_species": self.species.pk,
+                "acquisition_method": "other",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("butterfly_species", form.errors)
+
+    def test_manual_form_uses_japanese_rank_labels_and_validates_the_parent_rank(self):
+        form = TaxonManualForm(
+            {
+                "scientific_name": "Papilio bianor",
+                "japanese_name": "カラスアゲハ",
+                "rank": "species",
+                "parent": self.genus_taxon.pk,
+            }
+        )
+
+        self.assertEqual(form.fields["rank"].choices[1], ("family", "科"))
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.save().rank, "species")
+
+        invalid = TaxonManualForm(
+            {
+                "scientific_name": "Papilio maackii",
+                "japanese_name": "ミヤマカラスアゲハ",
+                "rank": "species",
+                "parent": self.family_taxon.pk,
+            }
+        )
+        self.assertFalse(invalid.is_valid())
+        self.assertIn("parent", invalid.errors)
+
+    def test_manual_form_marks_parent_candidates_with_their_rank(self):
+        html = TaxonManualForm().as_p()
+
+        self.assertIn('data-taxon-rank="family"', html)
+        self.assertIn("data-manual-taxon-rank", html)
 
 
 class JapaneseButterflyParserTests(TestCase):

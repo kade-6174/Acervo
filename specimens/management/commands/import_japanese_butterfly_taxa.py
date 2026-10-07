@@ -20,6 +20,13 @@ ATTRIBUTION = (
     "『日本産蝶類和名学名便覧』。CC BY 3.0。Wayback Machine 2021-05-05保存版を"
     "Acervo用に分類階層・データ形式を整形して利用。"
 )
+FAMILY_JAPANESE_NAMES = {
+    "Hesperiidae": "セセリチョウ科",
+    "Lycaenidae": "シジミチョウ科",
+    "Nymphalidae": "タテハチョウ科",
+    "Papilionidae": "アゲハチョウ科",
+    "Pieridae": "シロチョウ科",
+}
 
 
 @dataclass(frozen=True)
@@ -174,15 +181,21 @@ class Command(BaseCommand):
                 },
             )
             for family_name, family_url, entries in parsed:
+                family_japanese_name = FAMILY_JAPANESE_NAMES.get(family_name, "")
                 family_taxon, _ = Taxon.objects.get_or_create(
-                    scientific_name=family_name, defaults={"rank": "family"}
+                    scientific_name=family_name,
+                    defaults={"japanese_name": family_japanese_name, "rank": "family"},
                 )
+                if family_japanese_name and not family_taxon.japanese_name:
+                    family_taxon.japanese_name = family_japanese_name
+                    family_taxon.save(update_fields=["japanese_name"])
                 family_record, _ = TaxonDatasetRecord.objects.update_or_create(
                     dataset=dataset,
                     source_key=f"family-{family_name}",
                     defaults={
                         "rank": TaxonDatasetRecord.Rank.FAMILY,
                         "scientific_name": family_name,
+                        "japanese_name": family_japanese_name,
                         "source_url": family_url,
                         "taxon": family_taxon,
                     },
