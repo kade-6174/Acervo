@@ -14,6 +14,8 @@ Phase 9の管理画面に、保管場所の名称・備考・上位場所の編�
 
 ローカルの保管場所管理10テストとSQLiteの全376テストが成功（PostgreSQL専用4件skip）。権限・MFA不足、階層の循環、同階層の重複、存在しない上位場所、削除時の対象名不一致、参照中の場所の保護、監査記録失敗時の巻き戻しを確認した。Ruff lint・format、Django check、migration差分なし、`git diff --check`も成功した。PostgreSQL上のテスト、GitHub Actions、本番Composeへの反映、実ブラウザ受入はこの記録時点では未実施である。標本無効化・完全削除は未実装。現行モデルでは標本履歴・QR割当・写真が標本をPROTECT参照しており、完全削除には履歴と写真の保全・削除境界、QR tokenの無効化と番号不再利用の設計決定が必要である。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了とする。
 
+実装コミット`3feeb63`をGitHubへpushした。GitHub Actions run `37648327103`はPostgreSQL上の`test`と、本番Composeの直接HTTPS・Tunnel構成、暗号化バックアップと空環境復元を含む`production-container`がともに成功した。VM200の更新前HEADは`928c3f2`で作業ツリーに変更なし。PostgreSQL 18の暗号化バックアップ`acervo-20261007T160344Z-7a7ea946a1e8`を終了コード0で作成し、保持規則により旧バックアップ`acervo-20261007T153928Z-9c8cd76d7581`を1件削除した。`3feeb63`へfast-forward後、Cloudflare用Compose設定検証、webイメージの再ビルドと`up -d --build --wait`は成功した。起動結果はguest agentのPID `918313`を`qm guest exec-status`で追跡し、`exited=1`、`exitcode=0`、`db`・`web`・`proxy`のhealthyを確認した。コンテナ内`check --deploy`は問題0件、`migrate --check`は終了コード0。`docker compose ps`では`db`・`web`・`proxy`がhealthy、`tunnel`が稼働中だった。webの実行UIDは`10001`、VM200の作業ツリーは清潔でHEADは`3feeb63`。実ブラウザでの編集・削除・導入先設定の受入と、更新後のDB・写真ボリューム再起動永続化は未確認。文書だけの本追記はVM200への再反映不要。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+
 ## 2026-10-08 保管場所の管理画面
 
 Phase 9の保管場所管理の最初の範囲として、管理者が`/management/storage-locations/`で場所を一覧表示・追加できる画面を実装した。既存の保管場所を上位場所に指定でき、追加した場所は標本登録・編集の選択肢へ入る。利用者に表示する名称・備考は導入先で入力し、コードへ固定しない。管理ポータルの中央MFAゲートを通し、作成と「保管場所作成」の監査記録を同一トランザクションで保存する。`audit.0007_alter_auditlog_action`は監査操作種別だけを追加し、保管場所のDB構造は変更しない。
