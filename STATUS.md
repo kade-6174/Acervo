@@ -6,6 +6,12 @@
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。追加のカメラ切替機能はVM200へ反映し、iPhoneでの動作確認を完了した。写真選択欄はiPhoneで保存済み写真を選べるようになり、選択したスクリーンショットからQRを検出した。これは別の場所で作ったテストQRのため本番サイトのQR形式として拒否された。実際に本番サイトで発行したQR写真の読取は未確認。本番画面で製品名を固定表示しない修正はGitHub ActionsとVM200本番Compose反映まで完了した。Phase 9のQRラベル一括発行・PDF取得はローカル・CI・VM200本番Compose反映まで完了したが、Phase 9全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
+## 2026-10-08 保管場所の管理画面
+
+Phase 9の保管場所管理の最初の範囲として、管理者が`/management/storage-locations/`で場所を一覧表示・追加できる画面を実装した。既存の保管場所を上位場所に指定でき、追加した場所は標本登録・編集の選択肢へ入る。利用者に表示する名称・備考は導入先で入力し、コードへ固定しない。管理ポータルの中央MFAゲートを通し、作成と「保管場所作成」の監査記録を同一トランザクションで保存する。`audit.0007_alter_auditlog_action`は監査操作種別だけを追加し、保管場所のDB構造は変更しない。
+
+変更ファイルは`audit/models.py`、`audit/migrations/0007_alter_auditlog_action.py`、`management_portal/views.py`、`management_portal/urls.py`、`management_portal/templates/management_portal/index.html`、`management_portal/templates/management_portal/storage_location_list.html`、`management_portal/tests/test_storage_locations.py`である。管理画面の対象4テストで、階層作成、標本フォームへの反映、存在しない親と同じ上位場所での重複名の拒否、権限・MFA不足、監査記録失敗時の巻き戻しを確認した。SQLiteの全370テストは成功（PostgreSQL専用4件skip）。Ruff lint・format、Django check、migration差分なし、`git diff --check`も成功した。GitHub Actions、本番Compose反映、実ブラウザでの受入は未実施。場所の編集・削除、設定管理、標本無効化・完全削除などは残る。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了とする。
+
 ## 2026-10-07 QRラベル無効化の管理画面
 
 `/management/qr-batches/`の発行履歴から、発行単位ごとのQRラベル状態を確認できる画面を追加した。QR識別子は画面・URL・監査記録へ出さず、管理用のQRラベル番号、状態、割当有無だけを表示する。未使用・割当済みいずれのQRも個別に無効化でき、無効化後は既存の標本割当履歴を保持しながら、QR URLによる標本登録・詳細表示を既存の410応答へ移す。

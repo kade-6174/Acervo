@@ -8,6 +8,7 @@ urlpatterns = [
     path("", views.index, name="index"),
     path("audit-logs/", views.audit_log_list, name="audit_log_list"),
     path("specimens/export.csv", views.specimen_csv_export, name="specimen_csv_export"),
+    path("storage-locations/", views.storage_location_list, name="storage_location_list"),
     path("qr-batches/", views.qr_batch_list, name="qr_batch_list"),
     path("qr-batches/<int:batch_id>/labels.pdf", views.qr_batch_pdf, name="qr_batch_pdf"),
     path("qr-batches/<int:batch_id>/labels/", views.qr_batch_labels, name="qr_batch_labels"),

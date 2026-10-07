@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}保管場所 — {{ acervo_site_name }}{% endblock %}
+
+{% block content %}
+  <section class="container py-5"><div class="row justify-content-center"><div class="col-lg-8">
+    <p class="text-uppercase text-secondary fw-semibold mb-2">Management</p>
+    <h1 class="h2 mb-3">保管場所</h1>
+    <p class="text-secondary">箱や棚を登録できます。上位場所を選ぶと階層に追加され、標本登録・編集時に選択できます。</p>
+    {% include "management_portal/_messages.html" %}
+    <form method="post" class="border rounded bg-white p-4 mb-4">{% csrf_token %}
+      <h2 class="h5">保管場所を追加</h2>
+      {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+      {% for field in form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="text-danger" role="alert">{{ error }}</div>{% endfor %}</div>{% endfor %}
+      <button class="btn btn-dark" type="submit">追加する</button>
+    </form>
+    <h2 class="h5">登録済みの保管場所</h2>
+    <div class="table-responsive border rounded bg-white"><table class="table align-middle mb-0">
+      <thead><tr><th scope="col">名称</th><th scope="col">上位場所</th><th scope="col">備考</th></tr></thead>
+      <tbody>{% for location in locations %}<tr><td>{{ location.name }}</td><td>{{ location.parent.name|default:"—" }}</td><td>{{ location.note|default:"—" }}</td></tr>{% empty %}<tr><td colspan="3" class="text-secondary">保管場所はまだありません。</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <p class="mt-4 mb-0"><a class="btn btn-outline-secondary" href="{% url 'management:index' %}">管理トップへ戻る</a></p>
+  </div></div></section>
+{% endblock %}

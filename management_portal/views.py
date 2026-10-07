@@ -30,7 +30,7 @@ from accounts.user_administration import (
     update_user_administration_by_admin,
 )
 from audit.models import AuditLog
-from specimens.models import QRBatch, QRLabel, Specimen
+from specimens.models import QRBatch, QRLabel, Specimen, StorageLocation
 from specimens.services import (
     SpecimenServiceError,
     build_qr_labels_pdf,
@@ -108,6 +108,19 @@ class QRBatchCreationForm(forms.Form):
         self.fields["requested_count"].widget.attrs["class"] = "form-control"
         self.fields["note"].widget = forms.Textarea(attrs={"class": "form-control", "rows": 2})
         self.fields["confirmed"].widget.attrs["class"] = "form-check-input"
+
+
+class StorageLocationCreationForm(forms.ModelForm):
+    class Meta:
+        model = StorageLocation
+        fields = ["name", "parent", "note"]
+        widgets = {"note": forms.Textarea(attrs={"rows": 2})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs["class"] = "form-control"
+        self.fields["parent"].widget.attrs["class"] = "form-select"
+        self.fields["note"].widget.attrs["class"] = "form-control"
 
 
 class QRLabelRetirementConfirmationForm(forms.Form):
@@ -295,6 +308,37 @@ def qr_batch_list(request):
         request,
         "management_portal/qr_batch_list.html",
         {"form": form, "batches": batches},
+    )
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def storage_location_list(request):
+    """保管場所の階層を表示し、管理者だけが場所を追加する。"""
+
+    form = StorageLocationCreationForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            with transaction.atomic():
+                location = form.save()
+                AuditLog.objects.create(
+                    action=AuditLog.Action.STORAGE_LOCATION_CREATED,
+                    channel=AuditLog.Channel.MANAGEMENT_UI,
+                    actor=request.user,
+                    actor_username=request.user.username,
+                    target=None,
+                    target_username=f"保管場所 #{location.pk}",
+                )
+        except IntegrityError:
+            form.add_error(None, "保管場所を保存できませんでした。入力内容を確認してください。")
+        else:
+            messages.success(request, f"保管場所「{location.name}」を追加しました。")
+            return redirect("management:storage_location_list")
+    locations = StorageLocation.objects.select_related("parent").all()
+    return render(
+        request,
+        "management_portal/storage_location_list.html",
+        {"form": form, "locations": locations},
     )
 
 

@@ -31,6 +31,7 @@
           <a class="btn btn-outline-dark" href="{% url 'management:audit_log_list' %}">監査ログ</a>
           <a class="btn btn-outline-dark" href="{% url 'management:specimen_csv_export' %}">標本CSVを出力</a>
           <a class="btn btn-outline-dark" href="{% url 'management:qr_batch_list' %}">QRラベル発行</a>
+          <a class="btn btn-outline-dark" href="{% url 'management:storage_location_list' %}">保管場所</a>
           <a class="btn btn-outline-dark" href="{% url 'management:mfa_reset_search' %}">MFAリセット</a>
           <a class="btn btn-outline-secondary" href="{% url 'core:home' %}">通常画面へ戻る</a>
           <form method="post" action="{% url 'account_logout' %}">
