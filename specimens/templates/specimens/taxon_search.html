@@ -3,13 +3,13 @@
 {% block content %}
 <section class="container py-4" style="max-width: 56rem;">
   <h1 class="h3">分類候補を検索</h1>
-  <p class="text-secondary">まずAcervo内の分類を検索します。見つからない場合だけ、設定で有効な外部候補を照会します。</p>
+  <p class="text-secondary">まずこのサイト内の分類を検索します。見つからない場合だけ、設定で有効な外部候補を照会します。</p>
   {% if request.GET.created %}<div class="alert alert-success" role="status">分類を登録しました。標本登録・編集画面で選択できます。</div>{% endif %}
   <form method="get" class="row g-2 align-items-end" role="search">
     <div class="col-md-8"><label class="form-label" for="{{ form.query.id_for_label }}">{{ form.query.label }}</label><p class="form-text mt-0">学名または和名を入力してください。</p>{{ form.query }}</div>
     <div class="col-md-4"><button class="btn btn-primary w-100" type="submit">検索</button></div>
   </form>
-  {% if local_candidates %}<h2 class="h4 mt-4">Acervo内の候補</h2><ul class="list-group">{% for taxon in local_candidates %}<li class="list-group-item"><strong>{{ taxon }}</strong>{% if taxon.rank %}<span class="text-secondary">（{{ taxon.rank }}）</span>{% endif %}</li>{% endfor %}</ul>{% endif %}
+  {% if local_candidates %}<h2 class="h4 mt-4">このサイト内の候補</h2><ul class="list-group">{% for taxon in local_candidates %}<li class="list-group-item"><strong>{{ taxon }}</strong>{% if taxon.rank %}<span class="text-secondary">（{{ taxon.rank }}）</span>{% endif %}</li>{% endfor %}</ul>{% endif %}
   {% if external_candidates %}<h2 class="h4 mt-4">外部候補（GBIF）</h2><p class="text-secondary">採用時に根拠URL・引用・確認日を保存します。</p><ul class="list-group">{% for key, candidate in external_candidates %}<li class="list-group-item d-flex justify-content-between gap-3 align-items-center"><div><strong>{{ candidate.scientific_name }}</strong>{% if candidate.rank %}<span class="text-secondary">（{{ candidate.rank }}）</span>{% endif %}</div><form method="post" action="{% url 'specimens:taxon_adopt_external' %}">{% csrf_token %}<input type="hidden" name="candidate_key" value="{{ key }}"><button class="btn btn-outline-primary" type="submit">採用</button></form></li>{% endfor %}</ul>{% endif %}
   {% if form.is_bound and not local_candidates and not external_candidates %}<p class="mt-4">候補がありません。外部検索が停止中または利用できない場合も、手入力で登録できます。</p>{% endif %}
   <p class="mt-4"><a class="btn btn-outline-secondary" href="{% url 'specimens:taxon_manual_create' %}">分類を手入力で登録</a></p>

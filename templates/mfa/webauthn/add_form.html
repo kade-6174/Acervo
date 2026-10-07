@@ -4,7 +4,7 @@
 <section class="container py-5"><div class="row justify-content-center"><div class="col-md-8 col-lg-7">
   <h1 class="h2 mb-3">パスキーまたはセキュリティキーを追加</h1>
   <p>端末の画面ロック、PIN、生体認証、または物理キーを使って登録します。共有端末には登録しないでください。</p>
-  <p class="text-muted small">秘密鍵や生体情報がAcervoへ送信・保存されることはありません。</p>
+  <p class="text-muted small">秘密鍵や生体情報がこのサイトへ送信・保存されることはありません。</p>
   <div id="webauthn-status" class="alert d-none" role="status" aria-live="polite"></div>
   <form method="post" novalidate data-webauthn-form data-webauthn-options-url="{% url 'mfa_webauthn_registration_options' %}">
     {% csrf_token %}

@@ -219,7 +219,7 @@ class MFAURLRoutingTests(TestCase):
             reverse("mfa_webauthn_registration_options"),
         )
         self.assertContains(
-            webauthn_add, "秘密鍵や生体情報がAcervoへ送信・保存されることはありません"
+            webauthn_add, "秘密鍵や生体情報がこのサイトへ送信・保存されることはありません"
         )
 
     def test_authenticated_user_with_authenticators_can_access_views(self):

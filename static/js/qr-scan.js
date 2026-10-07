@@ -116,7 +116,7 @@
     if (!result) return false;
     const path = acceptedPath(result.data);
     if (!path) {
-      status.textContent = "AcervoのQRラベルではありません。別のラベルを読み取ってください。";
+      status.textContent = "このサイトで使えるQRコードではありません。別のQRコードをお試しください。";
       return false;
     }
     stopCamera();

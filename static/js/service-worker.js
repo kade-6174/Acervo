@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "acervo-static-v3";
+const CACHE_NAME = "acervo-static-v4";
 const STATIC_PATHS = [
   "/static/vendor/bootstrap/bootstrap.min.css",
   "/static/vendor/bootstrap/bootstrap.bundle.min.js",

@@ -22,6 +22,19 @@ class HomeViewTests(TestCase):
         self.assertNotContains(response, "cdn.jsdelivr.net")
 
     @override_settings(ACERVO_SITE_NAME="標本管理テスト")
+    def test_configured_site_name_replaces_product_name_in_pages(self):
+        login = self.client.get(reverse("account_login"))
+        self.assertContains(login, "ログイン — 標本管理テスト")
+        self.assertNotContains(login, "Acervo")
+
+        self.client.force_login(self.user)
+        for name in ("core:home", "core:qr_scan"):
+            with self.subTest(name=name):
+                response = self.client.get(reverse(name))
+                self.assertContains(response, "標本管理テスト")
+                self.assertNotContains(response, "Acervo")
+
+    @override_settings(ACERVO_SITE_NAME="標本管理テスト")
     def test_manifest_uses_configured_name_and_self_hosted_icons(self):
         response = self.client.get(reverse("core:manifest"))
 

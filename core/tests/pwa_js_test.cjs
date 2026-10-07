@@ -18,7 +18,7 @@ test("Service Workerは静的資産とオフライン案内だけを保存する
   };
   const caches = {
     open() { return Promise.resolve(cache); },
-    keys() { return Promise.resolve(["acervo-static-v2", "unrelated-cache"]); },
+    keys() { return Promise.resolve(["acervo-static-v3", "unrelated-cache"]); },
     delete(key) { removed.push(key); return Promise.resolve(true); },
     match() { return Promise.resolve(null); },
   };
@@ -43,7 +43,7 @@ test("Service Workerは静的資産とオフライン案内だけを保存する
   let activation;
   handlers.activate({ waitUntil(promise) { activation = promise; } });
   await activation;
-  assert.deepEqual(removed, ["acervo-static-v2"]);
+  assert.deepEqual(removed, ["acervo-static-v3"]);
 
   for (const pathname of ["/specimens/", "/specimens/abc/photos/1/", "/management/", "/management/specimens/export.csv", "/api/private/"]) {
     let responded = false;
@@ -103,7 +103,7 @@ test("QR読取は同一オリジンのUUIDv4経路だけへ進む", async () => 
     await imageInput.handlers.change();
   }
   assert.equal(visited.length, 0);
-  assert.match(elements.get("scan-status").textContent, /AcervoのQRラベルではありません/);
+  assert.match(elements.get("scan-status").textContent, /このサイトで使えるQRコードではありません/);
 
   decoded = "";
   imageInput.files = [{ type: "image/png", size: 100 }];
