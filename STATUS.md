@@ -12,7 +12,9 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 分類を手入力で登録する画面では、分類階級を「科」「属」「種」「その他」の日本語で表示し、属には科、種には属だけを上位分類候補として表示する。送信時にも上位分類の必須・分類階級を検証する。取込コマンドは5科の和名（セセリチョウ科、シジミチョウ科、タテハチョウ科、アゲハチョウ科、シロチョウ科）を保存・補完するようにした。DB migrationはない。
 
-変更ファイルは`specimens/forms.py`、`specimens/management/commands/import_japanese_butterfly_taxa.py`、`specimens/templates/specimens/register.html`、`specimens/templates/specimens/taxon_manual.html`、`static/js/taxon-hierarchy.js`、`specimens/tests/test_taxonomy.py`である。対象28テスト、SQLiteの全364テスト（PostgreSQL専用4件skip）、Ruff lint・format、JavaScript構文確認、Django check、migration差分なし、`git diff --check`が成功した。GitHub Actions、VM200本番Compose反映、iPhoneでの分類選択受入は未実施である。Phase 6の既存完了実績、Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体の完了状態は変更しない。
+変更ファイルは`specimens/forms.py`、`specimens/management/commands/import_japanese_butterfly_taxa.py`、`specimens/templates/specimens/register.html`、`specimens/templates/specimens/taxon_manual.html`、`static/js/taxon-hierarchy.js`、`specimens/tests/test_taxonomy.py`である。対象28テスト、SQLiteの全364テスト（PostgreSQL専用4件skip）、Ruff lint・format、JavaScript構文確認、Django check、migration差分なし、`git diff --check`が成功した。GitHub Actions run `37631440980` はPostgreSQL上の`test`と、直接HTTPS・Tunnel・暗号化バックアップと空環境復元を含む`production-container`がともに成功した。
+
+VM200では更新前に暗号化バックアップ`acervo-20261007T135501Z-19de5af02b70`をPostgreSQL 18で作成し、保持規則により直前の`acervo-20261007T125655Z-6b609e7d2e01`を削除した。`6a0d246`から`a06e13c`へfast-forward後、Cloudflare用Compose設定検証、webイメージ再ビルド、`up -d --build --wait`はいずれも成功した。`check --deploy`は警告なし、`migrate --check`は終了コード0、`db`、`web`、`proxy`はhealthy、`tunnel`は稼働中、webのUIDは`10001`である。作業ツリーは清潔でHEADは`a06e13c`。取込コマンドを成功させ、データセットは5科・328種であることを再確認した。DB schema変更はない。iPhoneでの分類選択受入は未実施である。Phase 6の既存完了実績、Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体の完了状態は変更しない。
 
 ## 2026-10-07 導入先名以外の製品名固定表示を禁止
 
