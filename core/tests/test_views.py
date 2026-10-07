@@ -56,6 +56,9 @@ class HomeViewTests(TestCase):
         self.client.force_login(self.user)
         response = self.client.get(url)
         self.assertContains(response, "カメラを起動")
+        self.assertContains(
+            response, "必要なら背面カメラへ切り替え、QRラベルを枠内に入れてください。"
+        )
         self.assertContains(response, 'id="switch-camera"')
         self.assertContains(response, "カメラが使えない場合はQRの写真を選択")
         self.assertContains(

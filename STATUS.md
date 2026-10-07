@@ -8,7 +8,9 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 ## 2026-10-07 QR写真選択の案内と動作の整合
 
-`templates/core/qr_scan.html`の写真ファイル入力から`capture="environment"`を外し、端末の保存済み画像を選択できる入力にした。`core/tests/test_views.py`に、写真選択の案内と画像ファイル入力の属性を確かめる回帰テストを追加した。カメラ読取・前面背面切替のJavaScriptとDB schemaは変更していない。ローカルSQLiteの全358テストは成功（PostgreSQL専用4件skip）。PWA用Node.jsの3テスト、Ruff lint・format、Django check、migration差分なし、`git diff --check`も成功した。最初に既定Pythonで試したDjango・Ruffの確認は依存未導入で実行できなかったため、既存`.venv`で再実行して成功した。GitHub Actions、VM200反映、iPhoneでの保存済み写真選択は未確認。Android実機受入はMVP完成後へ延期したまま。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了とする。
+`templates/core/qr_scan.html`の写真ファイル入力から`capture="environment"`を外し、端末の保存済み画像を選択できる入力にした。`core/tests/test_views.py`に、写真選択の案内と画像ファイル入力の属性を確かめる回帰テストを追加した。カメラ読取・前面背面切替のJavaScriptとDB schemaは変更していない。ローカルSQLiteの全358テストは成功（PostgreSQL専用4件skip）。PWA用Node.jsの3テスト、Ruff lint・format、Django check、migration差分なし、`git diff --check`も成功した。最初に既定Pythonで試したDjango・Ruffの確認は依存未導入で実行できなかったため、既存`.venv`で再実行して成功した。コミット`e0c1ea3`をpushした。GitHub Actions run 37492995807ではPostgreSQL上の`test`と直接HTTPS・Tunnel構成および暗号化バックアップ・空環境復元を含む`production-container`が全成功した。VM200反映とiPhoneでの保存済み写真選択は未確認。Android実機受入はMVP完成後へ延期したまま。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了とする。
+
+同日、運用者の追加依頼で読取画面の案内から「Acervoの」を外し、QRラベルの指示を簡潔にした。`templates/core/qr_scan.html`と`core/tests/test_views.py`を変更した。変更後の対象6テスト、Ruff lint・format、Django check、migration差分なし、`git diff --check`は成功。最初のRuff検査でテストの1行が長すぎると判明したため改行し、再検査で成功した。VM200の更新前バックアップ`acervo-20261007T104628Z-f0ea678adfc7`は作成成功（PostgreSQL 18、保持規則で旧1世代削除）。VM200の作業ツリーは清潔で更新前HEADは`78230a8`、`git fetch`後の`origin/main`は`e0c1ea3`だった。運用者が`e0c1ea3`へfast-forwardし、作業ツリーが清潔なことを確認した。新しい案内文を含むコミットのCI確認が終わるまで、コンテナ更新は保留する。
 
 ## 2026-10-07 PWA読取カメラの操作改善
 
