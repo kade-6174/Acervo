@@ -12,6 +12,7 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import F
+from django.db.models.deletion import ProtectedError
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -121,6 +122,18 @@ class StorageLocationCreationForm(forms.ModelForm):
         self.fields["name"].widget.attrs["class"] = "form-control"
         self.fields["parent"].widget.attrs["class"] = "form-select"
         self.fields["note"].widget.attrs["class"] = "form-control"
+
+
+class StorageLocationDeletionForm(forms.Form):
+    confirmed = forms.BooleanField(label="削除内容を確認した", required=True)
+    location_name = forms.CharField(label="削除する保管場所の名称", max_length=255)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["confirmed"].widget.attrs["class"] = "form-check-input"
+        self.fields["location_name"].widget.attrs.update(
+            {"class": "form-control", "autocomplete": "off"}
+        )
 
 
 class QRLabelRetirementConfirmationForm(forms.Form):
@@ -339,6 +352,151 @@ def storage_location_list(request):
         request,
         "management_portal/storage_location_list.html",
         {"form": form, "locations": locations},
+    )
+
+
+def _location_descendant_ids(locations, location_id):
+    children = {}
+    for item in locations:
+        children.setdefault(item.parent_id, []).append(item.pk)
+    descendants = set()
+    pending = [location_id]
+    while pending:
+        current = pending.pop()
+        if current in descendants:
+            continue
+        descendants.add(current)
+        pending.extend(children.get(current, []))
+    return descendants
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def storage_location_edit(request, location_id):
+    location = get_object_or_404(StorageLocation, pk=location_id)
+    form = StorageLocationCreationForm(
+        request.POST if request.method == "POST" else None, instance=location
+    )
+    if request.method == "POST":
+        if not evaluate_management_access(request).allowed:
+            return redirect("management:storage_location_list")
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    locations = list(StorageLocation.objects.select_for_update().order_by("pk"))
+                    current = next((item for item in locations if item.pk == location_id), None)
+                    if current is None:
+                        raise Http404("保管場所が見つかりません。")
+                    parent_id = form.cleaned_data["parent"]
+                    parent_id = parent_id.pk if parent_id else None
+                    if parent_id in _location_descendant_ids(locations, location_id):
+                        form.add_error("parent", "自分自身または下位の場所を上位にはできません。")
+                    elif parent_id is not None and not any(
+                        item.pk == parent_id for item in locations
+                    ):
+                        form.add_error("parent", "上位場所を確認できません。")
+                    elif any(
+                        item.pk != location_id
+                        and item.parent_id == parent_id
+                        and item.name == form.cleaned_data["name"]
+                        for item in locations
+                    ):
+                        form.add_error("name", "同じ上位場所に同じ名称が登録されています。")
+                    else:
+                        changed = (
+                            current.name != form.cleaned_data["name"]
+                            or current.parent_id != parent_id
+                            or current.note != form.cleaned_data["note"]
+                        )
+                        if changed:
+                            current.name = form.cleaned_data["name"]
+                            current.parent_id = parent_id
+                            current.note = form.cleaned_data["note"]
+                            current.save(update_fields=["name", "parent", "note"])
+                            AuditLog.objects.create(
+                                action=AuditLog.Action.STORAGE_LOCATION_UPDATED,
+                                channel=AuditLog.Channel.MANAGEMENT_UI,
+                                actor=request.user,
+                                actor_username=request.user.username,
+                                target_username=f"保管場所 #{current.pk}",
+                            )
+            except IntegrityError:
+                form.add_error(None, "保管場所を保存できませんでした。入力内容を確認してください。")
+            else:
+                if not form.errors:
+                    messages.success(
+                        request,
+                        "保管場所を更新しました。" if changed else "変更はありませんでした。",
+                    )
+                    return redirect("management:storage_location_list")
+    return render(
+        request,
+        "management_portal/storage_location_edit.html",
+        {"location": location, "form": form},
+    )
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def storage_location_delete(request, location_id):
+    location = get_object_or_404(StorageLocation, pk=location_id)
+    form = StorageLocationDeletionForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST":
+        if not evaluate_management_access(request).allowed:
+            return redirect("management:storage_location_list")
+        confirmation_url = reverse("management:storage_location_delete", args=[location_id])
+        if not _has_recent_primary_mfa_reauthentication(request):
+            return _mfa_reauthentication_redirect(request, confirmation_url)
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    current = get_object_or_404(
+                        StorageLocation.objects.select_for_update(), pk=location_id
+                    )
+                    if form.cleaned_data["location_name"] != current.name:
+                        form.add_error("location_name", "保管場所の名称が一致しません。")
+                    else:
+                        current.delete()
+                        AuditLog.objects.create(
+                            action=AuditLog.Action.STORAGE_LOCATION_DELETED,
+                            channel=AuditLog.Channel.MANAGEMENT_UI,
+                            actor=request.user,
+                            actor_username=request.user.username,
+                            target_username=f"保管場所 #{location_id}",
+                        )
+            except ProtectedError:
+                form.add_error(None, "標本または下位の場所から使われているため削除できません。")
+            except IntegrityError:
+                form.add_error(None, "保管場所を削除できませんでした。もう一度確認してください。")
+            else:
+                if not form.errors:
+                    messages.success(request, "保管場所を削除しました。")
+                    return redirect("management:storage_location_list")
+    return render(
+        request,
+        "management_portal/storage_location_delete.html",
+        {"location": location, "form": form},
+    )
+
+
+@never_cache
+@require_GET
+def site_settings(request):
+    """環境変数で管理する導入先設定のうち、公開してよい項目だけを表示する。"""
+    return render(
+        request,
+        "management_portal/site_settings.html",
+        {
+            "site_name": settings.ACERVO_SITE_NAME,
+            "organization_name": settings.ACERVO_ORGANIZATION_NAME,
+            "enrollment_policy": (
+                "学校回生方式"
+                if settings.ACERVO_ENROLLMENT_POLICY == "school_cohort"
+                else "在籍判定なし"
+            ),
+            "school_year_start_month": settings.ACERVO_SCHOOL_YEAR_START_MONTH,
+            "school_year_start_day": settings.ACERVO_SCHOOL_YEAR_START_DAY,
+        },
     )
 
 

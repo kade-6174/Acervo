@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}導入先設定 — {{ acervo_site_name }}{% endblock %}
+
+{% block content %}
+  <section class="container py-5"><div class="row justify-content-center"><div class="col-lg-8">
+    <h1 class="h2 mb-3">導入先設定</h1>
+    <p class="text-secondary">現在の表示設定です。変更はサーバーの環境設定と再起動で反映します。秘密情報はこの画面に表示しません。</p>
+    <dl class="row border rounded bg-white p-4">
+      <dt class="col-sm-5">サイト表示名</dt><dd class="col-sm-7">{{ site_name }}</dd>
+      <dt class="col-sm-5">組織名</dt><dd class="col-sm-7">{{ organization_name|default:"未設定" }}</dd>
+      <dt class="col-sm-5">在籍判定</dt><dd class="col-sm-7">{{ enrollment_policy }}</dd>
+      {% if enrollment_policy == "学校回生方式" %}<dt class="col-sm-5">年度切替日</dt><dd class="col-sm-7">{{ school_year_start_month }}月{{ school_year_start_day }}日</dd>{% endif %}
+    </dl>
+    <a class="btn btn-outline-secondary" href="{% url 'management:index' %}">管理トップへ戻る</a>
+  </div></div></section>
+{% endblock %}

@@ -16,8 +16,8 @@
     </form>
     <h2 class="h5">登録済みの保管場所</h2>
     <div class="table-responsive border rounded bg-white"><table class="table align-middle mb-0">
-      <thead><tr><th scope="col">名称</th><th scope="col">上位場所</th><th scope="col">備考</th></tr></thead>
-      <tbody>{% for location in locations %}<tr><td>{{ location.name }}</td><td>{{ location.parent.name|default:"—" }}</td><td>{{ location.note|default:"—" }}</td></tr>{% empty %}<tr><td colspan="3" class="text-secondary">保管場所はまだありません。</td></tr>{% endfor %}</tbody>
+      <thead><tr><th scope="col">名称</th><th scope="col">上位場所</th><th scope="col">備考</th><th scope="col">操作</th></tr></thead>
+      <tbody>{% for location in locations %}<tr><td>{{ location.name }}</td><td>{{ location.parent.name|default:"—" }}</td><td>{{ location.note|default:"—" }}</td><td><a href="{% url 'management:storage_location_edit' location.pk %}">編集</a> <a href="{% url 'management:storage_location_delete' location.pk %}">削除</a></td></tr>{% empty %}<tr><td colspan="4" class="text-secondary">保管場所はまだありません。</td></tr>{% endfor %}</tbody>
     </table></div>
     <p class="mt-4 mb-0"><a class="btn btn-outline-secondary" href="{% url 'management:index' %}">管理トップへ戻る</a></p>
   </div></div></section>

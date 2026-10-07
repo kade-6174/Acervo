@@ -9,6 +9,17 @@ urlpatterns = [
     path("audit-logs/", views.audit_log_list, name="audit_log_list"),
     path("specimens/export.csv", views.specimen_csv_export, name="specimen_csv_export"),
     path("storage-locations/", views.storage_location_list, name="storage_location_list"),
+    path(
+        "storage-locations/<int:location_id>/edit/",
+        views.storage_location_edit,
+        name="storage_location_edit",
+    ),
+    path(
+        "storage-locations/<int:location_id>/delete/",
+        views.storage_location_delete,
+        name="storage_location_delete",
+    ),
+    path("site-settings/", views.site_settings, name="site_settings"),
     path("qr-batches/", views.qr_batch_list, name="qr_batch_list"),
     path("qr-batches/<int:batch_id>/labels.pdf", views.qr_batch_pdf, name="qr_batch_pdf"),
     path("qr-batches/<int:batch_id>/labels/", views.qr_batch_labels, name="qr_batch_labels"),

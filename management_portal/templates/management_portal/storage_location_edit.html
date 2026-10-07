@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}保管場所を編集 — {{ acervo_site_name }}{% endblock %}
+
+{% block content %}
+  <section class="container py-5"><div class="row justify-content-center"><div class="col-lg-8">
+    <h1 class="h2 mb-3">保管場所を編集</h1>
+    <p class="text-secondary">上位場所を変更すると、その下位に登録した場所も一緒に移動します。</p>
+    <form method="post" class="border rounded bg-white p-4">{% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+      {% for field in form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="text-danger" role="alert">{{ error }}</div>{% endfor %}</div>{% endfor %}
+      <button class="btn btn-dark" type="submit">変更を保存</button>
+      <a class="btn btn-outline-secondary" href="{% url 'management:storage_location_list' %}">戻る</a>
+    </form>
+  </div></div></section>
+{% endblock %}

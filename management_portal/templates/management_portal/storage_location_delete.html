@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}保管場所を削除 — {{ acervo_site_name }}{% endblock %}
+
+{% block content %}
+  <section class="container py-5"><div class="row justify-content-center"><div class="col-lg-8">
+    <h1 class="h2 mb-3">保管場所を削除</h1>
+    <div class="alert alert-warning" role="alert">保管場所「{{ location.name }}」を削除します。標本や下位の場所から参照されている場合は削除できません。削除後は元に戻せません。</div>
+    <form method="post" class="border rounded bg-white p-4">{% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="mb-3"><label class="form-label" for="{{ form.location_name.id_for_label }}">{{ form.location_name.label }}（「{{ location.name }}」を入力）</label>{{ form.location_name }}{% for error in form.location_name.errors %}<div class="text-danger" role="alert">{{ error }}</div>{% endfor %}</div>
+      <div class="form-check mb-3">{{ form.confirmed }}<label class="form-check-label" for="{{ form.confirmed.id_for_label }}">{{ form.confirmed.label }}</label>{% for error in form.confirmed.errors %}<div class="text-danger" role="alert">{{ error }}</div>{% endfor %}</div>
+      <button class="btn btn-danger" type="submit">保管場所を削除</button>
+      <a class="btn btn-outline-secondary" href="{% url 'management:storage_location_list' %}">取り消す</a>
+    </form>
+  </div></div></section>
+{% endblock %}

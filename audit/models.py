@@ -18,6 +18,8 @@ class AuditLog(models.Model):
         QR_BATCH_PDF_EXPORTED = "qr_batch_pdf_exported", "QRラベルPDF出力"
         QR_LABEL_RETIRED = "qr_label_retired", "QRラベル無効化"
         STORAGE_LOCATION_CREATED = "storage_location_created", "保管場所作成"
+        STORAGE_LOCATION_UPDATED = "storage_location_updated", "保管場所更新"
+        STORAGE_LOCATION_DELETED = "storage_location_deleted", "保管場所削除"
 
     class Channel(models.TextChoices):
         MANAGEMENT_UI = "management_ui", "管理画面"
