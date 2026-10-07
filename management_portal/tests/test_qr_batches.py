@@ -50,12 +50,14 @@ class QRBatchManagementTests(TestCase):
         self.assertEqual(anonymous.post(self.list_url, {"requested_count": 1}).status_code, 302)
         self.client.force_login(self.member)
         pdf_url = reverse("management:qr_batch_pdf", kwargs={"batch_id": 1})
+        labels_url = reverse("management:qr_batch_labels", kwargs={"batch_id": 1})
         self.assertEqual(self.client.get(self.list_url).status_code, 403)
         self.assertEqual(
             self.client.post(self.list_url, {"requested_count": 1, "confirmed": "on"}).status_code,
             403,
         )
         self.assertEqual(self.client.get(pdf_url).status_code, 403)
+        self.assertEqual(self.client.get(labels_url).status_code, 403)
         self.assertFalse(QRBatch.objects.exists())
         self.assertFalse(AuditLog.objects.exists())
 
@@ -172,3 +174,49 @@ class QRBatchManagementTests(TestCase):
                 )
         self.assertEqual(QRLabel.objects.get(batch_id=batch.batch_id).print_count, 0)
         self.assertFalse(AuditLog.objects.exists())
+
+    def test_admin_can_retire_a_label_only_after_reconfirming_its_number(self):
+        self.login_admin()
+        batch = create_qr_batch(requested_count=1, created_by=self.admin)
+        label = QRLabel.objects.get(batch_id=batch.batch_id)
+        labels_url = reverse("management:qr_batch_labels", kwargs={"batch_id": batch.batch_id})
+        retire_url = reverse(
+            "management:qr_label_retire",
+            kwargs={"batch_id": batch.batch_id, "label_id": label.pk},
+        )
+
+        labels = self.client.get(labels_url)
+        self.assertContains(labels, f"#{label.pk}")
+        self.assertContains(labels, retire_url)
+        self.assertNotContains(labels, str(label.token))
+
+        response = self.client.post(retire_url, {"confirmed": "on", "label_id": label.pk + 1})
+        self.assertEqual(response.status_code, 200)
+        label.refresh_from_db()
+        self.assertEqual(label.status, QRLabel.Status.UNUSED)
+
+        response = self.client.post(retire_url, {"confirmed": "on", "label_id": label.pk})
+        self.assertRedirects(response, labels_url)
+        label.refresh_from_db()
+        self.assertEqual(label.status, QRLabel.Status.RETIRED)
+        self.assertIsNotNone(label.retired_at)
+        audit = AuditLog.objects.get(action=AuditLog.Action.QR_LABEL_RETIRED)
+        self.assertEqual(audit.actor, self.admin)
+        self.assertEqual(audit.target_username, f"QRラベル #{label.pk}")
+
+    def test_audit_failure_rolls_back_qr_retirement(self):
+        self.login_admin()
+        batch = create_qr_batch(requested_count=1, created_by=self.admin)
+        label = QRLabel.objects.get(batch_id=batch.batch_id)
+        retire_url = reverse(
+            "management:qr_label_retire",
+            kwargs={"batch_id": batch.batch_id, "label_id": label.pk},
+        )
+
+        with patch("management_portal.views.AuditLog.objects.create", side_effect=IntegrityError):
+            with self.assertRaises(IntegrityError):
+                self.client.post(retire_url, {"confirmed": "on", "label_id": label.pk})
+
+        label.refresh_from_db()
+        self.assertEqual(label.status, QRLabel.Status.UNUSED)
+        self.assertIsNone(label.retired_at)

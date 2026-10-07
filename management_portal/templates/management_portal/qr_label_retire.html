@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}QRラベル無効化の確認 — {{ acervo_site_name }}{% endblock %}
+
+{% block content %}
+  <section class="container py-5"><div class="row justify-content-center"><div class="col-lg-7">
+    <p class="text-uppercase text-secondary fw-semibold mb-2">Management</p>
+    <h1 class="h2 mb-3">QRラベル無効化の確認</h1>
+    <div class="alert alert-warning" role="alert"><p class="mb-2">QRラベル #{{ label.pk }} を無効化します。</p><p class="mb-0 fw-semibold">この操作は取り消せません。無効化後、このQR URLでは標本登録・詳細表示を行えません。</p></div>
+    <form method="post" class="border rounded bg-white p-4">{% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="form-check mb-3">{{ form.confirmed }}<label class="form-check-label" for="{{ form.confirmed.id_for_label }}">{{ form.confirmed.label }}</label>{% for error in form.confirmed.errors %}<div class="text-danger" role="alert">{{ error }}</div>{% endfor %}</div>
+      <label class="form-label" for="{{ form.label_id.id_for_label }}">確認のため、QRラベル番号「{{ label.pk }}」を入力してください</label>{{ form.label_id }}{% for error in form.label_id.errors %}<div class="text-danger" role="alert">{{ error }}</div>{% endfor %}
+      <button class="btn btn-danger mt-3" type="submit">QRラベルを無効化する</button>
+      <a class="btn btn-outline-secondary mt-3" href="{% url 'management:qr_batch_labels' batch_id=batch_id %}">戻る</a>
+    </form>
+  </div></div></section>
+{% endblock %}

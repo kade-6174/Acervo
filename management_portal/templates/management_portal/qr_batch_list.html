@@ -34,7 +34,7 @@
         <h2 class="h4">発行履歴</h2>
         <div class="table-responsive border rounded bg-white">
           <table class="table align-middle mb-0">
-            <thead><tr><th scope="col">発行日時</th><th scope="col">枚数</th><th scope="col">発行者</th><th scope="col">備考</th><th scope="col">印刷</th></tr></thead>
+            <thead><tr><th scope="col">発行日時</th><th scope="col">枚数</th><th scope="col">発行者</th><th scope="col">備考</th><th scope="col">操作</th></tr></thead>
             <tbody>
               {% for batch in batches %}
                 <tr>
@@ -42,7 +42,7 @@
                   <td>{{ batch.requested_count }}</td>
                   <td>{{ batch.created_by.username }}</td>
                   <td>{{ batch.note|default:"—" }}</td>
-                  <td><a class="btn btn-outline-dark btn-sm" href="{% url 'management:qr_batch_pdf' batch_id=batch.pk %}">PDFを取得</a></td>
+                  <td><a class="btn btn-outline-dark btn-sm" href="{% url 'management:qr_batch_pdf' batch_id=batch.pk %}">PDFを取得</a> <a class="btn btn-outline-secondary btn-sm" href="{% url 'management:qr_batch_labels' batch_id=batch.pk %}">状態・無効化</a></td>
                 </tr>
               {% empty %}
                 <tr><td colspan="5" class="text-secondary">まだ発行していません。</td></tr>

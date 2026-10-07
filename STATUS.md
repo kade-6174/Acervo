@@ -6,6 +6,14 @@
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。追加のカメラ切替機能はVM200へ反映し、iPhoneでの動作確認を完了した。写真選択欄はiPhoneで保存済み写真を選べるようになり、選択したスクリーンショットからQRを検出した。これは別の場所で作ったテストQRのため本番サイトのQR形式として拒否された。実際に本番サイトで発行したQR写真の読取は未確認。本番画面で製品名を固定表示しない修正はGitHub ActionsとVM200本番Compose反映まで完了した。Phase 9のQRラベル一括発行・PDF取得はローカル・CI・VM200本番Compose反映まで完了したが、Phase 9全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
+## 2026-10-07 QRラベル無効化の管理画面
+
+`/management/qr-batches/`の発行履歴から、発行単位ごとのQRラベル状態を確認できる画面を追加した。QR識別子は画面・URL・監査記録へ出さず、管理用のQRラベル番号、状態、割当有無だけを表示する。未使用・割当済みいずれのQRも個別に無効化でき、無効化後は既存の標本割当履歴を保持しながら、QR URLによる標本登録・詳細表示を既存の410応答へ移す。
+
+無効化は、対象QRラベル番号の再入力、確認チェック、管理ポータルの中央MFAゲート、直近のTOTPまたはパスキー再認証を必須とする。状態変更と「QRラベル無効化」の監査記録は同一トランザクションで行い、監査記録の保存に失敗した場合は無効化もロールバックする。監査操作種別追加の`audit.0006_alter_auditlog_action` migrationを含む。
+
+変更ファイルは`audit/models.py`、`audit/migrations/0006_alter_auditlog_action.py`、`management_portal/views.py`、`management_portal/urls.py`、QRラベル管理テンプレート、`management_portal/tests/test_qr_batches.py`である。QR管理とQR基盤の対象27テスト、SQLiteの全366テスト（PostgreSQL専用4件skip）、Ruff lint・format、Django check、migration差分なし、`git diff --check`が成功した。GitHub Actions、VM200本番Compose反映、実ブラウザでの無効化受入は未実施である。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体の完了状態は変更しない。
+
 ## 2026-10-07 日本産蝶類の分類階層選択
 
 標本登録画面では、既に本番へ取り込まれている「日本産蝶類和名学名便覧」（CC BY 3.0、5科・328種）のデータを、和名を優先して表示する科・属・種の3段階選択にした。科を選ぶまで属を、属を選ぶまで種を選べないようにし、親子関係と異なる選択肢は画面で隠す。JavaScriptを迂回した送信でも、フォームが科→属→種の親子関係を検証し、最も下位の選択を標本の分類として保存する。他の分類を使う既存の選択欄は「その他の分類」として残し、便覧の分類との同時選択は拒否する。

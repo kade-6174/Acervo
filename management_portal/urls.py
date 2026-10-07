@@ -10,6 +10,12 @@ urlpatterns = [
     path("specimens/export.csv", views.specimen_csv_export, name="specimen_csv_export"),
     path("qr-batches/", views.qr_batch_list, name="qr_batch_list"),
     path("qr-batches/<int:batch_id>/labels.pdf", views.qr_batch_pdf, name="qr_batch_pdf"),
+    path("qr-batches/<int:batch_id>/labels/", views.qr_batch_labels, name="qr_batch_labels"),
+    path(
+        "qr-batches/<int:batch_id>/labels/<int:label_id>/retire/",
+        views.qr_label_retire,
+        name="qr_label_retire",
+    ),
     path("users/", views.user_list, name="user_list"),
     path("users/new/", views.user_create, name="user_create"),
     path("users/<int:user_id>/", views.user_edit, name="user_edit"),

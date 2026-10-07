@@ -31,7 +31,12 @@ from accounts.user_administration import (
 )
 from audit.models import AuditLog
 from specimens.models import QRBatch, QRLabel, Specimen
-from specimens.services import build_qr_labels_pdf, create_qr_batch
+from specimens.services import (
+    SpecimenServiceError,
+    build_qr_labels_pdf,
+    create_qr_batch,
+    retire_qr_label,
+)
 
 from .admin_warnings import get_administrator_warnings
 
@@ -103,6 +108,20 @@ class QRBatchCreationForm(forms.Form):
         self.fields["requested_count"].widget.attrs["class"] = "form-control"
         self.fields["note"].widget = forms.Textarea(attrs={"class": "form-control", "rows": 2})
         self.fields["confirmed"].widget.attrs["class"] = "form-check-input"
+
+
+class QRLabelRetirementConfirmationForm(forms.Form):
+    """QR無効化の対象を再入力させる確認フォーム。"""
+
+    confirmed = forms.BooleanField(label="無効化の内容を確認した", required=True)
+    label_id = forms.IntegerField(label="QRラベル番号", min_value=1)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["confirmed"].widget.attrs["class"] = "form-check-input"
+        self.fields["label_id"].widget.attrs.update(
+            {"class": "form-control", "autocomplete": "off", "inputmode": "numeric"}
+        )
 
 
 def _authenticator_summary(user_id: int) -> list[str]:
@@ -311,6 +330,65 @@ def qr_batch_pdf(request, batch_id):
     response["Content-Disposition"] = f'attachment; filename="qr-batch-{batch.pk}.pdf"'
     response["X-Content-Type-Options"] = "nosniff"
     return response
+
+
+@never_cache
+@require_GET
+def qr_batch_labels(request, batch_id):
+    """発行済みQRの状態を表示し、無効化対象を選ぶ。"""
+
+    batch = get_object_or_404(QRBatch, pk=batch_id)
+    labels = QRLabel.objects.filter(batch=batch).select_related("specimen").order_by("pk")
+    return render(
+        request,
+        "management_portal/qr_batch_labels.html",
+        {"batch": batch, "labels": labels},
+    )
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def qr_label_retire(request, batch_id, label_id):
+    """再確認・直近MFA・監査記録を伴ってQRを無効化する。"""
+
+    label = get_object_or_404(QRLabel, pk=label_id, batch_id=batch_id)
+    if label.status == QRLabel.Status.RETIRED:
+        raise Http404
+
+    if request.method == "POST":
+        confirmation_url = reverse("management:qr_label_retire", args=[batch_id, label_id])
+        if not _has_recent_primary_mfa_reauthentication(request):
+            return _mfa_reauthentication_redirect(request, confirmation_url)
+
+        form = QRLabelRetirementConfirmationForm(request.POST)
+        if form.is_valid():
+            if form.cleaned_data["label_id"] != label.pk:
+                form.add_error("label_id", "表示されているQRラベル番号を入力してください。")
+            else:
+                try:
+                    with transaction.atomic():
+                        retire_qr_label(token=label.token)
+                        AuditLog.objects.create(
+                            action=AuditLog.Action.QR_LABEL_RETIRED,
+                            channel=AuditLog.Channel.MANAGEMENT_UI,
+                            actor=request.user,
+                            actor_username=request.user.username,
+                            target=None,
+                            target_username=f"QRラベル #{label.pk}",
+                        )
+                except SpecimenServiceError:
+                    form.add_error(None, "QRラベルは既に無効化されています。")
+                else:
+                    messages.success(request, f"QRラベル #{label.pk} を無効化しました。")
+                    return redirect("management:qr_batch_labels", batch_id=batch_id)
+    else:
+        form = QRLabelRetirementConfirmationForm()
+
+    return render(
+        request,
+        "management_portal/qr_label_retire.html",
+        {"batch_id": batch_id, "label": label, "form": form},
+    )
 
 
 @never_cache

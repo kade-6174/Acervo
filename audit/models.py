@@ -16,6 +16,7 @@ class AuditLog(models.Model):
         SPECIMEN_CSV_EXPORTED = "specimen_csv_exported", "標本CSV出力"
         QR_BATCH_CREATED = "qr_batch_created", "QRラベル一括発行"
         QR_BATCH_PDF_EXPORTED = "qr_batch_pdf_exported", "QRラベルPDF出力"
+        QR_LABEL_RETIRED = "qr_label_retired", "QRラベル無効化"
 
     class Channel(models.TextChoices):
         MANAGEMENT_UI = "management_ui", "管理画面"
