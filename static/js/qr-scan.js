@@ -92,9 +92,9 @@
     }
   }
 
-  function decode(width, height) {
+  function decode(width, height, inversionAttempts = "dontInvert") {
     const pixels = context.getImageData(0, 0, width, height);
-    return window.jsQR(pixels.data, width, height, { inversionAttempts: "dontInvert" });
+    return window.jsQR(pixels.data, width, height, { inversionAttempts });
   }
 
   async function imageFromFile(file) {
@@ -178,15 +178,29 @@
     }
     try {
       const bitmap = await imageFromFile(file);
-      const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
-      const width = Math.max(1, Math.round(bitmap.width * scale));
-      const height = Math.max(1, Math.round(bitmap.height * scale));
-      canvas.width = width;
-      canvas.height = height;
-      context.drawImage(bitmap, 0, 0, width, height);
-      if (bitmap.close) bitmap.close();
-      if (!handleResult(decode(width, height))) {
+      let result = null;
+      let previousSize = "";
+      try {
+        for (const maxSide of [1200, 2400]) {
+          const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+          const width = Math.max(1, Math.round(bitmap.width * scale));
+          const height = Math.max(1, Math.round(bitmap.height * scale));
+          const size = `${width}x${height}`;
+          if (size === previousSize) continue;
+          previousSize = size;
+          canvas.width = width;
+          canvas.height = height;
+          context.drawImage(bitmap, 0, 0, width, height);
+          result = decode(width, height, "attemptBoth");
+          if (result) break;
+        }
+      } finally {
+        if (bitmap.close) bitmap.close();
+      }
+      if (!result) {
         status.textContent = "QRコードが見つかりませんでした。別の写真を選択してください。";
+      } else {
+        handleResult(result);
       }
     } catch {
       status.textContent = "写真を読み取れませんでした。別の写真を選択してください。";

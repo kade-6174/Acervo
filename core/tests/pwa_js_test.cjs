@@ -18,7 +18,7 @@ test("Service Workerは静的資産とオフライン案内だけを保存する
   };
   const caches = {
     open() { return Promise.resolve(cache); },
-    keys() { return Promise.resolve(["acervo-static-v1", "unrelated-cache"]); },
+    keys() { return Promise.resolve(["acervo-static-v2", "unrelated-cache"]); },
     delete(key) { removed.push(key); return Promise.resolve(true); },
     match() { return Promise.resolve(null); },
   };
@@ -43,7 +43,7 @@ test("Service Workerは静的資産とオフライン案内だけを保存する
   let activation;
   handlers.activate({ waitUntil(promise) { activation = promise; } });
   await activation;
-  assert.deepEqual(removed, ["acervo-static-v1"]);
+  assert.deepEqual(removed, ["acervo-static-v2"]);
 
   for (const pathname of ["/specimens/", "/specimens/abc/photos/1/", "/management/", "/management/specimens/export.csv", "/api/private/"]) {
     let responded = false;
@@ -77,7 +77,7 @@ test("QR読取は同一オリジンのUUIDv4経路だけへ進む", async () => 
   let decoded = "";
   const window = {
     location: { origin: "https://acervo.test", assign(pathname) { visited.push(pathname); } },
-    jsQR() { return { data: decoded }; },
+    jsQR() { return decoded ? { data: decoded } : null; },
     createImageBitmap: async () => ({ width: 10, height: 10, close() {} }),
     addEventListener() {},
   };
@@ -103,11 +103,59 @@ test("QR読取は同一オリジンのUUIDv4経路だけへ進む", async () => 
     await imageInput.handlers.change();
   }
   assert.equal(visited.length, 0);
+  assert.match(elements.get("scan-status").textContent, /AcervoのQRラベルではありません/);
+
+  decoded = "";
+  imageInput.files = [{ type: "image/png", size: 100 }];
+  await imageInput.handlers.change();
+  assert.match(elements.get("scan-status").textContent, /QRコードが見つかりませんでした/);
 
   decoded = `https://acervo.test/q/${token}/`;
   imageInput.files = [{ type: "image/png", size: 100 }];
   await imageInput.handlers.change();
   assert.deepEqual(visited, [`/q/${token}/`]);
+});
+
+test("保存画像のQRが縮小時に読めなければ高解像度でも試す", async () => {
+  const elements = new Map();
+  for (const id of ["start-scan", "stop-scan", "switch-camera", "scan-video", "scan-canvas", "scan-image", "scan-status"]) {
+    elements.set(id, { handlers: {}, addEventListener(name, handler) { this.handlers[name] = handler; } });
+  }
+  const canvas = elements.get("scan-canvas");
+  canvas.getContext = () => ({
+    drawImage() {},
+    getImageData() { return { data: new Uint8ClampedArray(4) }; },
+  });
+  const scans = [];
+  const visited = [];
+  let closed = false;
+  const token = "12345678-1234-4123-8123-123456789abc";
+  const bitmap = { width: 2000, height: 3000, close() { closed = true; } };
+  const window = {
+    location: { origin: "https://acervo.test", assign(pathname) { visited.push(pathname); } },
+    jsQR(_pixels, width, height, options) {
+      scans.push({ width, height, inversionAttempts: options.inversionAttempts });
+      return width >= 1000 ? { data: `https://acervo.test/q/${token}/` } : null;
+    },
+    createImageBitmap: async () => bitmap,
+    addEventListener() {},
+  };
+  const document = { getElementById(id) { return elements.get(id); }, addEventListener() {} };
+  const code = fs.readFileSync(path.join(root, "static/js/qr-scan.js"), "utf8");
+  vm.runInNewContext(code, {
+    window, document, URL, Uint8ClampedArray, createImageBitmap: async () => bitmap,
+  });
+
+  const imageInput = elements.get("scan-image");
+  imageInput.files = [{ type: "image/png", size: 100 }];
+  await imageInput.handlers.change();
+  assert.deepEqual(scans, [
+    { width: 800, height: 1200, inversionAttempts: "attemptBoth" },
+    { width: 1600, height: 2400, inversionAttempts: "attemptBoth" },
+  ]);
+  assert.deepEqual(visited, [`/q/${token}/`]);
+  assert.equal(closed, true);
+  assert.equal(imageInput.value, "");
 });
 
 test("QR読取は画面側カメラを優先し、切替・失敗復旧・停止時に映像を解放する", async () => {

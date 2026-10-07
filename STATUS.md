@@ -4,7 +4,11 @@
 
 ## Current Task
 
-Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。追加のカメラ切替機能はVM200へ反映し、iPhoneでの動作確認を完了した。iPhoneで撮影画面が開く写真選択欄の不整合はローカル・CIで修正を検証し、VM200へ反映した。保存済み写真の選択はiPhone実機での最終確認待ち。Phase 9のQRラベル一括発行・PDF取得はローカル・CI・VM200本番Compose反映まで完了したが、Phase 9全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。追加のカメラ切替機能はVM200へ反映し、iPhoneでの動作確認を完了した。写真選択欄はiPhoneで保存済み写真を選べるようになったが、標準カメラでは読めるQRのスクリーンショットがアプリでは読み取れない問題が残り、修正・検証中。Phase 9のQRラベル一括発行・PDF取得はローカル・CI・VM200本番Compose反映まで完了したが、Phase 9全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+
+## 2026-10-07 保存済みQR画像の読取失敗
+
+運用者のiPhone実機では写真選択画面が開いたが、選んだQRのスクリーンショットは「QRコードが見つかりませんでした」と表示された。同じQRは標準カメラで読める。原因は実画像で未確定。コード上、QRを読めても同一サイトのUUIDv4 URL以外なら、その判定表示を「見つかりませんでした」で上書きする不具合を確認した。`static/js/qr-scan.js`で判定表示を保持し、保存画像だけは最大辺1200pxで見つからない場合に2400pxでも試し、反転QRも探索する。カメラ読取・切替の処理は維持する。`static/js/service-worker.js`のキャッシュ版を更新し、PWAが新しいJSを取得できるようにした。`core/tests/pwa_js_test.cjs`に判定表示、再試行と既存カメラ経路の回帰テストを追加した。ローカルSQLiteの全358テスト成功（PostgreSQL専用4件skip）、Node.jsの4テスト、Ruff lint・format、Django check、migration差分なし、`git diff --check`は成功。GitHub Actions、VM200反映、iPhone再確認は未実施。Android実機受入はMVP完成後へ延期したまま。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
 ## 2026-10-07 QR写真選択の案内と動作の整合
 
