@@ -1,6 +1,6 @@
 # Project Status
 
-最終更新: 2026-10-07
+最終更新: 2026-10-08
 
 ## Current Task
 
@@ -12,7 +12,9 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 無効化は、対象QRラベル番号の再入力、確認チェック、管理ポータルの中央MFAゲート、直近のTOTPまたはパスキー再認証を必須とする。状態変更と「QRラベル無効化」の監査記録は同一トランザクションで行い、監査記録の保存に失敗した場合は無効化もロールバックする。監査操作種別追加の`audit.0006_alter_auditlog_action` migrationを含む。
 
-変更ファイルは`audit/models.py`、`audit/migrations/0006_alter_auditlog_action.py`、`management_portal/views.py`、`management_portal/urls.py`、QRラベル管理テンプレート、`management_portal/tests/test_qr_batches.py`である。QR管理とQR基盤の対象27テスト、SQLiteの全366テスト（PostgreSQL専用4件skip）、Ruff lint・format、Django check、migration差分なし、`git diff --check`が成功した。GitHub Actions、VM200本番Compose反映、実ブラウザでの無効化受入は未実施である。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体の完了状態は変更しない。
+変更ファイルは`audit/models.py`、`audit/migrations/0006_alter_auditlog_action.py`、`management_portal/views.py`、`management_portal/urls.py`、QRラベル管理テンプレート、`management_portal/tests/test_qr_batches.py`である。QR管理とQR基盤の対象27テスト、SQLiteの全366テスト（PostgreSQL専用4件skip）、Ruff lint・format、Django check、migration差分なし、`git diff --check`が成功した。コミット`62b8375`に対するGitHub Actions run `37635997071`と`37635996585`では、PostgreSQL上の`test`と、直接HTTPS・Tunnel・暗号化バックアップと空環境復元を含む`production-container`がともに成功した。
+
+2026-10-08にVM200へ反映した。更新前の作業ツリーは清潔でHEADは`a06e13c`。更新前バックアップ`acervo-20261007T151615Z-556d56e56bc2`をPostgreSQL 18で作成し、保持規則により旧バックアップ`acervo-20261007T135501Z-19de5af02b70`を1件削除した。`62b8375`へfast-forward後、Cloudflare用Compose設定検証と`up -d --build --wait`は成功し、`db`・`web`・`proxy`・`tunnel`のhealthyを確認した。コンテナ内の`check --deploy`は問題0件、`migrate --check`は終了コード0、`docker compose ps`では`db`・`web`・`proxy`がhealthyで`tunnel`が稼働中、webの実行UIDは`10001`だった。VM200の作業ツリーは清潔でHEADは`62b8375`。実ブラウザでのQR無効化受入と更新後のDB・写真永続化は未確認である。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
 
 ## 2026-10-07 日本産蝶類の分類階層選択
 
