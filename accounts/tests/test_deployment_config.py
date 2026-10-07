@@ -28,7 +28,7 @@ class Phase1ConfigurationTests(SimpleTestCase):
         self.assertEqual(settings.MFA_RECOVERY_CODE_COUNT, 10)
         self.assertTrue(settings.MFA_RECOVERY_CODES_SHOW_ONCE)
         self.assertFalse(settings.MFA_TRUST_ENABLED)
-        self.assertEqual(settings.MFA_TOTP_ISSUER, "Acervo")
+        self.assertEqual(settings.MFA_TOTP_ISSUER, "このサイト")
         self.assertFalse(settings.MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN)
 
     @override_settings(ACERVO_SITE_NAME="導入先サイト", MFA_TOTP_ISSUER="導入先サイト")
@@ -195,13 +195,13 @@ class WebAuthnRPConfigurationTests(SimpleTestCase):
             with self.subTest(request=request.META):
                 with context.request_context(request):
                     entity = self.adapter.get_public_key_credential_rp_entity()
-                self.assertEqual(entity, {"id": "passkey.example.org", "name": "Acervo"})
+                self.assertEqual(entity, {"id": "passkey.example.org", "name": "このサイト"})
 
     @override_settings(ACERVO_PUBLIC_BASE_URL="http://localhost:8000")
     def test_localhost_http_is_only_allowed_for_local_development(self):
         self.assertEqual(
             self.adapter.get_public_key_credential_rp_entity(),
-            {"id": "localhost", "name": "Acervo"},
+            {"id": "localhost", "name": "このサイト"},
         )
 
 

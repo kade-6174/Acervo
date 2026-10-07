@@ -8,12 +8,13 @@ class HomeViewTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="home-user", cohort_number=33)
 
-    def test_home_page_is_available(self):
+    def test_home_page_uses_the_generic_default_site_name(self):
         self.client.force_login(self.user)
         response = self.client.get(reverse("core:home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Acervo")
+        self.assertContains(response, "このサイト")
+        self.assertNotContains(response, "Acervo")
         self.assertContains(response, "QRコードを読み取る")
         self.assertContains(response, reverse("core:qr_scan"))
         self.assertContains(response, reverse("core:manifest"))
