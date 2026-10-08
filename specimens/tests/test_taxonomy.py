@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -6,7 +6,6 @@ from django.utils import timezone
 
 from accounts.models import User
 from specimens.forms import SpecimenRegistrationForm, TaxonManualForm
-from specimens.management.commands.import_japanese_butterfly_taxa import _fetch, _SpeciesListParser
 from specimens.models import Taxon, TaxonDataset, TaxonDatasetRecord, TaxonSource
 from specimens.services import (
     TaxonCandidate,
@@ -113,7 +112,7 @@ class TaxonomyViewsTests(TestCase):
 class ButterflyHierarchyFormTests(TestCase):
     def setUp(self):
         dataset = TaxonDataset.objects.create(
-            slug="japanese-butterflies-binran-2010-2013",
+            slug="japanese-butterflies-ja-328",
             title="日本産蝶類和名学名便覧",
             version="2010–2013",
             license_name="CC BY 3.0",
@@ -127,6 +126,11 @@ class ButterflyHierarchyFormTests(TestCase):
         self.genus_taxon = Taxon.objects.create(
             scientific_name="Papilio", rank="genus", parent=self.family_taxon
         )
+        self.subfamily_taxon = Taxon.objects.create(
+            japanese_name="アゲハチョウ亜科", rank="subfamily", parent=self.family_taxon
+        )
+        self.genus_taxon.parent = self.subfamily_taxon
+        self.genus_taxon.save(update_fields=["parent"])
         self.species_taxon = Taxon.objects.create(
             scientific_name="Papilio xuthus",
             japanese_name="アゲハ",
@@ -144,11 +148,21 @@ class ButterflyHierarchyFormTests(TestCase):
         self.genus = TaxonDatasetRecord.objects.create(
             dataset=dataset,
             source_key="genus-Papilionidae-Papilio",
-            parent=self.family,
+            parent=None,
             rank=TaxonDatasetRecord.Rank.GENUS,
             scientific_name="Papilio",
             taxon=self.genus_taxon,
         )
+        self.subfamily = TaxonDatasetRecord.objects.create(
+            dataset=dataset,
+            source_key="subfamily-Papilioninae",
+            parent=self.family,
+            rank=TaxonDatasetRecord.Rank.SUBFAMILY,
+            japanese_name="アゲハチョウ亜科",
+            taxon=self.subfamily_taxon,
+        )
+        self.genus.parent = self.subfamily
+        self.genus.save(update_fields=["parent"])
         self.species = TaxonDatasetRecord.objects.create(
             dataset=dataset,
             source_key="species-100",
@@ -163,6 +177,7 @@ class ButterflyHierarchyFormTests(TestCase):
         form = SpecimenRegistrationForm(
             {
                 "butterfly_family": self.family.pk,
+                "butterfly_subfamily": self.subfamily.pk,
                 "butterfly_genus": self.genus.pk,
                 "butterfly_species": self.species.pk,
                 "acquisition_method": "other",
@@ -177,12 +192,12 @@ class ButterflyHierarchyFormTests(TestCase):
 
     def test_registration_rejects_a_species_outside_the_selected_genus(self):
         other_genus_taxon = Taxon.objects.create(
-            scientific_name="Graphium", rank="genus", parent=self.family_taxon
+            scientific_name="Graphium", rank="genus", parent=self.subfamily_taxon
         )
         other_genus = TaxonDatasetRecord.objects.create(
             dataset=self.family.dataset,
             source_key="genus-Papilionidae-Graphium",
-            parent=self.family,
+            parent=self.subfamily,
             rank=TaxonDatasetRecord.Rank.GENUS,
             scientific_name="Graphium",
             taxon=other_genus_taxon,
@@ -190,6 +205,7 @@ class ButterflyHierarchyFormTests(TestCase):
         form = SpecimenRegistrationForm(
             {
                 "butterfly_family": self.family.pk,
+                "butterfly_subfamily": self.subfamily.pk,
                 "butterfly_genus": other_genus.pk,
                 "butterfly_species": self.species.pk,
                 "acquisition_method": "other",
@@ -198,6 +214,33 @@ class ButterflyHierarchyFormTests(TestCase):
 
         self.assertFalse(form.is_valid())
         self.assertIn("butterfly_species", form.errors)
+
+    def test_registration_requires_tribe_when_genus_is_below_tribe(self):
+        tribe_taxon = Taxon.objects.create(
+            japanese_name="アゲハチョウ族", rank="tribe", parent=self.subfamily_taxon
+        )
+        tribe = TaxonDatasetRecord.objects.create(
+            dataset=self.family.dataset,
+            source_key="tribe-Papilionini",
+            parent=self.subfamily,
+            rank=TaxonDatasetRecord.Rank.TRIBE,
+            japanese_name="アゲハチョウ族",
+            taxon=tribe_taxon,
+        )
+        self.genus.parent = tribe
+        self.genus.save(update_fields=["parent"])
+        base = {
+            "butterfly_family": self.family.pk,
+            "butterfly_subfamily": self.subfamily.pk,
+            "butterfly_genus": self.genus.pk,
+            "butterfly_species": self.species.pk,
+            "acquisition_method": "other",
+        }
+        forged = SpecimenRegistrationForm(base)
+        self.assertFalse(forged.is_valid())
+        self.assertIn("butterfly_genus", forged.errors)
+        valid = SpecimenRegistrationForm({**base, "butterfly_tribe": tribe.pk})
+        self.assertTrue(valid.is_valid(), valid.errors)
 
     def test_manual_form_uses_japanese_rank_labels_and_validates_the_parent_rank(self):
         form = TaxonManualForm(
@@ -229,43 +272,3 @@ class ButterflyHierarchyFormTests(TestCase):
 
         self.assertIn('data-taxon-rank="family"', html)
         self.assertIn("data-manual-taxon-rank", html)
-
-
-class JapaneseButterflyParserTests(TestCase):
-    def test_parser_keeps_species_author_year_and_omits_nested_subspecies(self):
-        parser = _SpeciesListParser()
-        parser.feed(
-            "<ol><li><i>Papilio</i> <i>xuthus</i> Linnaeus, 1767 アゲハ"
-            '<a href="/species/100">詳細</a></li><ul><li><i>Papilio</i> <i>xuthus</i>'
-            '<i>formosana</i> Fruhstorfer, 1908 アゲハ亜種 <a href="/species/101">詳細</a>'
-            "</li></ul></ol>"
-        )
-
-        self.assertEqual(len(parser.entries), 1)
-        entry = parser.entries[0]
-        self.assertEqual(entry.scientific_name, "Papilio xuthus")
-        self.assertEqual(entry.scientific_author, "Linnaeus")
-        self.assertEqual(entry.original_publication_year, 1767)
-        self.assertEqual(entry.japanese_name, "アゲハ")
-        self.assertEqual(entry.source_key, "species-100")
-
-    def test_fetch_retries_transient_connection_failure(self):
-        response = MagicMock()
-        response.read.return_value = b"<html></html>"
-        response.__enter__.return_value = response
-        with (
-            patch(
-                "specimens.management.commands.import_japanese_butterfly_taxa.urlopen",
-                side_effect=[OSError("temporary"), response],
-            ) as mocked_open,
-            patch(
-                "specimens.management.commands.import_japanese_butterfly_taxa.time.sleep"
-            ) as mocked_sleep,
-        ):
-            result = _fetch(
-                "https://web.archive.org/web/20210505224155/https://binran.lepimages.jp/"
-            )
-
-        self.assertEqual(result, "<html></html>")
-        self.assertEqual(mocked_open.call_count, 2)
-        mocked_sleep.assert_called_once_with(1)

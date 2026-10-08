@@ -11,13 +11,13 @@
     {{ form.non_field_errors }}
     <fieldset class="border rounded p-3" data-taxon-hierarchy>
       <legend class="float-none w-auto px-2 fs-6 mb-2">分類</legend>
-      <p class="form-text">日本産蝶類和名学名便覧の取込み済みデータから、科、属、種の順に選択できます。</p>
+      <p class="form-text">日本産蝶類の和名分類を、科、亜科、族、属、種の順に選択できます。族がない場合は未選択のまま進めます。</p>
       {% if not form.butterfly_dataset_available %}
-        <p class="alert alert-secondary mb-3">日本産蝶類和名学名便覧はまだ取り込まれていません。下の「その他の分類」を使うか、管理者へ取込みを依頼してください。</p>
+        <p class="alert alert-secondary mb-3">和名分類データはまだ取り込まれていません。下の「その他の分類」を使うか、管理者へ取込みを依頼してください。</p>
       {% endif %}
       <div class="row g-3">
         {% for field in form.visible_fields %}
-          {% if field.name == "butterfly_family" or field.name == "butterfly_genus" or field.name == "butterfly_species" %}
+          {% if field.name == "butterfly_family" or field.name == "butterfly_subfamily" or field.name == "butterfly_tribe" or field.name == "butterfly_genus" or field.name == "butterfly_species" %}
             <div class="col-md-4"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>
           {% endif %}
         {% endfor %}
@@ -28,7 +28,7 @@
       </details>
     </fieldset>
     {% for field in form.visible_fields %}
-      {% if field.name != "butterfly_family" and field.name != "butterfly_genus" and field.name != "butterfly_species" and field.name != "taxon" %}
+      {% if field.name != "butterfly_family" and field.name != "butterfly_subfamily" and field.name != "butterfly_tribe" and field.name != "butterfly_genus" and field.name != "butterfly_species" and field.name != "taxon" %}
         <div><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>
       {% endif %}
     {% endfor %}

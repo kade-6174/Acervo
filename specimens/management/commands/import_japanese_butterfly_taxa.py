@@ -1,245 +1,144 @@
-"""日本産蝶類和名学名便覧の分類データだけを、明示実行で取り込む。"""
+"""指定されたローカルJSONだけから日本産蝶類の和名階層を取り込む。"""
 
-import re
-import time
-from dataclasses import dataclass
-from html.parser import HTMLParser
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+import hashlib
+import json
+from pathlib import Path
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
 from specimens.models import Taxon, TaxonDataset, TaxonDatasetRecord, TaxonDatasetRevision
 
-ARCHIVE_URL = "https://web.archive.org/web/20210505224155/https://binran.lepimages.jp/"
-DATASET_SLUG = "japanese-butterflies-binran-2010-2013"
-ATTRIBUTION = (
-    "出典：猪又敏男・植村好延・矢後勝也・神保宇嗣・上田恭一郎（2010–2013）"
-    "『日本産蝶類和名学名便覧』。CC BY 3.0。Wayback Machine 2021-05-05保存版を"
-    "Acervo用に分類階層・データ形式を整形して利用。"
+DATASET_SLUG = "japanese-butterflies-ja-328"
+RANKS = (
+    ("界", TaxonDatasetRecord.Rank.KINGDOM),
+    ("門", TaxonDatasetRecord.Rank.PHYLUM),
+    ("綱", TaxonDatasetRecord.Rank.CLASS),
+    ("目", TaxonDatasetRecord.Rank.ORDER),
+    ("科", TaxonDatasetRecord.Rank.FAMILY),
+    ("亜科", TaxonDatasetRecord.Rank.SUBFAMILY),
+    ("族", TaxonDatasetRecord.Rank.TRIBE),
+    ("属", TaxonDatasetRecord.Rank.GENUS),
+    ("種", TaxonDatasetRecord.Rank.SPECIES),
 )
-FAMILY_JAPANESE_NAMES = {
-    "Hesperiidae": "セセリチョウ科",
-    "Lycaenidae": "シジミチョウ科",
-    "Nymphalidae": "タテハチョウ科",
-    "Papilionidae": "アゲハチョウ科",
-    "Pieridae": "シロチョウ科",
-}
+DEFAULT_SOURCE = Path(settings.BASE_DIR) / "specimens" / "data" / "japanese_butterflies_ja_328.json"
 
 
-@dataclass(frozen=True)
-class SpeciesEntry:
-    source_key: str
-    scientific_name: str
-    japanese_name: str
-    scientific_author: str
-    original_publication_year: int | None
-    source_url: str
-
-
-class _SpeciesListParser(HTMLParser):
-    """保存版の種一覧から、最上位の種リストだけを読み取る最小パーサー。"""
-
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.ol_depth = 0
-        self.ul_depth = 0
-        self._current: dict | None = None
-        self.entries: list[SpeciesEntry] = []
-
-    def handle_starttag(self, tag, attrs):
-        attributes = dict(attrs)
-        if tag == "ol":
-            self.ol_depth += 1
-        elif tag == "ul":
-            self.ul_depth += 1
-        elif tag == "li" and self.ol_depth and not self.ul_depth:
-            self._finish_current()
-            self._current = {"text": [], "italics": [], "source_key": ""}
-        elif tag == "i" and self._current is not None:
-            self._current["in_italic"] = True
-        elif tag == "a" and self._current is not None:
-            self._current["in_link"] = True
-            match = re.search(r"/species/(\d+)", attributes.get("href", ""))
-            if match:
-                self._current["source_key"] = f"species-{match.group(1)}"
-
-    def handle_endtag(self, tag):
-        if tag == "i" and self._current is not None:
-            self._current["in_italic"] = False
-        elif tag == "a" and self._current is not None:
-            self._current["in_link"] = False
-        elif tag == "li":
-            self._finish_current()
-        elif tag == "ul":
-            self.ul_depth = max(0, self.ul_depth - 1)
-        elif tag == "ol":
-            self.ol_depth = max(0, self.ol_depth - 1)
-
-    def handle_data(self, data):
-        if self._current is None:
-            return
-        text = " ".join(data.split())
-        if not text or self._current.get("in_link"):
-            return
-        self._current["text"].append(text)
-        if self._current.get("in_italic"):
-            self._current["italics"].append(text)
-
-    def _finish_current(self):
-        if self._current is None:
-            return
-        entry = _entry_from_parts(
-            self._current["source_key"], self._current["italics"], self._current["text"]
-        )
-        if entry:
-            self.entries.append(entry)
-        self._current = None
-
-
-def _entry_from_parts(source_key, italics, text_parts):
-    if not source_key or len(italics) < 2:
-        return None
-    scientific_name = " ".join(italics[:2])
-    full_text = " ".join(text_parts)
-    remainder = full_text.replace(scientific_name, "", 1).strip()
-    japanese_start = re.search(r"[\u3040-\u30ff\u3400-\u9fff]", remainder)
-    author_part = remainder[: japanese_start.start()].strip() if japanese_start else remainder
-    japanese_name = remainder[japanese_start.start() :].strip() if japanese_start else ""
-    year_match = re.search(r"(?:\[)?(1[5-9]\d{2}|20\d{2})(?:\])?", author_part)
-    year = int(year_match.group(1)) if year_match else None
-    author = re.sub(r"(?:,?\s*\[?(?:1[5-9]\d{2}|20\d{2})\]?)", "", author_part).strip()
-    return SpeciesEntry(source_key, scientific_name, japanese_name, author, year, "")
-
-
-def _fetch(url):
-    request = Request(url, headers={"User-Agent": "Acervo/0.1 butterfly taxonomy importer"})
-    for attempt in range(3):
-        try:
-            with urlopen(request, timeout=20) as response:  # noqa: S310 - fixed archive HTTPS URL
-                return response.read().decode("utf-8")
-        except (HTTPError, URLError, OSError, UnicodeDecodeError) as error:
-            if attempt == 2:
-                raise CommandError(
-                    "保存版へ接続できませんでした。時間を置いてから再実行してください。"
-                ) from error
-            time.sleep(attempt + 1)
-
-
-def _family_urls(index_html, archive_url):
-    identifiers = sorted(set(re.findall(r"/taxa/family/([A-Za-z]+)/species", index_html)))
-    if len(identifiers) != 5:
-        raise CommandError("保存版から蝶類5科の一覧を確認できませんでした。取込みを中止します。")
-    base = archive_url.rstrip("/")
-    return [(identifier, f"{base}/taxa/family/{identifier}/species") for identifier in identifiers]
+def _validated_source(source_file):
+    try:
+        raw = source_file.read_bytes()
+        payload = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise CommandError("分類JSONを読み取れません。取込みを中止します。") from error
+    if not isinstance(payload, dict) or not isinstance(payload.get("source"), dict):
+        raise CommandError("分類JSONの出典情報が不正です。")
+    source = payload["source"]
+    if not all(
+        isinstance(source.get(key), str) and source[key] for key in ("title", "url", "license")
+    ):
+        raise CommandError("分類JSONの出典・利用条件を確認できません。")
+    rows = payload.get("taxa")
+    if payload.get("count") != 328 or not isinstance(rows, list) or len(rows) != 328:
+        raise CommandError("分類JSONは328種でなければなりません。")
+    paths = set()
+    nodes = set()
+    for row in rows:
+        if not isinstance(row, dict) or set(row) != {key for key, _ in RANKS}:
+            raise CommandError("分類JSONの階級が不正です。")
+        if any(
+            not isinstance(row[key], str) or not row[key].strip() for key, _ in RANKS if key != "族"
+        ):
+            raise CommandError("分類JSONに空の必須階級があります。")
+        if row["族"] is not None and (not isinstance(row["族"], str) or not row["族"].strip()):
+            raise CommandError("分類JSONの族が不正です。")
+        path = tuple(row[key].strip() if row[key] is not None else None for key, _ in RANKS)
+        if path in paths:
+            raise CommandError("分類JSONに重複した種があります。")
+        paths.add(path)
+        current = ()
+        for value in path:
+            if value is not None:
+                current += (value,)
+                nodes.add(current)
+    return payload, raw, nodes
 
 
 class Command(BaseCommand):
-    help = "Wayback Machine保存版の日本産蝶類328種を、出典情報付きで冪等に取り込む"
+    help = "指定されたローカルJSONだけから日本産蝶類328種の和名分類を取り込む"
 
     def add_arguments(self, parser):
-        parser.add_argument("--dry-run", action="store_true", help="保存せず解析件数だけ確認する")
-        parser.add_argument("--source-url", default=ARCHIVE_URL, help="Wayback Machine保存版のURL")
+        parser.add_argument("--dry-run", action="store_true", help="保存せず件数を検証する")
+        parser.add_argument(
+            "--source-file", type=Path, default=DEFAULT_SOURCE, help="分類JSONのローカルパス"
+        )
 
     def handle(self, *args, **options):
-        source_url = options["source_url"]
-        if not source_url.startswith("https://web.archive.org/web/20210505224155/"):
-            raise CommandError("許可された2021-05-05のWayback Machine保存版だけを指定できます。")
-
-        index_html = _fetch(source_url)
-        families = _family_urls(index_html, source_url)
-        parsed = []
-        for family_name, family_url in families:
-            parser = _SpeciesListParser()
-            parser.feed(_fetch(family_url))
-            if not parser.entries:
-                raise CommandError(
-                    f"{family_name}の種一覧を解析できませんでした。取込みを中止します。"
-                )
-            parsed.append((family_name, family_url, parser.entries))
-        species_count = sum(len(entries) for _, _, entries in parsed)
-        if species_count != 328:
-            raise CommandError(
-                f"328種ではなく{species_count}件を検出したため、取込みを中止します。"
-            )
+        payload, raw, nodes = _validated_source(options["source_file"])
+        version = f"sha256:{hashlib.sha256(raw).hexdigest()}"
         if options["dry_run"]:
-            self.stdout.write(self.style.SUCCESS("検証成功: 5科、328種を検出しました。"))
+            self.stdout.write(self.style.SUCCESS(f"検証成功: 328種、{len(nodes)}階層項目。"))
             return
 
+        source = payload["source"]
+        attribution = (
+            f"出典：{source['title']}。{source['license']}。"
+            f"{source['url']}。指定JSONから和名分類階層のみを取り込んだ。"
+        )
         with transaction.atomic():
-            dataset, _ = TaxonDataset.objects.get_or_create(
+            dataset, created = TaxonDataset.objects.get_or_create(
                 slug=DATASET_SLUG,
                 defaults={
-                    "title": "日本産蝶類和名学名便覧",
-                    "version": "2010–2013",
-                    "license_name": "CC BY 3.0",
-                    "source_url": source_url,
+                    "title": payload.get("title") or source["title"],
+                    "version": version,
+                    "license_name": source["license"],
+                    "source_url": source["url"],
                     "retrieved_on": timezone.localdate(),
-                    "attribution": ATTRIBUTION,
+                    "attribution": attribution,
                 },
             )
-            for family_name, family_url, entries in parsed:
-                family_japanese_name = FAMILY_JAPANESE_NAMES.get(family_name, "")
-                family_taxon, _ = Taxon.objects.get_or_create(
-                    scientific_name=family_name,
-                    defaults={"japanese_name": family_japanese_name, "rank": "family"},
-                )
-                if family_japanese_name and not family_taxon.japanese_name:
-                    family_taxon.japanese_name = family_japanese_name
-                    family_taxon.save(update_fields=["japanese_name"])
-                family_record, _ = TaxonDatasetRecord.objects.update_or_create(
-                    dataset=dataset,
-                    source_key=f"family-{family_name}",
-                    defaults={
-                        "rank": TaxonDatasetRecord.Rank.FAMILY,
-                        "scientific_name": family_name,
-                        "japanese_name": family_japanese_name,
-                        "source_url": family_url,
-                        "taxon": family_taxon,
-                    },
-                )
-                genera = {}
-                for entry in entries:
-                    genus_name = entry.scientific_name.split(" ", 1)[0]
-                    if genus_name not in genera:
-                        genus_taxon, _ = Taxon.objects.get_or_create(
-                            scientific_name=genus_name,
-                            parent=family_taxon,
-                            defaults={"rank": "genus"},
+            if not created:
+                if dataset.version != version or dataset.records.count() != len(nodes):
+                    raise CommandError(
+                        "既存の分類版と一致しません。既存データを上書きせず中止します。"
+                    )
+                self.stdout.write(self.style.SUCCESS("取込み済み: 分類版は変更されていません。"))
+                return
+
+            records = {}
+            taxa = {}
+            for row in payload["taxa"]:
+                parent_path = ()
+                for key, rank in RANKS:
+                    name = row[key]
+                    if name is None:
+                        continue
+                    path = (*parent_path, name.strip())
+                    if path not in records:
+                        parent_taxon = taxa.get(parent_path)
+                        taxon = Taxon.objects.create(
+                            scientific_name="",
+                            japanese_name=name.strip(),
+                            rank=rank,
+                            parent=parent_taxon,
                         )
-                        genera[genus_name], _ = TaxonDatasetRecord.objects.update_or_create(
+                        path_json = json.dumps(path, ensure_ascii=False).encode("utf-8")
+                        source_key = f"{rank}-{hashlib.sha256(path_json).hexdigest()}"
+                        record = TaxonDatasetRecord.objects.create(
                             dataset=dataset,
-                            source_key=f"genus-{family_name}-{genus_name}",
-                            defaults={
-                                "parent": family_record,
-                                "rank": TaxonDatasetRecord.Rank.GENUS,
-                                "scientific_name": genus_name,
-                                "source_url": family_url,
-                                "taxon": genus_taxon,
-                            },
+                            source_key=source_key,
+                            parent=records.get(parent_path),
+                            rank=rank,
+                            scientific_name="",
+                            japanese_name=name.strip(),
+                            source_url=source["url"],
+                            taxon=taxon,
                         )
-                    species_taxon, _ = Taxon.objects.get_or_create(
-                        scientific_name=entry.scientific_name,
-                        parent=genera[genus_name].taxon,
-                        defaults={"japanese_name": entry.japanese_name, "rank": "species"},
-                    )
-                    TaxonDatasetRecord.objects.update_or_create(
-                        dataset=dataset,
-                        source_key=entry.source_key,
-                        defaults={
-                            "parent": genera[genus_name],
-                            "rank": TaxonDatasetRecord.Rank.SPECIES,
-                            "scientific_name": entry.scientific_name,
-                            "japanese_name": entry.japanese_name,
-                            "scientific_author": entry.scientific_author,
-                            "original_publication_year": entry.original_publication_year,
-                            "source_url": family_url,
-                            "taxon": species_taxon,
-                        },
-                    )
+                        records[path] = record
+                        taxa[path] = taxon
+                    parent_path = path
             TaxonDatasetRevision.objects.create(
-                dataset=dataset, note="Wayback Machine 2021-05-05保存版から初期取込みを実行"
+                dataset=dataset, note="指定された和名分類JSONを初回取込み"
             )
-        self.stdout.write(self.style.SUCCESS("取込み成功: 5科、328種を保存しました。"))
+        self.stdout.write(self.style.SUCCESS("取込み成功: 328種の和名分類を保存しました。"))

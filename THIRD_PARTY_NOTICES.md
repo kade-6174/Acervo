@@ -20,6 +20,16 @@
 
 上記のライセンスファイルは変更・削除しません。
 
+## 日本産蝶類の和名分類データ
+
+- 同梱ファイル: [specimens/data/japanese_butterflies_ja_328.json](specimens/data/japanese_butterflies_ja_328.json)
+- 原データ: 『日本産蝶類和名学名便覧 (BINRAN)』、猪又敏男・植村好延・矢後勝也・上田恭一郎・神保宇嗣
+- 出典URL: https://web.archive.org/web/20210119031631/http://binran.lepimages.jp/taxa
+- ライセンス: [CC BY 3.0 Unported](https://creativecommons.org/licenses/by/3.0/)
+- 変更点: 指定JSONは種の和名と界〜種の分類階層を整理したデータであり、亜種・異名・学名は含まない。取込処理はこの同梱JSONのみを読み、出典サイトへ通信しない。
+
+このデータはAcervo固有部分のApache-2.0へ再ライセンスしない。
+
 ## Python依存パッケージとコンテナ基盤
 
 `pyproject.toml`のPython依存パッケージ、およびDockerfile・Composeが参照するPython、Caddy、PostgreSQL、cloudflaredの各イメージは、各配布元のライセンスに従います。この通知は、これらをAcervo固有部分と同じApache-2.0であると主張するものではありません。

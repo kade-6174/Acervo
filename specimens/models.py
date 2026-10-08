@@ -78,10 +78,16 @@ class TaxonDataset(models.Model):
 
 
 class TaxonDatasetRecord(models.Model):
-    """一つの版における科・属・種の階層。将来版と混同しない。"""
+    """一つの版における分類階層。将来版と混同しない。"""
 
     class Rank(models.TextChoices):
+        KINGDOM = "kingdom", "界"
+        PHYLUM = "phylum", "門"
+        CLASS = "class", "綱"
+        ORDER = "order", "目"
         FAMILY = "family", "科"
+        SUBFAMILY = "subfamily", "亜科"
+        TRIBE = "tribe", "族"
         GENUS = "genus", "属"
         SPECIES = "species", "種"
 
@@ -91,7 +97,7 @@ class TaxonDatasetRecord(models.Model):
         "self", null=True, blank=True, on_delete=models.PROTECT, related_name="children"
     )
     rank = models.CharField("分類階級", max_length=16, choices=Rank)
-    scientific_name = models.CharField("学名", max_length=255)
+    scientific_name = models.CharField("学名", max_length=255, blank=True)
     japanese_name = models.CharField("和名", max_length=255, blank=True)
     scientific_author = models.CharField("学名著者", max_length=255, blank=True)
     original_publication_year = models.PositiveSmallIntegerField("原記載年", null=True, blank=True)
@@ -112,7 +118,7 @@ class TaxonDatasetRecord(models.Model):
         ordering = ["rank", "scientific_name", "pk"]
 
     def __str__(self):
-        return self.scientific_name
+        return self.japanese_name or self.scientific_name
 
 
 class TaxonDatasetRevision(models.Model):

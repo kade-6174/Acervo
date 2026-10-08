@@ -2,6 +2,8 @@
   const hierarchy = document.querySelector("[data-taxon-hierarchy]");
   if (hierarchy) {
     const family = hierarchy.querySelector("[data-taxon-rank='family']");
+    const subfamily = hierarchy.querySelector("[data-taxon-rank='subfamily']");
+    const tribe = hierarchy.querySelector("[data-taxon-rank='tribe']");
     const genus = hierarchy.querySelector("[data-taxon-rank='genus']");
     const species = hierarchy.querySelector("[data-taxon-rank='species']");
 
@@ -23,11 +25,15 @@
     };
 
     const update = () => {
-      filterOptions(genus, family.value);
+      filterOptions(subfamily, family.value);
+      filterOptions(tribe, subfamily.value);
+      filterOptions(genus, tribe.value || subfamily.value);
       filterOptions(species, genus.value);
     };
 
     family.addEventListener("change", update);
+    subfamily.addEventListener("change", update);
+    tribe.addEventListener("change", update);
     genus.addEventListener("change", update);
     update();
   }

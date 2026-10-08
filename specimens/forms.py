@@ -9,7 +9,7 @@ from .models import (
     TaxonDatasetRecord,
 )
 
-JAPANESE_BUTTERFLY_DATASET_SLUG = "japanese-butterflies-binran-2010-2013"
+JAPANESE_BUTTERFLY_DATASET_SLUG = "japanese-butterflies-ja-328"
 
 
 class TaxonChoiceField(forms.ModelChoiceField):
@@ -22,12 +22,12 @@ class TaxonChoiceField(forms.ModelChoiceField):
 
 
 class TaxonDatasetRecordChoiceField(forms.ModelChoiceField):
-    """便覧の科・属・種を、和名を優先して表示する選択欄。"""
+    """指定JSONの和名分類を表示する選択欄。"""
 
     def label_from_instance(self, obj):
-        if obj.japanese_name:
+        if obj.japanese_name and obj.scientific_name:
             return f"{obj.japanese_name}（{obj.scientific_name}）"
-        return obj.scientific_name
+        return obj.japanese_name or obj.scientific_name
 
 
 class TaxonHierarchySelect(forms.Select):
@@ -68,6 +68,12 @@ class SpecimenRegistrationForm(forms.Form):
     butterfly_family = TaxonDatasetRecordChoiceField(
         label="科", queryset=TaxonDatasetRecord.objects.none(), required=False
     )
+    butterfly_subfamily = TaxonDatasetRecordChoiceField(
+        label="亜科", queryset=TaxonDatasetRecord.objects.none(), required=False
+    )
+    butterfly_tribe = TaxonDatasetRecordChoiceField(
+        label="族", queryset=TaxonDatasetRecord.objects.none(), required=False
+    )
     butterfly_genus = TaxonDatasetRecordChoiceField(
         label="属", queryset=TaxonDatasetRecord.objects.none(), required=False
     )
@@ -100,6 +106,8 @@ class SpecimenRegistrationForm(forms.Form):
         self.butterfly_dataset_available = dataset is not None
         for field_name, rank in (
             ("butterfly_family", TaxonDatasetRecord.Rank.FAMILY),
+            ("butterfly_subfamily", TaxonDatasetRecord.Rank.SUBFAMILY),
+            ("butterfly_tribe", TaxonDatasetRecord.Rank.TRIBE),
             ("butterfly_genus", TaxonDatasetRecord.Rank.GENUS),
             ("butterfly_species", TaxonDatasetRecord.Rank.SPECIES),
         ):
@@ -118,26 +126,42 @@ class SpecimenRegistrationForm(forms.Form):
     def clean(self):
         cleaned_data = super().clean()
         family = cleaned_data.get("butterfly_family")
+        subfamily = cleaned_data.get("butterfly_subfamily")
+        tribe = cleaned_data.get("butterfly_tribe")
         genus = cleaned_data.get("butterfly_genus")
         species = cleaned_data.get("butterfly_species")
-        selected_record = species or genus or family
+        selected_record = species or genus or tribe or subfamily or family
 
         if selected_record:
-            if genus and not family:
+            if subfamily and not family:
                 self.add_error("butterfly_family", "科を選択してください。")
+            if subfamily and family and subfamily.parent_id != family.pk:
+                self.add_error("butterfly_subfamily", "選択した科に属する亜科を選んでください。")
+            if tribe and not subfamily:
+                self.add_error("butterfly_subfamily", "亜科を選択してください。")
+            if tribe and subfamily and tribe.parent_id != subfamily.pk:
+                self.add_error("butterfly_tribe", "選択した亜科に属する族を選んでください。")
+            if genus and not subfamily:
+                self.add_error("butterfly_subfamily", "亜科を選択してください。")
             if species and not genus:
                 self.add_error("butterfly_genus", "属を選択してください。")
-            if genus and family and genus.parent_id != family.pk:
-                self.add_error("butterfly_genus", "選択した科に属する属を選んでください。")
+            if genus and subfamily and genus.parent_id != (tribe.pk if tribe else subfamily.pk):
+                self.add_error("butterfly_genus", "選択した亜科・族に属する属を選んでください。")
             if species and genus and species.parent_id != genus.pk:
                 self.add_error("butterfly_species", "選択した属に属する種を選んでください。")
             if cleaned_data.get("taxon"):
-                self.add_error("taxon", "便覧の分類と他の分類は同時に選択できません。")
+                self.add_error("taxon", "和名分類と他の分類は同時に選択できません。")
             if not selected_record.taxon_id:
                 raise forms.ValidationError("選択した分類を標本へ関連付けられません。")
             cleaned_data["taxon"] = selected_record.taxon
 
-        for field_name in ("butterfly_family", "butterfly_genus", "butterfly_species"):
+        for field_name in (
+            "butterfly_family",
+            "butterfly_subfamily",
+            "butterfly_tribe",
+            "butterfly_genus",
+            "butterfly_species",
+        ):
             cleaned_data.pop(field_name, None)
         return cleaned_data
 
