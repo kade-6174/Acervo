@@ -14,6 +14,7 @@ from .models import (
 )
 
 JAPANESE_BUTTERFLY_DATASET_SLUG = "japanese-butterflies-ja-328"
+LEGACY_BUTTERFLY_DATASET_SLUG = "japanese-butterflies-binran-2010-2013"
 SMALL_KANA = str.maketrans("ァィゥェォャュョッヮヵヶ", "アイウエオヤユヨツワカケ")
 RANK_ORDER = {rank: index for index, (rank, _) in enumerate(TaxonDatasetRecord.Rank.choices)}
 RANK_LABELS = dict(TaxonDatasetRecord.Rank.choices)
@@ -184,7 +185,10 @@ class SpecimenRegistrationForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["taxon"].queryset = Taxon.objects.exclude(
-            taxondatasetrecord__dataset__slug=JAPANESE_BUTTERFLY_DATASET_SLUG
+            taxondatasetrecord__dataset__slug__in=(
+                JAPANESE_BUTTERFLY_DATASET_SLUG,
+                LEGACY_BUTTERFLY_DATASET_SLUG,
+            )
         ).distinct()
         dataset = TaxonDataset.objects.filter(slug=JAPANESE_BUTTERFLY_DATASET_SLUG).first()
         self.butterfly_dataset_available = dataset is not None
