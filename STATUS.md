@@ -6,6 +6,14 @@
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。追加のカメラ切替機能はVM200へ反映し、iPhoneでの動作確認を完了した。写真選択欄はiPhoneで保存済み写真を選べるようになり、選択したスクリーンショットからQRを検出した。これは別の場所で作ったテストQRのため本番サイトのQR形式として拒否された。実際に本番サイトで発行したQR写真の読取は未確認。本番画面で製品名を固定表示しない修正はGitHub ActionsとVM200本番Compose反映まで完了した。Phase 9のQRラベル一括発行・PDF取得はローカル・CI・VM200本番Compose反映まで完了したが、Phase 9全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
+## 2026-10-08 指定JSONによる蝶類和名分類と標本管理一覧
+
+運用者が指定した`日本産蝶類_和名分類_328種.json`だけを日本産蝶類和名分類の参照元とする方針を`PROJECT_SPEC.md`へ記録した。運用者の承認を受け、元ファイルを変更せず`specimens/data/japanese_butterflies_ja_328.json`へコピーした。両ファイルのSHA-256は`1c9fb5a46cf825cc5e1a0ab04806571e502505e441a8edc6ed4b9406ac4cfa33`で一致する。出典とCC BY 3.0の適用を`THIRD_PARTY_NOTICES.md`へ明記した。取込コマンドは外部サイトを取得せず、このローカルJSONのみを読み、328種・9階級・階層の重複を保存前に検証する。新版`japanese-butterflies-ja-328`へ和名だけを取り込み、既存の便覧版レコード、学名、既存標本の分類参照は変更しない。再実行は同一版なら無変更、内容が異なる版なら上書きせず停止する。JSONにない学名は補完しない。
+
+標本登録画面の和名分類選択を科→亜科→族（該当する場合）→属→種に拡張した。ブラウザで下位候補を絞り込み、送信時も親子関係を検証する。元JSONの界・門・綱・目もDBの階層として保持する。Phase 9の次の安全な範囲として、管理者MFAゲート配下に標本管理一覧を追加し、標本番号・分類名・状態で検索して詳細へ進めるようにした。標本無効化・完全削除の操作はまだ追加していない。これらは現行の履歴・QR・写真の保護参照と公開URLの意味を含むため、別途設計を確定する。
+
+変更ファイルは`PROJECT_SPEC.md`、`THIRD_PARTY_NOTICES.md`、`STATUS.md`、`specimens/data/japanese_butterflies_ja_328.json`、`specimens/models.py`、`specimens/migrations/0004_alter_taxondatasetrecord_rank_and_more.py`、`specimens/management/commands/import_japanese_butterfly_taxa.py`、`specimens/forms.py`、`specimens/templates/specimens/register.html`、`static/js/taxon-hierarchy.js`、分類テスト、`management_portal/views.py`、`management_portal/urls.py`、管理トップ・標本管理一覧テンプレート、管理画面テストである。実JSONは328種、5科、21亜科、31族、168属、全557階層項目で、族がない48種を含む。ローカルSQLiteの全382テストは成功（PostgreSQL専用4件skip）。実JSONの件数・ハッシュ・取込結果、版違いと重複の拒否、冪等性、既存標本参照の保持、親子関係の不正送信、管理者以外とMFA未完了の拒否を確認した。Ruff lint・format、Django check、migration差分なし、JavaScript構文確認、`git diff --check`が成功した。Windowsサンドボックスでは既存の非同期DBテストが停止したため、同じテストと全体テストを通常権限で再実行して成功を確認した。PostgreSQL上のCI、本番取込み、実ブラウザの階層選択はこの記録時点では未実施。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+
 ## 2026-10-08 保管場所の編集・削除と導入先設定の参照画面
 
 Phase 9の管理画面に、保管場所の名称・備考・上位場所の編集、未使用の保管場所の削除、導入先設定の参照画面を追加した。上位場所の変更時は自分自身・下位場所への移動と同階層の同名を拒否し、既存の下位場所は新しい階層へ一緒に移動する。削除は対象名の再入力、確認チェック、直近のTOTPまたはパスキー再認証を必須とし、標本または下位場所が参照する場所は削除しない。編集・削除と監査記録は同一トランザクションで保存し、監査記録失敗時は変更を巻き戻す。監査記録には名称・備考などの入力値を含めない。`audit.0008_alter_auditlog_action`は監査操作種別のみ追加し、保管場所のDB構造は変更しない。

@@ -10,8 +10,9 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.db.models.deletion import ProtectedError
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
@@ -496,6 +497,35 @@ def site_settings(request):
             ),
             "school_year_start_month": settings.ACERVO_SCHOOL_YEAR_START_MONTH,
             "school_year_start_day": settings.ACERVO_SCHOOL_YEAR_START_DAY,
+        },
+    )
+
+
+@never_cache
+@require_GET
+def specimen_management_list(request):
+    """管理者向けに標本の状態と詳細への導線を表示する。"""
+    query = request.GET.get("q", "").strip()[:255]
+    status = request.GET.get("status", "")
+    specimens = Specimen.objects.select_related("taxon", "storage_location")
+    if query:
+        specimens = specimens.filter(
+            Q(specimen_code__icontains=query)
+            | Q(identification_text__icontains=query)
+            | Q(taxon__japanese_name__icontains=query)
+            | Q(taxon__scientific_name__icontains=query)
+        )
+    if status in Specimen.Status.values:
+        specimens = specimens.filter(status=status)
+    page = Paginator(specimens.order_by("-created_at", "-pk"), 25).get_page(request.GET.get("page"))
+    return render(
+        request,
+        "management_portal/specimen_list.html",
+        {
+            "page": page,
+            "query": query,
+            "status": status,
+            "status_choices": Specimen.Status.choices,
         },
     )
 
