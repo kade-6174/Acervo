@@ -1,6 +1,6 @@
 # Project Status
 
-最終更新: 2026-10-08
+最終更新: 2026-10-09
 
 ## Current Task
 
@@ -13,6 +13,8 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 「その他の分類」の選択欄は、指定JSONにない手入力・外部候補・旧データの分類を標本へ関連付けるため必要であり、`PROJECT_SPEC.md`の一般分類の機能として残す。表示名を「別の分類を選択する」に改め、指定JSON版の分類をこの選択欄から除き、既存のその他の分類を階級別の見出しで分けて和名優先の名前順に表示する。既存のTaxon、標本参照、JSONの内容、QRの形式・認可は変更しない。変更ファイルは`specimens/forms.py`、`specimens/templates/specimens/register.html`、`static/js/taxon-hierarchy.js`、`specimens/tests/test_butterfly_json_import.py`、`specimens/tests/test_taxonomy.py`、`core/tests/taxon_hierarchy_js_test.cjs`、本書。DB migrationと分類データの再取込みは不要である。
 
 ローカルSQLiteの全385テストは成功（PostgreSQL専用4件skip）。分類対象19テストとNode.js 5テストも成功。指定JSONの科の表示順、実際のHTMLの順序、別分類の階級グループ、上位未選択・選択済み時の候補の入替えと矛盾選択の解除を確認した。Ruff lint・format、Django check、migration差分なし、`git diff --check`も成功した。PostgreSQL上のCI、VM200本番反映、iPhone等の実ブラウザ受入はこの記録時点では未実施。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+
+実装コミット`6b8c4cf`をGitHubへpushした。GitHub Actions run `37796870289`は完了し、PostgreSQL上の`test`と、直接HTTPS・Tunnel・暗号化バックアップから空環境への復元を含む`production-container`がともに成功した。VM200は更新前の作業ツリーが清潔でHEADは`4c15f80`。PostgreSQL 18の更新前バックアップ`acervo-20261008T154316Z-4eee91b9a2c4`を終了コード0で作成し、保持規則により旧バックアップ`acervo-20261008T143541Z-47e48c141865`を1件削除した。`6b8c4cf`へfast-forwardし、Cloudflare用Compose設定検証、webイメージの再ビルドと`up -d --build --wait`が成功した。guest agentのPID `1422301`は`exited=1`、`exitcode=0`で完了し、出力は省略なし。コンテナ内`check --deploy`は問題0件、`migrate --check`は成功した。`docker compose ps`では`db`・`web`・`proxy`がhealthy、`tunnel`が稼働中。webの実行UIDは`10001`で、VM200の作業ツリーは清潔、HEADは`6b8c4cf`。一括確認の終端に`DEPLOY_OK head=6b8c4cf uid=10001`を確認した。iPhone等の実ブラウザでの分類候補の絞り込み・五十音順表示と、更新後のDB・写真ボリューム再起動永続化は未確認。本追記は文書だけのためVM200への再反映は不要。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
 
 ## 2026-10-08 標本登録の和名分類選択欄を修正
 
