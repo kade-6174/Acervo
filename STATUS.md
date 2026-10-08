@@ -8,11 +8,13 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 ## 2026-10-08 標本登録の和名分類選択欄を修正
 
-VM200へ指定JSONを取り込んだ後、iPhoneの標本登録画面で科・亜科・族・属・種の選択欄が「オプションなし」となり選べないことを運用者が確認した。DBには全557項目が存在する。原因は`SpecimenRegistrationForm`が分類レコードのquerysetを設定した後に選択ウィジェットを交換し、新しいウィジェットへ候補を渡していなかったこと。ウィジェットを各フィールドの定義時に設定し、実JSON取込後のHTMLに科・種の候補が存在する回帰テストを追加した。
+VM200へ指定JSONを取り込んだ後、本番の標本登録画面で科・亜科・族・属・種の選択欄が「オプションなし」となり選べないことを運用者が確認した。DBには全557項目が存在する。原因は`SpecimenRegistrationForm`が分類レコードのquerysetを設定した後に選択ウィジェットを交換し、新しいウィジェットへ候補を渡していなかったこと。ウィジェットを各フィールドの定義時に設定し、実JSON取込後のHTMLに科・種の候補が存在する回帰テストを追加した。
 
 下位分類は上位の選択がなくても候補を表示する。選択済みの上位階級がある場合だけ、その系統に属する候補へブラウザで絞り込む。亜科・族・属など中間の欄を空欄のまま種を選べる。送信時は選択した最下位の分類を標本に保存し、同時に選択した他の階級がその祖先に当たるかサーバー側で検証する。矛盾した組合せは拒否する。指定JSON、旧分類、既存標本の参照、QRの形式・認可は変更しない。
 
 変更ファイルは`specimens/forms.py`、`specimens/templates/specimens/register.html`、`static/js/taxon-hierarchy.js`、`specimens/tests/test_taxonomy.py`、`specimens/tests/test_butterfly_json_import.py`、`core/tests/taxon_hierarchy_js_test.cjs`、`.github/workflows/ci.yml`、本書である。ローカルSQLiteの全384テストは成功（PostgreSQL専用4件skip）。対象18テスト、Node.js 5テスト、Ruff lint・format、Django check、migration差分なし、JavaScript構文確認、`git diff --check`が成功した。PostgreSQL上のCI、VM200本番再反映、iPhoneでの再確認はこの記録時点では未実施。既存の2026-10-08バックアップは前回の更新前に取得済みで、本修正の本番更新前にも作業ツリーとバックアップを確認する。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+
+修正コミット`4c15f80`をGitHubへpushした。GitHub Actions run `37792906887`では、PostgreSQL上の`test`と、直接HTTPS・Tunnel・暗号化バックアップから空環境への復元を含む`production-container`がともに成功した。VM200は更新前の作業ツリーが清潔でHEADは`9a5df35`。PostgreSQL 18の更新前バックアップ`acervo-20261008T143541Z-47e48c141865`を終了コード0で作成し、保持規則により旧バックアップ`acervo-20261008T134137Z-bd773191b6c4`を1件削除した。`4c15f80`へfast-forward後、Cloudflare用Composeの設定検証は成功した。`up -d --build --wait`はguest agentのPID `1399222`で完了し、`exited=1`、`exitcode=0`、webのhealthyを確認した。コンテナ内`check --deploy`は問題0件、`migrate --check`は終了コード0。`docker compose ps`では`db`・`web`・`proxy`がhealthy、`tunnel`が稼働中で、webの実行UIDは`10001`だった。VM200の作業ツリーは清潔でHEADは`4c15f80`。本番webコンテナのフォームを実際に描画し、科5・亜科21・族31・属168・種328の候補が各選択欄へ出力されることを終了コード0で確認した。iPhone等の実ブラウザでの再確認と、更新後のDB・写真ボリューム再起動永続化は未実施。本追記は文書だけのためVM200への再反映は不要。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
 
 ## 2026-10-08 指定JSONによる蝶類和名分類と標本管理一覧
 
