@@ -6,13 +6,15 @@
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。追加のカメラ切替機能はVM200へ反映し、iPhoneでの動作確認を完了した。写真選択欄はiPhoneで保存済み写真を選べるようになり、選択したスクリーンショットからQRを検出した。これは別の場所で作ったテストQRのため本番サイトのQR形式として拒否された。実際に本番サイトで発行したQR写真の読取は未確認。本番画面で製品名を固定表示しない修正はGitHub ActionsとVM200本番Compose反映まで完了した。Phase 9のQRラベル一括発行・PDF取得はローカル・CI・VM200本番Compose反映まで完了したが、Phase 9全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
-## 2026-10-09 旧便覧版分類の削除準備
+## 2026-10-09 旧便覧版分類の削除
 
 運用者の指示により、指定JSON版とは別に残る旧便覧版`japanese-butterflies-binran-2010-2013`を削除対象とした。VM200の本番DBを読み取り専用で照会し、旧版1件・分類レコード501件・対応するTaxon 501件・取込み履歴2件を確認した。旧Taxonを参照する標本、他データセット、旧Taxon外の子分類、追加出典はいずれも0件。指定JSON版、手入力・外部候補の分類、運用者の元JSONは削除対象に含めない。
 
 `specimens/management/commands/remove_legacy_butterfly_taxa.py`を追加した。既定では件数確認のみ行い、`--apply`の明示指定時だけ旧版slugの取込み履歴・階層レコード・データセット・対応Taxonを一つのトランザクションで子から削除する。実行直前に標本、別データセット、外部の子分類、追加出典の参照を再確認し、参照があれば削除を中止する。`specimens/forms.py`では旧版の候補を登録画面の「別の分類」から除外し、`specimens/templates/specimens/register.html`の旧データ案内を修正した。`specimens/tests/test_remove_legacy_butterfly_taxa.py`で確認のみ・削除・標本参照時の中止・手入力の子分類参照時の中止を検証した。
 
 ローカルSQLiteの全388テストは成功（PostgreSQL専用4件skip）。追加3テストも成功。Ruff lint・format、Django check、migration差分なし、`git diff --check`が成功した。全体テストはWindows制限環境では既存の非同期DBテストで停止したため、通常権限で再実行して成功した。PostgreSQL上のCI、本番バックアップ、旧版の実削除、本番画面での候補確認はこの記録時点では未実施。本番反映時は先にバックアップを取り、同じ確認コマンドの`LEGACY_READY`を確認してから`--apply`を実行する。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+
+実装コミット`d840c0c`をGitHubへpushした。GitHub Actions run `37805572293`はPostgreSQL上の`test`と、直接HTTPS・Tunnel・暗号化バックアップから空環境への復元を含む`production-container`がともに成功した。VM200は更新前に作業ツリーが清潔でHEADは`6b8c4cf`。PostgreSQL 18の更新前バックアップ`acervo-20261008T160737Z-b19c5f085448`を終了コード0で作成し、保持規則により旧バックアップ`acervo-20261008T154316Z-4eee91b9a2c4`を1件削除した。`d840c0c`へfast-forward後、Cloudflare用Composeの設定検証と`up -d --build --wait`、コンテナ内`check --deploy`（問題0件）、`migrate --check`が成功した。旧版の再確認は`LEGACY_READY records=501 taxa=501 revisions=2`で、明示削除は`LEGACY_REMOVED records=501 taxa=501 revisions=2`で完了。さらに旧版が存在しないことを確認した。guest agentのPID `1431587`は`exited=1`、`exitcode=0`で、出力は省略なし。`docker compose ps`では`db`・`web`・`proxy`がhealthy、`tunnel`が稼働中。webの実行UIDは`10001`、VM200の作業ツリーは清潔でHEADは`d840c0c`。終端の`LEGACY_DELETE_OK head=d840c0c uid=10001`を確認した。指定JSON版の件数再照会、iPhone等の実ブラウザでの候補確認、更新後のDB・写真ボリューム再起動永続化は未実施。本追記は文書だけのためVM200への再反映は不要。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
 
 ## 2026-10-08 和名分類候補の絞り込みと五十音順
 
