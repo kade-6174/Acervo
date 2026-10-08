@@ -8,12 +8,10 @@ const vm = require("node:vm");
 
 function makeSelect(entries) {
   const options = [
-    { value: "", dataset: {}, hidden: false, disabled: false, selected: true },
+    { value: "", dataset: {}, selected: true },
     ...entries.map(([value, ancestors]) => ({
       value,
       dataset: { ancestorIds: ancestors.join(",") },
-      hidden: false,
-      disabled: false,
       selected: false,
     })),
   ];
@@ -22,14 +20,14 @@ function makeSelect(entries) {
   return {
     options,
     handlers,
-    disabled: false,
     addEventListener(name, handler) { handlers[name] = handler; },
+    replaceChildren(...available) { this.options = available; },
     get value() { return current; },
     set value(value) {
-      current = value;
-      options.forEach((option) => { option.selected = option.value === value; });
+      current = this.options.some((option) => option.value === value) ? value : "";
+      this.options.forEach((option) => { option.selected = option.value === current; });
     },
-    option(value) { return options.find((option) => option.value === value); },
+    values() { return this.options.map((option) => option.value); },
   };
 }
 
@@ -58,9 +56,7 @@ test("和名分類は上位の空欄を許し、選択済みの系統だけへ�
     },
   });
 
-  assert.equal(selects.species.disabled, false);
-  assert.equal(selects.species.option("s1").disabled, false);
-  assert.equal(selects.species.option("s2").disabled, false);
+  assert.deepEqual(selects.species.values(), ["", "s1", "s2"]);
   selects.species.value = "s1";
   selects.species.handlers.change();
   assert.equal(selects.species.value, "s1");
@@ -68,13 +64,23 @@ test("和名分類は上位の空欄を許し、選択済みの系統だけへ�
   selects.family.value = "f1";
   selects.family.handlers.change();
   assert.equal(selects.species.value, "s1");
-  assert.equal(selects.subfamily.option("sf2").disabled, true);
-  assert.equal(selects.species.option("s2").disabled, true);
-  assert.equal(selects.genus.option("g1").disabled, false);
+  assert.deepEqual(selects.subfamily.values(), ["", "sf1"]);
+  assert.deepEqual(selects.species.values(), ["", "s1"]);
+  assert.deepEqual(selects.genus.values(), ["", "g1"]);
 
   selects.family.value = "f2";
   selects.family.handlers.change();
   assert.equal(selects.species.value, "");
-  assert.equal(selects.species.option("s2").disabled, false);
-  assert.equal(selects.genus.option("g1").disabled, true);
+  assert.deepEqual(selects.species.values(), ["", "s2"]);
+  assert.deepEqual(selects.genus.values(), ["", "g2"]);
+
+  selects.family.value = "";
+  selects.family.handlers.change();
+  assert.deepEqual(selects.subfamily.values(), ["", "sf1", "sf2"]);
+  assert.deepEqual(selects.species.values(), ["", "s1", "s2"]);
+
+  selects.subfamily.value = "sf1";
+  selects.subfamily.handlers.change();
+  assert.deepEqual(selects.genus.values(), ["", "g1"]);
+  assert.deepEqual(selects.species.values(), ["", "s1"]);
 });

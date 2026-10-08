@@ -75,9 +75,24 @@ class JapaneseButterflyJsonImportTests(TestCase):
         self.assertFalse(records.exclude(scientific_name="").exists())
 
         form = SpecimenRegistrationForm()
+        family_labels = [
+            str(label) for value, label in form.fields["butterfly_family"].choices if value
+        ]
+        self.assertEqual(
+            family_labels,
+            [
+                "アゲハチョウ科",
+                "シジミチョウ科",
+                "シロチョウ科",
+                "セセリチョウ科",
+                "タテハチョウ科",
+            ],
+        )
         family = records.get(rank="family", japanese_name="アゲハチョウ科")
-        self.assertIn(f'value="{family.pk}"', str(form["butterfly_family"]))
-        self.assertIn("アゲハチョウ科", str(form["butterfly_family"]))
+        family_html = str(form["butterfly_family"])
+        self.assertIn(f'value="{family.pk}"', family_html)
+        self.assertIn("アゲハチョウ科", family_html)
+        self.assertLess(family_html.index("アゲハチョウ科"), family_html.index("シジミチョウ科"))
         tribe_free_species = records.filter(
             rank="species", parent__parent__rank="subfamily"
         ).first()
@@ -91,6 +106,7 @@ class JapaneseButterflyJsonImportTests(TestCase):
         )
         self.assertTrue(selected.is_valid(), selected.errors)
         self.assertEqual(selected.cleaned_data["taxon"].pk, tribe_free_species.taxon_id)
+        self.assertFalse(form.fields["taxon"].queryset.exists())
 
     def test_import_is_atomic_idempotent_and_preserves_existing_taxa(self):
         old_dataset = TaxonDataset.objects.create(

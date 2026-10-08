@@ -7,28 +7,24 @@
     const genus = hierarchy.querySelector("[data-taxon-rank='genus']");
     const species = hierarchy.querySelector("[data-taxon-rank='species']");
     const selects = [family, subfamily, tribe, genus, species];
+    const optionCatalogs = selects.map((select) => Array.from(select.options));
 
-    const filterOptions = (select, selectedAncestors) => {
-      for (const option of select.options) {
-        if (!option.value) {
-          option.hidden = false;
-          option.disabled = false;
-          continue;
-        }
+    const filterOptions = (select, catalog, selectedAncestors) => {
+      const selectedValue = select.value;
+      const available = catalog.filter((option) => {
+        if (!option.value) return true;
         const ancestorIds = (option.dataset.ancestorIds || "").split(",");
-        const visible = selectedAncestors.every((id) => ancestorIds.includes(id));
-        option.hidden = !visible;
-        option.disabled = !visible;
-        if (!visible && option.selected) {
-          select.value = "";
-        }
-      }
+        return selectedAncestors.every((id) => ancestorIds.includes(id));
+      });
+      select.replaceChildren(...available);
+      select.value = available.some((option) => option.value === selectedValue) ? selectedValue : "";
     };
 
     const update = () => {
       for (let index = 1; index < selects.length; index += 1) {
         filterOptions(
           selects[index],
+          optionCatalogs[index],
           selects.slice(0, index).map((select) => select.value).filter(Boolean),
         );
       }

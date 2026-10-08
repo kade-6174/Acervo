@@ -1,4 +1,8 @@
+import unicodedata
+from itertools import groupby
+
 from django import forms
+from django.forms.models import ModelChoiceIterator
 
 from .models import (
     Specimen,
@@ -10,6 +14,57 @@ from .models import (
 )
 
 JAPANESE_BUTTERFLY_DATASET_SLUG = "japanese-butterflies-ja-328"
+SMALL_KANA = str.maketrans("ァィゥェォャュョッヮヵヶ", "アイウエオヤユヨツワカケ")
+RANK_ORDER = {rank: index for index, (rank, _) in enumerate(TaxonDatasetRecord.Rank.choices)}
+RANK_LABELS = dict(TaxonDatasetRecord.Rank.choices)
+
+
+def _japanese_sort_key(name):
+    normalized = unicodedata.normalize("NFKC", name)
+    katakana = "".join(
+        chr(ord(character) + 0x60) if "ぁ" <= character <= "ゖ" else character
+        for character in normalized
+    )
+    return katakana.translate(SMALL_KANA).casefold(), katakana.casefold()
+
+
+class JapaneseNameChoiceIterator(ModelChoiceIterator):
+    """和名優先で五十音順に選択肢を描画する。"""
+
+    def __iter__(self):
+        if self.field.empty_label is not None:
+            yield "", self.field.empty_label
+        records = sorted(
+            self.queryset,
+            key=lambda record: (
+                not bool(record.japanese_name),
+                _japanese_sort_key(record.japanese_name or record.scientific_name),
+                record.pk,
+            ),
+        )
+        for record in records:
+            yield self.choice(record)
+
+
+class GroupedTaxonChoiceIterator(ModelChoiceIterator):
+    """和名分類以外のローカル分類を階級ごとに表示する。"""
+
+    def __iter__(self):
+        if self.field.empty_label is not None:
+            yield "", self.field.empty_label
+        taxa = sorted(
+            self.queryset,
+            key=lambda taxon: (
+                RANK_ORDER.get(taxon.rank, len(RANK_ORDER)),
+                taxon.rank,
+                not bool(taxon.japanese_name),
+                _japanese_sort_key(taxon.japanese_name or taxon.scientific_name),
+                taxon.pk,
+            ),
+        )
+        for rank, group in groupby(taxa, key=lambda taxon: taxon.rank):
+            label = RANK_LABELS.get(rank, "その他" if rank else "階級未設定")
+            yield label, [self.choice(taxon) for taxon in group]
 
 
 class TaxonChoiceField(forms.ModelChoiceField):
@@ -21,8 +76,14 @@ class TaxonChoiceField(forms.ModelChoiceField):
         return obj.japanese_name or obj.scientific_name or f"分類 {obj.pk}"
 
 
+class GroupedTaxonChoiceField(TaxonChoiceField):
+    iterator = GroupedTaxonChoiceIterator
+
+
 class TaxonDatasetRecordChoiceField(forms.ModelChoiceField):
     """指定JSONの和名分類を表示する選択欄。"""
+
+    iterator = JapaneseNameChoiceIterator
 
     def label_from_instance(self, obj):
         if obj.japanese_name and obj.scientific_name:
@@ -100,8 +161,8 @@ class SpecimenRegistrationForm(forms.Form):
         required=False,
         widget=TaxonHierarchySelect(attrs={"class": "form-select", "data-taxon-rank": "species"}),
     )
-    taxon = TaxonChoiceField(
-        label="分類", queryset=Taxon.objects.all(), required=False, empty_label="未選択"
+    taxon = GroupedTaxonChoiceField(
+        label="登録済みの分類", queryset=Taxon.objects.none(), required=False, empty_label="未選択"
     )
     identification_text = forms.CharField(label="同定情報", max_length=500, required=False)
     acquisition_method = forms.ChoiceField(label="入手方法", choices=Specimen.AcquisitionMethod)
@@ -122,6 +183,9 @@ class SpecimenRegistrationForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["taxon"].queryset = Taxon.objects.exclude(
+            taxondatasetrecord__dataset__slug=JAPANESE_BUTTERFLY_DATASET_SLUG
+        ).distinct()
         dataset = TaxonDataset.objects.filter(slug=JAPANESE_BUTTERFLY_DATASET_SLUG).first()
         self.butterfly_dataset_available = dataset is not None
         for field_name, rank in (

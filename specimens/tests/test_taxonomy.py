@@ -219,6 +219,21 @@ class ButterflyHierarchyFormTests(TestCase):
                     self.species_taxon if "butterfly_species" in selections else self.genus_taxon,
                 )
 
+    def test_other_taxa_are_grouped_by_rank_and_sorted_by_japanese_name(self):
+        Taxon.objects.create(japanese_name="いろは", rank="species")
+        Taxon.objects.create(japanese_name="エビ", rank="species")
+        Taxon.objects.create(japanese_name="アオ", rank="species")
+        Taxon.objects.create(scientific_name="Example genus", rank="genus")
+
+        form = SpecimenRegistrationForm()
+        html = str(form["taxon"])
+        self.assertIn('<optgroup label="属">', html)
+        self.assertIn('<optgroup label="種">', html)
+        self.assertLess(html.index("Example genus"), html.index("アオ"))
+        self.assertLess(html.index("アオ"), html.index("いろは"))
+        self.assertLess(html.index("いろは"), html.index("エビ"))
+        self.assertNotIn(f'value="{self.species_taxon.pk}"', html)
+
     def test_registration_rejects_a_species_outside_the_selected_genus(self):
         other_genus_taxon = Taxon.objects.create(
             scientific_name="Graphium", rank="genus", parent=self.subfamily_taxon

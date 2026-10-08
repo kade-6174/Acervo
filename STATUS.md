@@ -6,6 +6,14 @@
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。追加のカメラ切替機能はVM200へ反映し、iPhoneでの動作確認を完了した。写真選択欄はiPhoneで保存済み写真を選べるようになり、選択したスクリーンショットからQRを検出した。これは別の場所で作ったテストQRのため本番サイトのQR形式として拒否された。実際に本番サイトで発行したQR写真の読取は未確認。本番画面で製品名を固定表示しない修正はGitHub ActionsとVM200本番Compose反映まで完了した。Phase 9のQRラベル一括発行・PDF取得はローカル・CI・VM200本番Compose反映まで完了したが、Phase 9全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
+## 2026-10-08 和名分類候補の絞り込みと五十音順
+
+標本登録の科・亜科・族・属・種の各選択欄は、選択済みの上位階級がある場合、その祖先を持つ候補だけを選択欄へ残す。ブラウザによって非表示optionが選択画面に残ることを避け、候補そのものを選択欄から外す。上位階級を選ばなければ、その階級の全候補を表示する。上位の変更で矛盾する下位の選択は解除する。候補は指定JSONに保存された和名を五十音順に並べ、半角・ひらがな・小書き仮名を正規化して比較する。送信時の祖先関係のサーバー側検証は維持する。
+
+「その他の分類」の選択欄は、指定JSONにない手入力・外部候補・旧データの分類を標本へ関連付けるため必要であり、`PROJECT_SPEC.md`の一般分類の機能として残す。表示名を「別の分類を選択する」に改め、指定JSON版の分類をこの選択欄から除き、既存のその他の分類を階級別の見出しで分けて和名優先の名前順に表示する。既存のTaxon、標本参照、JSONの内容、QRの形式・認可は変更しない。変更ファイルは`specimens/forms.py`、`specimens/templates/specimens/register.html`、`static/js/taxon-hierarchy.js`、`specimens/tests/test_butterfly_json_import.py`、`specimens/tests/test_taxonomy.py`、`core/tests/taxon_hierarchy_js_test.cjs`、本書。DB migrationと分類データの再取込みは不要である。
+
+ローカルSQLiteの全385テストは成功（PostgreSQL専用4件skip）。分類対象19テストとNode.js 5テストも成功。指定JSONの科の表示順、実際のHTMLの順序、別分類の階級グループ、上位未選択・選択済み時の候補の入替えと矛盾選択の解除を確認した。Ruff lint・format、Django check、migration差分なし、`git diff --check`も成功した。PostgreSQL上のCI、VM200本番反映、iPhone等の実ブラウザ受入はこの記録時点では未実施。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+
 ## 2026-10-08 標本登録の和名分類選択欄を修正
 
 VM200へ指定JSONを取り込んだ後、本番の標本登録画面で科・亜科・族・属・種の選択欄が「オプションなし」となり選べないことを運用者が確認した。DBには全557項目が存在する。原因は`SpecimenRegistrationForm`が分類レコードのquerysetを設定した後に選択ウィジェットを交換し、新しいウィジェットへ候補を渡していなかったこと。ウィジェットを各フィールドの定義時に設定し、実JSON取込後のHTMLに科・種の候補が存在する回帰テストを追加した。
