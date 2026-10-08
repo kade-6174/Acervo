@@ -190,6 +190,35 @@ class ButterflyHierarchyFormTests(TestCase):
         family_labels = [str(label) for _, label in form.fields["butterfly_family"].choices]
         self.assertIn("アゲハチョウ科（Papilionidae）", family_labels)
 
+    def test_registration_renders_dataset_options_in_each_hierarchy_select(self):
+        form = SpecimenRegistrationForm()
+
+        for field_name, record in (
+            ("butterfly_family", self.family),
+            ("butterfly_subfamily", self.subfamily),
+            ("butterfly_genus", self.genus),
+            ("butterfly_species", self.species),
+        ):
+            self.assertIn(f'value="{record.pk}"', str(form[field_name]))
+        self.assertIn(
+            f'data-ancestor-ids="{self.genus.pk},{self.subfamily.pk},{self.family.pk}"',
+            str(form["butterfly_species"]),
+        )
+
+    def test_registration_accepts_lower_ranks_without_selecting_upper_ranks(self):
+        for selections in (
+            {"butterfly_species": self.species.pk},
+            {"butterfly_genus": self.genus.pk},
+            {"butterfly_family": self.family.pk, "butterfly_species": self.species.pk},
+        ):
+            with self.subTest(selections=selections):
+                form = SpecimenRegistrationForm({**selections, "acquisition_method": "other"})
+                self.assertTrue(form.is_valid(), form.errors)
+                self.assertEqual(
+                    form.cleaned_data["taxon"],
+                    self.species_taxon if "butterfly_species" in selections else self.genus_taxon,
+                )
+
     def test_registration_rejects_a_species_outside_the_selected_genus(self):
         other_genus_taxon = Taxon.objects.create(
             scientific_name="Graphium", rank="genus", parent=self.subfamily_taxon
@@ -215,7 +244,25 @@ class ButterflyHierarchyFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("butterfly_species", form.errors)
 
-    def test_registration_requires_tribe_when_genus_is_below_tribe(self):
+        other_family_taxon = Taxon.objects.create(japanese_name="別の科", rank="family")
+        other_family = TaxonDatasetRecord.objects.create(
+            dataset=self.family.dataset,
+            source_key="family-other",
+            rank=TaxonDatasetRecord.Rank.FAMILY,
+            japanese_name="別の科",
+            taxon=other_family_taxon,
+        )
+        mismatched = SpecimenRegistrationForm(
+            {
+                "butterfly_family": other_family.pk,
+                "butterfly_species": self.species.pk,
+                "acquisition_method": "other",
+            }
+        )
+        self.assertFalse(mismatched.is_valid())
+        self.assertIn("butterfly_species", mismatched.errors)
+
+    def test_registration_allows_skipped_tribe_but_rejects_a_different_tribe(self):
         tribe_taxon = Taxon.objects.create(
             japanese_name="アゲハチョウ族", rank="tribe", parent=self.subfamily_taxon
         )
@@ -236,11 +283,33 @@ class ButterflyHierarchyFormTests(TestCase):
             "butterfly_species": self.species.pk,
             "acquisition_method": "other",
         }
-        forged = SpecimenRegistrationForm(base)
-        self.assertFalse(forged.is_valid())
-        self.assertIn("butterfly_genus", forged.errors)
+        without_tribe = SpecimenRegistrationForm(base)
+        self.assertTrue(without_tribe.is_valid(), without_tribe.errors)
         valid = SpecimenRegistrationForm({**base, "butterfly_tribe": tribe.pk})
         self.assertTrue(valid.is_valid(), valid.errors)
+
+        another_tribe_taxon = Taxon.objects.create(japanese_name="別の族", rank="tribe")
+        another_tribe = TaxonDatasetRecord.objects.create(
+            dataset=self.family.dataset,
+            source_key="tribe-other",
+            parent=self.subfamily,
+            rank=TaxonDatasetRecord.Rank.TRIBE,
+            japanese_name="別の族",
+            taxon=another_tribe_taxon,
+        )
+        mismatched = SpecimenRegistrationForm({**base, "butterfly_tribe": another_tribe.pk})
+        self.assertFalse(mismatched.is_valid())
+        self.assertIn("butterfly_species", mismatched.errors)
+
+        skipped = SpecimenRegistrationForm(
+            {
+                "butterfly_family": self.family.pk,
+                "butterfly_genus": self.genus.pk,
+                "butterfly_species": self.species.pk,
+                "acquisition_method": "other",
+            }
+        )
+        self.assertTrue(skipped.is_valid(), skipped.errors)
 
     def test_manual_form_uses_japanese_rank_labels_and_validates_the_parent_rank(self):
         form = TaxonManualForm(

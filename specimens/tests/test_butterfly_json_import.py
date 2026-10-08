@@ -11,6 +11,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from accounts.models import User
+from specimens.forms import SpecimenRegistrationForm
 from specimens.management.commands.import_japanese_butterfly_taxa import (
     DATASET_SLUG,
     DEFAULT_SOURCE,
@@ -72,6 +73,24 @@ class JapaneseButterflyJsonImportTests(TestCase):
         self.assertEqual(records.filter(rank="genus").count(), 168)
         self.assertEqual(records.filter(rank="species").count(), 328)
         self.assertFalse(records.exclude(scientific_name="").exists())
+
+        form = SpecimenRegistrationForm()
+        family = records.get(rank="family", japanese_name="アゲハチョウ科")
+        self.assertIn(f'value="{family.pk}"', str(form["butterfly_family"]))
+        self.assertIn("アゲハチョウ科", str(form["butterfly_family"]))
+        tribe_free_species = records.filter(
+            rank="species", parent__parent__rank="subfamily"
+        ).first()
+        self.assertIsNotNone(tribe_free_species)
+        self.assertIn(f'value="{tribe_free_species.pk}"', str(form["butterfly_species"]))
+        selected = SpecimenRegistrationForm(
+            {
+                "butterfly_species": tribe_free_species.pk,
+                "acquisition_method": "other",
+            }
+        )
+        self.assertTrue(selected.is_valid(), selected.errors)
+        self.assertEqual(selected.cleaned_data["taxon"].pk, tribe_free_species.taxon_id)
 
     def test_import_is_atomic_idempotent_and_preserves_existing_taxa(self):
         old_dataset = TaxonDataset.objects.create(

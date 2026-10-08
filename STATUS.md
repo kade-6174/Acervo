@@ -6,6 +6,14 @@
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。追加のカメラ切替機能はVM200へ反映し、iPhoneでの動作確認を完了した。写真選択欄はiPhoneで保存済み写真を選べるようになり、選択したスクリーンショットからQRを検出した。これは別の場所で作ったテストQRのため本番サイトのQR形式として拒否された。実際に本番サイトで発行したQR写真の読取は未確認。本番画面で製品名を固定表示しない修正はGitHub ActionsとVM200本番Compose反映まで完了した。Phase 9のQRラベル一括発行・PDF取得はローカル・CI・VM200本番Compose反映まで完了したが、Phase 9全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
+## 2026-10-08 標本登録の和名分類選択欄を修正
+
+VM200へ指定JSONを取り込んだ後、iPhoneの標本登録画面で科・亜科・族・属・種の選択欄が「オプションなし」となり選べないことを運用者が確認した。DBには全557項目が存在する。原因は`SpecimenRegistrationForm`が分類レコードのquerysetを設定した後に選択ウィジェットを交換し、新しいウィジェットへ候補を渡していなかったこと。ウィジェットを各フィールドの定義時に設定し、実JSON取込後のHTMLに科・種の候補が存在する回帰テストを追加した。
+
+下位分類は上位の選択がなくても候補を表示する。選択済みの上位階級がある場合だけ、その系統に属する候補へブラウザで絞り込む。亜科・族・属など中間の欄を空欄のまま種を選べる。送信時は選択した最下位の分類を標本に保存し、同時に選択した他の階級がその祖先に当たるかサーバー側で検証する。矛盾した組合せは拒否する。指定JSON、旧分類、既存標本の参照、QRの形式・認可は変更しない。
+
+変更ファイルは`specimens/forms.py`、`specimens/templates/specimens/register.html`、`static/js/taxon-hierarchy.js`、`specimens/tests/test_taxonomy.py`、`specimens/tests/test_butterfly_json_import.py`、`core/tests/taxon_hierarchy_js_test.cjs`、`.github/workflows/ci.yml`、本書である。ローカルSQLiteの全384テストは成功（PostgreSQL専用4件skip）。対象18テスト、Node.js 5テスト、Ruff lint・format、Django check、migration差分なし、JavaScript構文確認、`git diff --check`が成功した。PostgreSQL上のCI、VM200本番再反映、iPhoneでの再確認はこの記録時点では未実施。既存の2026-10-08バックアップは前回の更新前に取得済みで、本修正の本番更新前にも作業ツリーとバックアップを確認する。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+
 ## 2026-10-08 指定JSONによる蝶類和名分類と標本管理一覧
 
 運用者が指定した`日本産蝶類_和名分類_328種.json`だけを日本産蝶類和名分類の参照元とする方針を`PROJECT_SPEC.md`へ記録した。運用者の承認を受け、元ファイルを変更せず`specimens/data/japanese_butterflies_ja_328.json`へコピーした。両ファイルのSHA-256は`1c9fb5a46cf825cc5e1a0ab04806571e502505e441a8edc6ed4b9406ac4cfa33`で一致する。出典とCC BY 3.0の適用を`THIRD_PARTY_NOTICES.md`へ明記した。取込コマンドは外部サイトを取得せず、このローカルJSONのみを読み、328種・9階級・階層の重複を保存前に検証する。新版`japanese-butterflies-ja-328`へ和名だけを取り込み、既存の便覧版レコード、学名、既存標本の分類参照は変更しない。再実行は同一版なら無変更、内容が異なる版なら上書きせず停止する。JSONにない学名は補完しない。

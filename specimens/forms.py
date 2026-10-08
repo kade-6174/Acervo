@@ -31,13 +31,18 @@ class TaxonDatasetRecordChoiceField(forms.ModelChoiceField):
 
 
 class TaxonHierarchySelect(forms.Select):
-    """親レコードのIDをoptionへ渡し、ブラウザ側で下位候補を絞り込む。"""
+    """祖先レコードのIDをoptionへ渡し、空欄の中間階級を許容する。"""
 
     def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
         option = super().create_option(name, value, label, selected, index, subindex, attrs)
         instance = getattr(value, "instance", None)
         if instance is not None:
-            option["attrs"]["data-parent-id"] = str(instance.parent_id or "")
+            ancestor_ids = []
+            parent = instance.parent
+            while parent is not None:
+                ancestor_ids.append(str(parent.pk))
+                parent = parent.parent
+            option["attrs"]["data-ancestor-ids"] = ",".join(ancestor_ids)
         return option
 
 
@@ -66,19 +71,34 @@ class MultipleFileField(forms.FileField):
 
 class SpecimenRegistrationForm(forms.Form):
     butterfly_family = TaxonDatasetRecordChoiceField(
-        label="科", queryset=TaxonDatasetRecord.objects.none(), required=False
+        label="科",
+        queryset=TaxonDatasetRecord.objects.none(),
+        required=False,
+        widget=TaxonHierarchySelect(attrs={"class": "form-select", "data-taxon-rank": "family"}),
     )
     butterfly_subfamily = TaxonDatasetRecordChoiceField(
-        label="亜科", queryset=TaxonDatasetRecord.objects.none(), required=False
+        label="亜科",
+        queryset=TaxonDatasetRecord.objects.none(),
+        required=False,
+        widget=TaxonHierarchySelect(attrs={"class": "form-select", "data-taxon-rank": "subfamily"}),
     )
     butterfly_tribe = TaxonDatasetRecordChoiceField(
-        label="族", queryset=TaxonDatasetRecord.objects.none(), required=False
+        label="族",
+        queryset=TaxonDatasetRecord.objects.none(),
+        required=False,
+        widget=TaxonHierarchySelect(attrs={"class": "form-select", "data-taxon-rank": "tribe"}),
     )
     butterfly_genus = TaxonDatasetRecordChoiceField(
-        label="属", queryset=TaxonDatasetRecord.objects.none(), required=False
+        label="属",
+        queryset=TaxonDatasetRecord.objects.none(),
+        required=False,
+        widget=TaxonHierarchySelect(attrs={"class": "form-select", "data-taxon-rank": "genus"}),
     )
     butterfly_species = TaxonDatasetRecordChoiceField(
-        label="種", queryset=TaxonDatasetRecord.objects.none(), required=False
+        label="種",
+        queryset=TaxonDatasetRecord.objects.none(),
+        required=False,
+        widget=TaxonHierarchySelect(attrs={"class": "form-select", "data-taxon-rank": "species"}),
     )
     taxon = TaxonChoiceField(
         label="分類", queryset=Taxon.objects.all(), required=False, empty_label="未選択"
@@ -114,13 +134,10 @@ class SpecimenRegistrationForm(forms.Form):
             field = self.fields[field_name]
             field.queryset = (
                 TaxonDatasetRecord.objects.filter(dataset=dataset, rank=rank).select_related(
-                    "taxon", "parent"
+                    "taxon", "parent__parent__parent__parent__parent__parent__parent__parent"
                 )
                 if dataset
                 else TaxonDatasetRecord.objects.none()
-            )
-            field.widget = TaxonHierarchySelect(
-                attrs={"class": "form-select", "data-taxon-rank": rank}
             )
 
     def clean(self):
@@ -133,22 +150,27 @@ class SpecimenRegistrationForm(forms.Form):
         selected_record = species or genus or tribe or subfamily or family
 
         if selected_record:
-            if subfamily and not family:
-                self.add_error("butterfly_family", "科を選択してください。")
-            if subfamily and family and subfamily.parent_id != family.pk:
-                self.add_error("butterfly_subfamily", "選択した科に属する亜科を選んでください。")
-            if tribe and not subfamily:
-                self.add_error("butterfly_subfamily", "亜科を選択してください。")
-            if tribe and subfamily and tribe.parent_id != subfamily.pk:
-                self.add_error("butterfly_tribe", "選択した亜科に属する族を選んでください。")
-            if genus and not subfamily:
-                self.add_error("butterfly_subfamily", "亜科を選択してください。")
-            if species and not genus:
-                self.add_error("butterfly_genus", "属を選択してください。")
-            if genus and subfamily and genus.parent_id != (tribe.pk if tribe else subfamily.pk):
-                self.add_error("butterfly_genus", "選択した亜科・族に属する属を選んでください。")
-            if species and genus and species.parent_id != genus.pk:
-                self.add_error("butterfly_species", "選択した属に属する種を選んでください。")
+            selected_field_name = next(
+                field_name
+                for field_name, record in (
+                    ("butterfly_species", species),
+                    ("butterfly_genus", genus),
+                    ("butterfly_tribe", tribe),
+                    ("butterfly_subfamily", subfamily),
+                    ("butterfly_family", family),
+                )
+                if record
+            )
+            ancestor_ids = set()
+            parent = selected_record.parent
+            while parent is not None:
+                ancestor_ids.add(parent.pk)
+                parent = parent.parent
+            if any(
+                record and record.pk != selected_record.pk and record.pk not in ancestor_ids
+                for record in (family, subfamily, tribe, genus)
+            ):
+                self.add_error(selected_field_name, "選択した上位分類の系統と一致しません。")
             if cleaned_data.get("taxon"):
                 self.add_error("taxon", "和名分類と他の分類は同時に選択できません。")
             if not selected_record.taxon_id:

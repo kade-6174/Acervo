@@ -6,35 +6,35 @@
     const tribe = hierarchy.querySelector("[data-taxon-rank='tribe']");
     const genus = hierarchy.querySelector("[data-taxon-rank='genus']");
     const species = hierarchy.querySelector("[data-taxon-rank='species']");
+    const selects = [family, subfamily, tribe, genus, species];
 
-    const filterOptions = (select, parentId) => {
+    const filterOptions = (select, selectedAncestors) => {
       for (const option of select.options) {
         if (!option.value) {
           option.hidden = false;
           option.disabled = false;
           continue;
         }
-        const visible = Boolean(parentId) && option.dataset.parentId === parentId;
+        const ancestorIds = (option.dataset.ancestorIds || "").split(",");
+        const visible = selectedAncestors.every((id) => ancestorIds.includes(id));
         option.hidden = !visible;
         option.disabled = !visible;
         if (!visible && option.selected) {
           select.value = "";
         }
       }
-      select.disabled = !parentId;
     };
 
     const update = () => {
-      filterOptions(subfamily, family.value);
-      filterOptions(tribe, subfamily.value);
-      filterOptions(genus, tribe.value || subfamily.value);
-      filterOptions(species, genus.value);
+      for (let index = 1; index < selects.length; index += 1) {
+        filterOptions(
+          selects[index],
+          selects.slice(0, index).map((select) => select.value).filter(Boolean),
+        );
+      }
     };
 
-    family.addEventListener("change", update);
-    subfamily.addEventListener("change", update);
-    tribe.addEventListener("change", update);
-    genus.addEventListener("change", update);
+    selects.forEach((select) => select.addEventListener("change", update));
     update();
   }
 

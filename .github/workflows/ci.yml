@@ -55,8 +55,8 @@ jobs:
           ruff check .
           ruff format --check .
 
-      - name: PWAのキャッシュ境界とQR読取を確認
-        run: node --test core/tests/pwa_js_test.cjs
+      - name: PWAのキャッシュ境界、QR読取、分類選択を確認
+        run: node --test core/tests/pwa_js_test.cjs core/tests/taxon_hierarchy_js_test.cjs
 
       - name: Django設定を確認
         run: python manage.py check --settings=config.settings.test
