@@ -8,6 +8,10 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 ## 2026-10-09 監査ログ画面の検索と標本登録の分類UI整理
 
+実装コミット`7a52c78`と`bb73f15`をGitHubへpushした。GitHub Actions run `37942717540`ではPostgreSQL上の`test`と`production-container`がともに成功した。2026-10-09にProxmoxホストへの公開鍵SSH接続を使い、VM200をQEMU guest agent経由で本番更新した。更新前のVM200は作業ツリーが清潔でHEADは`d840c0c`。更新前バックアップを終了コード0で作成し、保存先に`acervo-20261009T143013Z-9511c5b9f4e6`の暗号化payload・metadata・checksumsの3ファイルが存在することを確認した。保持規則による削除の対象名は取得していない。`bb73f15`へのfast-forward、本番Cloudflare用Compose設定検証、`up -d --build --wait`、webコンテナ内`check --deploy`、`migrate --check`は一連のガード付き処理で成功し、最終表示`DEPLOY_OK head=bb73f15 uid=10001`とguest agent終了コード0を確認した。別途`docker compose ps`で`db`・`web`・`proxy`がhealthy、`tunnel`が稼働中であること、webの実行UIDが`10001`であること、VM200のGit作業ツリーが清潔でHEADが`bb73f15`であることを確認した。実ブラウザでの監査ログ絞込み・標本登録の受入と、更新後のDB・写真ボリューム再起動永続化は未実施。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+
+同日、運用者の指示でProxmoxホストのSSH管理経路を設定した。Windows側の既存公開鍵とProxmoxの登録済み公開鍵の指紋一致を確認し、`/etc/ssh/sshd_config.d/10-acervo-management.conf`でSSHの待受を`vmbr0`のプライベートLANアドレスに限定し、rootのパスワード認証とキーボード対話認証を無効化した。新規の公開鍵接続と`sshd -t`を確認後、`ssh.service`の自動起動を有効化し、このPCのSSH設定へ`pve`接続先を追加した。`ssh pve`でProxmoxとVM200の稼働を再確認した。ProxmoxホストにはTailscaleコマンドがなく、このPCのTailscaleは未接続のため、現在確認できたSSH経路は同一LAN内からに限る。VM200のSSHは変更していない。
+
 Phase 9の監査ログ画面は従来の直近100件制限を外し、操作種別・経路・実行者名・開始日・終了日で絞り、50件ずつ新しい順に閲覧できるようにした。不正な条件はフォームエラーとして表示し、未絞込みの記録を意図せず表示しない。ページ移動時も有効な絞込み条件を保持する。変更ファイルは`management_portal/views.py`、`management_portal/templates/management_portal/audit_log_list.html`、`management_portal/tests/test_audit_log_ui.py`。管理者MFAゲートとキャッシュ禁止を維持する。
 
 運用者の追加指示により、標本登録画面から「別の分類を選択する」の一覧を削除し、科・亜科・族・属・種の和名分類欄だけを表示する。既存の分類候補検索・手入力と、登録後の標本編集での分類指定は維持する。登録確認で保存済み分類を再検証できるようにし、和名分類を選んだQR登録が確定まで通る回帰テストを追加した。確認画面では和名がある分類を和名優先で表示する。変更ファイルは`specimens/forms.py`、`specimens/views.py`、`specimens/templates/specimens/register.html`、`specimens/templates/specimens/edit.html`、`specimens/tests/test_taxonomy.py`。分類JSON、既存標本、QRの形式・認可、DB構造は変更しない。
