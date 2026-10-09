@@ -151,6 +151,41 @@ class QRLabelRetirementConfirmationForm(forms.Form):
         )
 
 
+class AuditLogFilterForm(forms.Form):
+    action = forms.ChoiceField(
+        label="操作",
+        choices=[("", "すべての操作"), *AuditLog.Action.choices],
+        required=False,
+    )
+    channel = forms.ChoiceField(
+        label="経路",
+        choices=[("", "すべての経路"), *AuditLog.Channel.choices],
+        required=False,
+    )
+    actor_username = forms.CharField(label="実行者のユーザー名", max_length=150, required=False)
+    from_date = forms.DateField(
+        label="開始日", required=False, widget=forms.DateInput(attrs={"type": "date"})
+    )
+    to_date = forms.DateField(
+        label="終了日", required=False, widget=forms.DateInput(attrs={"type": "date"})
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ("action", "channel"):
+            self.fields[field_name].widget.attrs["class"] = "form-select"
+        for field_name in ("actor_username", "from_date", "to_date"):
+            self.fields[field_name].widget.attrs["class"] = "form-control"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        from_date = cleaned_data.get("from_date")
+        to_date = cleaned_data.get("to_date")
+        if from_date and to_date and from_date > to_date:
+            self.add_error("to_date", "終了日は開始日以降にしてください。")
+        return cleaned_data
+
+
 def _authenticator_summary(user_id: int) -> list[str]:
     """認証器の秘密データに触れず、一般的な種別だけを返す。"""
     types = set(Authenticator.objects.filter(user_id=user_id).values_list("type", flat=True))
@@ -288,10 +323,36 @@ def user_list(request):
 @never_cache
 @require_GET
 def audit_log_list(request):
-    """最小限の追記専用監査記録を、新しい順で表示する。"""
+    """追記専用の監査記録を条件で絞り、新しい順に表示する。"""
 
-    audit_logs = AuditLog.objects.select_related("actor", "target").all()[:100]
-    return render(request, "management_portal/audit_log_list.html", {"audit_logs": audit_logs})
+    form = AuditLogFilterForm(request.GET if request.GET else None)
+    audit_logs = AuditLog.objects.all()
+    page_query = ""
+    if form.is_bound:
+        if form.is_valid():
+            filters = {
+                key: value for key, value in form.cleaned_data.items() if value not in (None, "")
+            }
+            if filters.get("action"):
+                audit_logs = audit_logs.filter(action=filters["action"])
+            if filters.get("channel"):
+                audit_logs = audit_logs.filter(channel=filters["channel"])
+            if filters.get("actor_username"):
+                audit_logs = audit_logs.filter(actor_username__icontains=filters["actor_username"])
+            if filters.get("from_date"):
+                audit_logs = audit_logs.filter(occurred_at__date__gte=filters["from_date"])
+            if filters.get("to_date"):
+                audit_logs = audit_logs.filter(occurred_at__date__lte=filters["to_date"])
+            if filters:
+                page_query = f"{urlencode(filters)}&"
+        else:
+            audit_logs = audit_logs.none()
+    page = Paginator(audit_logs, 50).get_page(request.GET.get("page"))
+    return render(
+        request,
+        "management_portal/audit_log_list.html",
+        {"form": form, "page": page, "page_query": page_query},
+    )
 
 
 @never_cache

@@ -8,12 +8,23 @@
       <div class="col-lg-10">
         <p class="text-uppercase text-secondary fw-semibold mb-2">Management</p>
         <h1 class="h2 mb-3">監査ログ</h1>
-        <p class="text-secondary">直近100件の管理操作です。パスワード、認証コード、MFAの秘密情報は表示しません。</p>
+        <p class="text-secondary">管理操作を新しい順に表示します。パスワード、認証コード、MFAの秘密情報は表示しません。</p>
+        <form method="get" class="border rounded bg-white p-3 mb-4">
+          {{ form.non_field_errors }}
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label" for="{{ form.action.id_for_label }}">{{ form.action.label }}</label>{{ form.action }}{{ form.action.errors }}</div>
+            <div class="col-md-6"><label class="form-label" for="{{ form.channel.id_for_label }}">{{ form.channel.label }}</label>{{ form.channel }}{{ form.channel.errors }}</div>
+            <div class="col-md-12"><label class="form-label" for="{{ form.actor_username.id_for_label }}">{{ form.actor_username.label }}</label>{{ form.actor_username }}{{ form.actor_username.errors }}</div>
+            <div class="col-md-6"><label class="form-label" for="{{ form.from_date.id_for_label }}">{{ form.from_date.label }}</label>{{ form.from_date }}{{ form.from_date.errors }}</div>
+            <div class="col-md-6"><label class="form-label" for="{{ form.to_date.id_for_label }}">{{ form.to_date.label }}</label>{{ form.to_date }}{{ form.to_date.errors }}</div>
+          </div>
+          <div class="d-flex gap-2 mt-3"><button class="btn btn-dark" type="submit">絞り込む</button><a class="btn btn-outline-secondary" href="{% url 'management:audit_log_list' %}">条件を解除</a></div>
+        </form>
         <div class="table-responsive border rounded bg-white">
           <table class="table align-middle mb-0">
             <thead><tr><th scope="col">日時</th><th scope="col">操作</th><th scope="col">実行者</th><th scope="col">対象</th><th scope="col">経路</th></tr></thead>
             <tbody>
-              {% for audit_log in audit_logs %}
+              {% for audit_log in page %}
                 <tr>
                   <td>{{ audit_log.occurred_at|date:"Y年n月j日 H:i" }}</td>
                   <td>{{ audit_log.get_action_display }}</td>
@@ -22,11 +33,16 @@
                   <td>{{ audit_log.get_channel_display }}</td>
                 </tr>
               {% empty %}
-                <tr><td colspan="5" class="text-secondary">監査ログはまだありません。</td></tr>
+                <tr><td colspan="5" class="text-secondary">条件に一致する監査ログはありません。</td></tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
+        {% if page.has_other_pages %}<nav aria-label="監査ログのページ" class="mt-3"><ul class="pagination">
+          {% if page.has_previous %}<li class="page-item"><a class="page-link" href="?{{ page_query }}page={{ page.previous_page_number }}">前へ</a></li>{% endif %}
+          <li class="page-item disabled"><span class="page-link">{{ page.number }} / {{ page.paginator.num_pages }}</span></li>
+          {% if page.has_next %}<li class="page-item"><a class="page-link" href="?{{ page_query }}page={{ page.next_page_number }}">次へ</a></li>{% endif %}
+        </ul></nav>{% endif %}
         <p class="mt-4 mb-0"><a class="btn btn-outline-secondary" href="{% url 'management:index' %}">管理トップへ戻る</a></p>
       </div>
     </div>
