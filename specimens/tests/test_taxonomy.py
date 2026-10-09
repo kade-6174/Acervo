@@ -6,10 +6,11 @@ from django.utils import timezone
 
 from accounts.models import User
 from specimens.forms import SpecimenRegistrationForm, TaxonManualForm
-from specimens.models import Taxon, TaxonDataset, TaxonDatasetRecord, TaxonSource
+from specimens.models import QRLabel, Specimen, Taxon, TaxonDataset, TaxonDatasetRecord, TaxonSource
 from specimens.services import (
     TaxonCandidate,
     adopt_external_taxon_candidate,
+    create_qr_batch,
     search_taxon_candidates,
 )
 
@@ -219,20 +220,51 @@ class ButterflyHierarchyFormTests(TestCase):
                     self.species_taxon if "butterfly_species" in selections else self.genus_taxon,
                 )
 
-    def test_other_taxa_are_grouped_by_rank_and_sorted_by_japanese_name(self):
-        Taxon.objects.create(japanese_name="いろは", rank="species")
-        Taxon.objects.create(japanese_name="エビ", rank="species")
-        Taxon.objects.create(japanese_name="アオ", rank="species")
-        Taxon.objects.create(scientific_name="Example genus", rank="genus")
-
+    def test_registration_does_not_render_another_classification_list(self):
+        Taxon.objects.create(japanese_name="手入力の種", rank="species")
         form = SpecimenRegistrationForm()
         html = str(form["taxon"])
-        self.assertIn('<optgroup label="属">', html)
-        self.assertIn('<optgroup label="種">', html)
-        self.assertLess(html.index("Example genus"), html.index("アオ"))
-        self.assertLess(html.index("アオ"), html.index("いろは"))
-        self.assertLess(html.index("いろは"), html.index("エビ"))
-        self.assertNotIn(f'value="{self.species_taxon.pk}"', html)
+        self.assertIn('type="hidden"', html)
+        self.assertNotIn("<select", html)
+        self.assertNotIn("手入力の種", html)
+        self.assertFalse(
+            SpecimenRegistrationForm(
+                {"taxon": self.species_taxon.pk, "acquisition_method": "other"}
+            ).is_valid()
+        )
+        saved = SpecimenRegistrationForm(
+            {"taxon": self.species_taxon.pk, "acquisition_method": "other"},
+            allow_saved_taxon=True,
+        )
+        self.assertTrue(saved.is_valid(), saved.errors)
+
+    def test_japanese_classification_survives_qr_confirmation(self):
+        member = User.objects.create_user(username="butterfly-member", cohort_number=33)
+        label = QRLabel.objects.get(
+            pk=create_qr_batch(requested_count=1, created_by=member).label_ids[0]
+        )
+        register_url = reverse("specimens:register", kwargs={"token": label.token})
+        confirm_url = reverse("specimens:register_confirm", kwargs={"token": label.token})
+        self.client.force_login(member)
+
+        self.assertNotContains(self.client.get(register_url), "別の分類を選択する")
+        response = self.client.post(
+            register_url,
+            {"butterfly_species": self.species.pk, "acquisition_method": "other"},
+        )
+        self.assertRedirects(response, confirm_url, fetch_redirect_response=False)
+        self.assertContains(self.client.get(confirm_url), "アゲハ")
+        response = self.client.post(confirm_url)
+
+        self.assertEqual(response.status_code, 200)
+        specimen = Specimen.objects.get()
+        self.assertEqual(specimen.taxon_id, self.species_taxon.pk)
+        label.refresh_from_db()
+        self.assertEqual(label.specimen_id, specimen.pk)
+        self.assertContains(
+            self.client.get(reverse("specimens:edit", args=[specimen.detail_uuid])),
+            "分類候補を検索・登録する",
+        )
 
     def test_registration_rejects_a_species_outside_the_selected_genus(self):
         other_genus_taxon = Taxon.objects.create(

@@ -6,6 +6,14 @@
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。追加のカメラ切替機能はVM200へ反映し、iPhoneでの動作確認を完了した。写真選択欄はiPhoneで保存済み写真を選べるようになり、選択したスクリーンショットからQRを検出した。これは別の場所で作ったテストQRのため本番サイトのQR形式として拒否された。実際に本番サイトで発行したQR写真の読取は未確認。本番画面で製品名を固定表示しない修正はGitHub ActionsとVM200本番Compose反映まで完了した。Phase 9のQRラベル一括発行・PDF取得はローカル・CI・VM200本番Compose反映まで完了したが、Phase 9全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
+## 2026-10-09 監査ログ画面の検索と標本登録の分類UI整理
+
+Phase 9の監査ログ画面は従来の直近100件制限を外し、操作種別・経路・実行者名・開始日・終了日で絞り、50件ずつ新しい順に閲覧できるようにした。不正な条件はフォームエラーとして表示し、未絞込みの記録を意図せず表示しない。ページ移動時も有効な絞込み条件を保持する。変更ファイルは`management_portal/views.py`、`management_portal/templates/management_portal/audit_log_list.html`、`management_portal/tests/test_audit_log_ui.py`。管理者MFAゲートとキャッシュ禁止を維持する。
+
+運用者の追加指示により、標本登録画面から「別の分類を選択する」の一覧を削除し、科・亜科・族・属・種の和名分類欄だけを表示する。既存の分類候補検索・手入力と、登録後の標本編集での分類指定は維持する。登録確認で保存済み分類を再検証できるようにし、和名分類を選んだQR登録が確定まで通る回帰テストを追加した。確認画面では和名がある分類を和名優先で表示する。変更ファイルは`specimens/forms.py`、`specimens/views.py`、`specimens/templates/specimens/register.html`、`specimens/templates/specimens/edit.html`、`specimens/tests/test_taxonomy.py`。分類JSON、既存標本、QRの形式・認可、DB構造は変更しない。
+
+ローカルSQLiteの全393テストは成功（PostgreSQL専用4件skip）。監査ログの権限・絞込み・ページ送り・不正入力と、QR登録の分類選択から確認・確定までを検証した。Ruff lint・format、Django check、migration差分なし、`git diff --check`も成功した。PostgreSQL上のCI、本番反映、実ブラウザ受入はこの記録時点では未実施。標本無効化・完全削除は既存履歴・QR・写真・標本番号の扱いを決めるまで未実装。Phase 9全体、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了のままとする。
+
 ## 2026-10-09 旧便覧版分類の削除
 
 運用者の指示により、指定JSON版とは別に残る旧便覧版`japanese-butterflies-binran-2010-2013`を削除対象とした。VM200の本番DBを読み取り専用で照会し、旧版1件・分類レコード501件・対応するTaxon 501件・取込み履歴2件を確認した。旧Taxonを参照する標本、他データセット、旧Taxon外の子分類、追加出典はいずれも0件。指定JSON版、手入力・外部候補の分類、運用者の元JSONは削除対象に含めない。

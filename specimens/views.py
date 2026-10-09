@@ -20,7 +20,7 @@ from .forms import (
     TaxonManualForm,
     TaxonSearchForm,
 )
-from .models import QRLabel, Specimen, SpecimenPhoto, StorageLocation, TaxonDataset
+from .models import QRLabel, Specimen, SpecimenPhoto, StorageLocation, Taxon, TaxonDataset
 from .services import (
     SpecimenServiceError,
     TaxonCandidate,
@@ -296,7 +296,7 @@ def register(request, token):
                 }
                 return redirect("specimens:register_confirm", token=token)
     else:
-        form = SpecimenRegistrationForm(initial={"taxon": request.GET.get("taxon")})
+        form = SpecimenRegistrationForm()
     return render(request, "specimens/register.html", {"form": form, "token": token})
 
 
@@ -310,7 +310,7 @@ def register_confirm(request, token):
     if not data:
         return redirect("specimens:register", token=token)
     if request.method == "POST":
-        form = SpecimenRegistrationForm(data["fields"])
+        form = SpecimenRegistrationForm(data["fields"], allow_saved_taxon=True)
         if not form.is_valid():
             raise Http404
         form.cleaned_data.pop("photos")
@@ -429,6 +429,9 @@ def _registration_summary(fields):
     }
     choices = dict(SpecimenRegistrationForm.base_fields["acquisition_method"].choices)
     values = dict(fields)
+    if values.get("taxon"):
+        taxon = Taxon.objects.filter(pk=values["taxon"]).first()
+        values["taxon"] = (taxon.japanese_name or str(taxon)) if taxon else "—"
     if values.get("acquisition_method"):
         values["acquisition_method"] = choices.get(values["acquisition_method"], "—")
     if values.get("storage_location"):
