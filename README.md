@@ -40,6 +40,7 @@ HTTPSのサイトへログインし、ホームの「QRコードを読み取る�
 - [STATUS.md](STATUS.md) — 実装状況、テスト結果、問題点
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — 汎用導入マニュアル
 - [docs/SPECIMEN_MANAGEMENT.md](docs/SPECIMEN_MANAGEMENT.md) — 標本の無効化・完全削除と写真削除の再試行
+- [docs/OPERATIONS.md](docs/OPERATIONS.md) — 更新・障害対応・リリース確認と管理者交代
 
 現在はパスキー／セキュリティキーの登録・管理、パスワードログイン後の第二要素認証、passwordless passkeyログインを提供します。パスキーsignupは公開していません。
 

@@ -8,6 +8,14 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 ## 2026-10-11 Phase 9 標本無効化・完全削除
 
+まとめた変更`1320d1f`のGitHub Actions run `38067411764`では`test`（PostgreSQL全409件・JavaScript5件）と`production-container`が成功した。署名付き暗号化バックアップから独立した空DBへ試験標本・履歴・QR・写真を復元し、`restored_specimen=verified protected_photo=verified anonymous=denied`を確認した。復元先db・web・proxyを再作成後も同じ検査が成功し、`backup_restore_ci=success`で終了した。先行コミット`8a04015`のrun `38067145994`も両ジョブ成功。
+
+本番VM200は更新前の作業ツリーが清潔でHEADは`2b56dd9`。アプリ・Docker・バックアップ保存先のファイルシステムは約28GB空き、使用率22%、inode使用率17%だった。更新前バックアップ`acervo-20261010T162633Z-3d153cd88b9b`は終了コード0で作成し、暗号化payload・metadata・checksumsの3ファイルの存在を確認した。保持規則で`acervo-20261010T155841Z-5c0796adcd2f`を1世代削除した。ProxmoxへのSSHからQEMU guest agentを使用し、作業ツリー・現在HEAD・origin/mainのガード後、`1320d1f`へfast-forward、Compose設定検証、ビルド・起動をまとめて行った。PID `1025012`は終了コード0。後続の`check --deploy`は問題0件、`migrate --check`は終了コード0、db・web・proxyはhealthy、tunnelは稼働中。web UIDは`10001`、Git作業ツリーは清潔でHEADは`1320d1f`、`DEPLOY_OK head=1320d1f uid=10001`を確認した。
+
+通常更新・ディスク確認・障害対応・巻戻し判断・管理者交代・サーバー移行・リリース前受入表を`docs/OPERATIONS.md`へ整備した。非公開運用台帳テンプレートには署名鍵の保管場所、日次実行・監視の担当、復元試験予定、確認結果欄を追加し、秘密値や実データを入れないよう明記した。README・導入手順からリンクし、導入例の古い実HTTPSパスキー未確認記述を更新した。対象文書のローカルリンク存在確認と`git diff --check`は成功。これらは文書だけのため本番へ再反映しない。
+
+本番での無効化・完全削除の実ブラウザ受入、本番サイト発行QRのiPhone写真読取、実データを用いた別ホスト保存物からの標本・保護写真復元、更新後のホスト再起動永続化は未実施。CIの試験用セッションによる認可確認は実ブラウザ認証の代替としない。Phase 9・Phase 10、7C-LIVE-A・7C-LIVE-B、Phase 1全体は未完了。Android向け実装はMVPの範囲内で、Android実機受入だけをMVP完成後へ残す。
+
 実装コミット`8a04015`のGitHub Actions run `38067145994`で、PostgreSQL上の`test`は成功した（全409件、追加の並行操作4件を含む）。本番Compose・復元のジョブは確認中で、本番VM200はまだ更新していない。
 
 Phase 10の運用検証として、`.github/scripts/backup-restore-specimen.py`と既存復元CIへ非機密の試験標本・履歴・割当QR・再エンコード済み写真を追加した。復元後の番号・UUID・QR・採番元・履歴・状態保持、認証済み詳細・写真表示、未ログイン拒否、写真バイト一致を確認し、復元先コンテナ再作成後も繰り返す。READMEと復元・導入・受入文書の「標本・写真未実装」等の古い記述を更新した。ローカルの一時SQLite DB・写真領域で作成と検証は成功した。Windows sandboxの標準一時領域ではDBを開けなかったため、作業場所内の一時領域へ切り替えて成功し、その領域は削除済み。Linuxの暗号化復元・再作成経路はCI待ちであり、実ブラウザの認証や実データ復元を成功扱いにしない。
