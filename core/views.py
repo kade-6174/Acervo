@@ -1,8 +1,13 @@
+import json
+import re
+
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.contrib.staticfiles.storage import staticfiles_storage
 from django.db import connection
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.templatetags.static import static
 from django.views.decorators.cache import never_cache
 
 from specimens.access import can_use_qr
@@ -26,8 +31,8 @@ def manifest(request):
             "background_color": "#ffffff",
             "theme_color": "#212529",
             "icons": [
-                {"src": "/static/pwa/icon-192.png", "sizes": "192x192", "type": "image/png"},
-                {"src": "/static/pwa/icon-512.png", "sizes": "512x512", "type": "image/png"},
+                {"src": static("pwa/icon-192.png"), "sizes": "192x192", "type": "image/png"},
+                {"src": static("pwa/icon-512.png"), "sizes": "512x512", "type": "image/png"},
             ],
         },
         content_type="application/manifest+json",
@@ -37,7 +42,15 @@ def manifest(request):
 @never_cache
 def service_worker(request):
     source = settings.BASE_DIR / "static" / "js" / "service-worker.js"
-    response = HttpResponse(source.read_bytes(), content_type="text/javascript; charset=utf-8")
+    script = re.sub(
+        r'"/static/([^"\n]+)"',
+        lambda match: json.dumps(static(match[1])),
+        source.read_text(encoding="utf-8"),
+    )
+    # allowlistとオフライン案内を同じ収集済み資産へ向ける。
+    version = getattr(staticfiles_storage, "manifest_hash", "development")
+    script = script.replace("acervo-static-v4", f"acervo-static-v5-{version}")
+    response = HttpResponse(script, content_type="text/javascript; charset=utf-8")
     response["Service-Worker-Allowed"] = "/"
     return response
 

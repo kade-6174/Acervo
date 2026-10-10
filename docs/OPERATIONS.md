@@ -46,6 +46,8 @@ docker compose -f compose.production.yaml -f compose.direct.yaml up -d --build -
 
 この構成ではweb起動時にmigrationを実行します。起動成功後、次を確認します。
 
+web起動時の`collectstatic`は内容のハッシュを含むファイル名と対応表を作成します。画面とPWAは対応表のURLを参照するため、更新したJavaScript・CSSを以前の長期キャッシュから読み続けません。対応表作成や参照に失敗した場合は起動・受入失敗として扱います。稼働中に静的資産を手動で上書きせず、同じ反映対象から再ビルドします。
+
 ```bash
 docker compose -f compose.production.yaml -f compose.direct.yaml exec -T web python manage.py check --deploy
 ```

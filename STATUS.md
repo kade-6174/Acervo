@@ -8,6 +8,12 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 ## 2026-10-11 Phase 9 標本無効化・完全削除
 
+コミット`fe5d656`のGitHub Actions run `38069050933`はPostgreSQLの`test`と`production-container`がともに成功した。無効化済み標本、削除済みQR、写真削除待ちを含む追加復元検証も成功した。GitHub mainへのpushとCI一覧への出現には時間差があり、remote HEAD一致と後続runの成功を確認した。独立した実機復元先VM201の状態は読取りだけで`stopped`を確認し、起動・設定・データは変更していない。
+
+Phase 10の更新確認中、Caddyがファイル名の変わらない静的資産へ1年のimmutableキャッシュを返し、修正前の分類JavaScript等がブラウザに残り得ることを確認した。本番の静的資産保存をDjango標準`ManifestStaticFilesStorage`へ変更し、内容別のファイル名を画面が参照するようにした。PWA manifestのアイコンとService Workerの静的allowlist・オフライン案内も同じ対応表へ向け、対応表のハッシュでPWAキャッシュ名を更新する。写真保存方式とPWAの非公開データ除外は変更しない。`core/tests/test_static_updates.py`で内容変更後のURL・worker更新、manifest整合、欠落資産の失敗を検証し、本番ComposeのCIへCaddy経由の内容別URL確認を追加した。
+
+対象10テストとローカル全412テストは成功（PostgreSQL専用8件skip）。既存バックアップテストを含む`core.tests`の最初の実行はWindows sandboxの一時領域権限で失敗したため、通常権限で全テストを再実行して成功した。全静的資産の内容別ファイル収集も成功。Ruff lint・format、migration差分なし、`git diff --check`は成功。この静的資産変更のLinux本番構成CIとVM200反映は未実施で、CI成功後に反映する。
+
 本番反映結果・運用手順だけのコミット`20f8718`はGitHub Actions run `38067895943`で両ジョブ成功を確認した。VM200へは再反映していない。続けて復元CIの試験データに、無効化済み標本・履歴・写真と完全削除済みQR・写真削除待ちを追加した。復元後も詳細・写真は404、QRは410で利用不可、無効化済みデータと削除待ちは保持され、完全削除済み標本は存在しないことを検査する。ローカルの一時DB・写真領域で作成・検証は成功した。最初の追加検査は無効QRの期待HTTP値と表示文言の設定が現行実装と合わず失敗し、410と実際の利用不可表示へ訂正して成功した。失敗時に残った試験用DBは作業場所内の専用一時ディレクトリを確認して削除した。Ruff lint・formatと差分チェックは成功、追加経路のLinux復元CIは未確認。この変更はCIと文書のみで、本番コンテナ再更新は不要。
 
 まとめた変更`1320d1f`のGitHub Actions run `38067411764`では`test`（PostgreSQL全409件・JavaScript5件）と`production-container`が成功した。署名付き暗号化バックアップから独立した空DBへ試験標本・履歴・QR・写真を復元し、`restored_specimen=verified protected_photo=verified anonymous=denied`を確認した。復元先db・web・proxyを再作成後も同じ検査が成功し、`backup_restore_ci=success`で終了した。先行コミット`8a04015`のrun `38067145994`も両ジョブ成功。

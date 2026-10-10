@@ -241,6 +241,8 @@ test "$("${compose[@]}" exec -T db sh -c 'psql -At -U "$POSTGRES_USER" -d "$POST
 "${compose[@]}" up --detach --force-recreate --no-deps --wait web
 test "$("${compose[@]}" exec -T web cat /app/media/ci-persistence-check.txt)" = "retained"
 
+"${compose[@]}" exec -T -e "ACERVO_CI_MODE=$mode" web python - < .github/scripts/verify-static-assets.py
+
 if [[ "$mode" == "direct" ]]; then
   proxy_id="$("${compose[@]}" ps -q proxy)"
   docker inspect --format '{{json .HostConfig.PortBindings}}' "$proxy_id" | python3 -c '

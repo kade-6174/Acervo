@@ -12,6 +12,12 @@ from accounts.security import (
 
 from .base import *  # noqa: F403
 
+# 内容が変わった資産はURLも変え、以前の長期キャッシュを参照しない。
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"},
+}
+
 if not SECRET_KEY:  # noqa: F405
     raise ImproperlyConfigured("DJANGO_SECRET_KEYの設定が必要です。")
 if not ALLOWED_HOSTS:  # noqa: F405
