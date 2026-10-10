@@ -41,6 +41,7 @@ HTTPSのサイトへログインし、ホームの「QRコードを読み取る�
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — 汎用導入マニュアル
 - [docs/SPECIMEN_MANAGEMENT.md](docs/SPECIMEN_MANAGEMENT.md) — 標本の無効化・完全削除と写真削除の再試行
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) — 更新・障害対応・リリース確認と管理者交代
+- [docs/IPHONE_ACCEPTANCE.md](docs/IPHONE_ACCEPTANCE.md) — iPhoneでの表示更新・分類候補・本番発行QRの写真読取
 
 現在はパスキー／セキュリティキーの登録・管理、パスワードログイン後の第二要素認証、passwordless passkeyログインを提供します。パスキーsignupは公開していません。
 

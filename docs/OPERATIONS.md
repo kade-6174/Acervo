@@ -66,6 +66,10 @@ docker compose -f compose.production.yaml -f compose.direct.yaml exec -T web id 
 
 **確認ポイント:** 各終了コード0、Djangoの問題0件、未適用migrationなし、db・web・proxyのhealthy、UID`10001`。Tunnel専用ではtunnelの稼働も確認します。最後にGit作業ツリーが清潔でHEADが反映対象と一致することを確認し、日時・バックアップID・結果を記録します。文書だけの更新はコンテナへの再反映を必要としません。
 
+### 文書だけのCI
+
+GitHub Actionsは最初に差分を判定します。既知のルート文書と`docs/`内のMarkdownだけなら、判定テストと変更範囲確認を行い、PostgreSQLの`test`と`production-container`をスキップします。コード、設定、データ、テンプレート、CI処理の変更を含む場合は両ジョブを実行します。比較できない差分、未知のファイル、空差分、symlink、README削除も全CIへ進めます。スキップしたジョブを「テスト成功」と記録せず、実際の変更範囲確認成功・スキップとして記録します。
+
 ## 失敗した場合
 
 | 症状 | 最初の対応 | 再開条件 |

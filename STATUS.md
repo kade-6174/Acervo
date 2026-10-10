@@ -6,6 +6,16 @@
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。追加のカメラ切替機能はVM200へ反映し、iPhoneでの動作確認を完了した。写真選択欄はiPhoneで保存済み写真を選べるようになり、選択したスクリーンショットからQRを検出した。これは別の場所で作ったテストQRのため本番サイトのQR形式として拒否された。実際に本番サイトで発行したQR写真の読取は未確認。本番画面で製品名を固定表示しない修正はGitHub ActionsとVM200本番Compose反映まで完了した。Phase 9のQRラベル一括発行・PDF取得はローカル・CI・VM200本番Compose反映まで完了したが、Phase 9全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
+## 2026-10-11 Phase 10 静的資産更新とCIの効率化
+
+静的資産変更`3be1d2e`のGitHub Actions run `38069502773`は、PostgreSQL全412テスト・JavaScript5件と、本番Compose・復元の両ジョブが成功した。Caddy経由の内容別URL資産は直接HTTPS・Tunnel専用それぞれ15件の検証に成功。無効化・削除待ち状態を含む復元検証もコンテナ再作成前後で成功した。
+
+本番VM200は更新前の作業ツリーが清潔、HEADは`1320d1f`。更新前バックアップ`acervo-20261010T165636Z-4554b2a44950`を終了コード0で作成し、暗号化payload・metadata・checksumsの3ファイルの存在を確認した。保持規則で`acervo-20261010T162633Z-3d153cd88b9b`が1世代削除された。`3be1d2e`へガード付きfast-forward後、Compose設定検証、ビルド・起動はPID `1036813`・終了コード0で成功。`check --deploy`は問題0件、`migrate --check`は終了コード0、db・web・proxyはhealthy、tunnelは稼働中。UID`10001`、Git作業ツリー清潔、HEAD`3be1d2e`と`DEPLOY_OK`を確認した。本番のCaddy内部経路から内容別URLの分類JS・QR JS・CSS・Bootstrap CSS・HTMXの5資産を取得し、Service Workerのv5と内容別オフラインURL・キャッシュ禁止を確認して`STATIC_UPDATE_OK assets=5 worker=versioned`が成功した。
+
+実データ復元準備の読取りでは、本番の標本・写真・写真ファイル・履歴・無効化済み標本・削除待ちはいずれも0件だった。標本・写真の実データ受入を行うには、先に非機密の試験標本と写真を実サイトで登録する必要がある。修正済みage復号鍵の保管パスを運用者へ確認中で、内容の貼付は求めていない。VM201は停止中のまま変更していない。iPhoneでの表示更新・和名候補・本番発行QRの写真読取・登録・未認証拒否を`docs/IPHONE_ACCEPTANCE.md`へ整理し、READMEからリンクした。対象文書のリンク存在と差分チェックは成功。実機確認は未実施。
+
+文書コミットの不要なPostgreSQL・コンテナ検証を省くため、CIの先頭に差分判定を追加した。既知のルート文書と`docs/`のMarkdownだけなら軽い変更範囲確認を行い、コード・設定・データ・CI等の変更や判定不能時は両ジョブを実行する。renameは元・先の両パスで判定し、symlink・README削除・不正SHA・比較失敗・未知のファイル・空差分では省略しない。判定の9テストはローカル成功。CI変更自体のGitHub検証と後続文書コミットでの省略確認は未実施。このCI・文書変更は本番再反映不要。Phase 9・Phase 10、7C-LIVE-A・7C-LIVE-B、Phase 1全体は未完了。
+
 ## 2026-10-11 Phase 9 標本無効化・完全削除
 
 コミット`fe5d656`のGitHub Actions run `38069050933`はPostgreSQLの`test`と`production-container`がともに成功した。無効化済み標本、削除済みQR、写真削除待ちを含む追加復元検証も成功した。GitHub mainへのpushとCI一覧への出現には時間差があり、remote HEAD一致と後続runの成功を確認した。独立した実機復元先VM201の状態は読取りだけで`stopped`を確認し、起動・設定・データは変更していない。

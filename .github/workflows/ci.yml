@@ -9,7 +9,28 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: 変更範囲の確認
+    runs-on: ubuntu-latest
+    outputs:
+      runtime: ${{ steps.scope.outputs.runtime }}
+    steps:
+      - name: リポジトリと比較対象を取得
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: 差分判定の失敗経路を確認
+        run: python3 -m unittest discover -s .github/scripts/tests
+      - name: 実装に影響する変更を判定
+        id: scope
+        env:
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          CI_HEAD_SHA: ${{ github.sha }}
+        run: python3 .github/scripts/ci-change-scope.py
+
   test:
+    needs: changes
+    if: needs.changes.outputs.runtime == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -68,6 +89,8 @@ jobs:
         run: python manage.py test --settings=config.settings.test
 
   production-container:
+    needs: changes
+    if: needs.changes.outputs.runtime == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: リポジトリを取得
