@@ -8,6 +8,8 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 ## 2026-10-11 Phase 9 標本無効化・完全削除
 
+本番反映結果・運用手順だけのコミット`20f8718`はGitHub Actions run `38067895943`で両ジョブ成功を確認した。VM200へは再反映していない。続けて復元CIの試験データに、無効化済み標本・履歴・写真と完全削除済みQR・写真削除待ちを追加した。復元後も詳細・写真は404、QRは410で利用不可、無効化済みデータと削除待ちは保持され、完全削除済み標本は存在しないことを検査する。ローカルの一時DB・写真領域で作成・検証は成功した。最初の追加検査は無効QRの期待HTTP値と表示文言の設定が現行実装と合わず失敗し、410と実際の利用不可表示へ訂正して成功した。失敗時に残った試験用DBは作業場所内の専用一時ディレクトリを確認して削除した。Ruff lint・formatと差分チェックは成功、追加経路のLinux復元CIは未確認。この変更はCIと文書のみで、本番コンテナ再更新は不要。
+
 まとめた変更`1320d1f`のGitHub Actions run `38067411764`では`test`（PostgreSQL全409件・JavaScript5件）と`production-container`が成功した。署名付き暗号化バックアップから独立した空DBへ試験標本・履歴・QR・写真を復元し、`restored_specimen=verified protected_photo=verified anonymous=denied`を確認した。復元先db・web・proxyを再作成後も同じ検査が成功し、`backup_restore_ci=success`で終了した。先行コミット`8a04015`のrun `38067145994`も両ジョブ成功。
 
 本番VM200は更新前の作業ツリーが清潔でHEADは`2b56dd9`。アプリ・Docker・バックアップ保存先のファイルシステムは約28GB空き、使用率22%、inode使用率17%だった。更新前バックアップ`acervo-20261010T162633Z-3d153cd88b9b`は終了コード0で作成し、暗号化payload・metadata・checksumsの3ファイルの存在を確認した。保持規則で`acervo-20261010T155841Z-5c0796adcd2f`を1世代削除した。ProxmoxへのSSHからQEMU guest agentを使用し、作業ツリー・現在HEAD・origin/mainのガード後、`1320d1f`へfast-forward、Compose設定検証、ビルド・起動をまとめて行った。PID `1025012`は終了コード0。後続の`check --deploy`は問題0件、`migrate --check`は終了コード0、db・web・proxyはhealthy、tunnelは稼働中。web UIDは`10001`、Git作業ツリーは清潔でHEADは`1320d1f`、`DEPLOY_OK head=1320d1f uid=10001`を確認した。
