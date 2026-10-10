@@ -6,7 +6,7 @@
 
 生物班の学校年度・回生による在籍判定、`kdf-biology.org`、Cloudflare Tunnel、Tailscaleは導入例であり、Acervoの固定要件ではありません。Symbiotaは非稼働の検証環境であり、現在のAcervoとは連携・移行・同時運用しません。公式サイト、Wiki、メールサービスも本リポジトリの管理対象外で、メール認証・メール確認・メールによるパスワードリセットは提供していません。
 
-> **開発中** — TOTP、Recovery Codes、WebAuthn第二要素、パスキーの登録・管理・パスワードレスログイン、管理者MFAゲート、別管理者によるMFAリセット画面、最後の管理者向け緊急MFAリセットコマンドは実装・統合検証済みです。Windows＋Chrome＋Windows Hello＋`localhost`で実機受入を完了しています。実運用HTTPSドメイン、同期パスキー、Chrome以外の実運用対象ブラウザは未確認です。正確な現在地は [STATUS.md](STATUS.md) を参照してください。
+> **開発中** — 認証・管理者MFA、標本登録・検索・保護写真、QR・PDF・CSV、分類選択、PWA、管理画面、暗号化バックアップ・復元を実装しています。実ドメインの公開・管理者認証とiPhoneのPWA・カメラQR読取は確認済みです。本番サイト発行QRの写真読取、標本・写真を含む実環境の復元受入、管理者引き継ぎなどが残っています。Android実機受入はMVP完成後に実施します。Phase 1・Phase 9・Phase 10および7C-LIVE全体の完了は未確定です。正確な現在地は [STATUS.md](STATUS.md) を参照してください。
 
 ## 主な機能（MVP）
 

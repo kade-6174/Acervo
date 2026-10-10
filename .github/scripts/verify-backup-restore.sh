@@ -26,6 +26,7 @@ sudo chown -R 10001:10001 "$work_directory/archives" "$work_directory/keys" "$wo
 "${source_compose[@]}" build backup
 "${source_compose[@]}" up --detach --wait db web proxy
 "${source_compose[@]}" exec -T web sh -c 'printf %s restored-photo > /app/media/backup-restore-check.txt'
+"${source_compose[@]}" exec -T web python - seed < .github/scripts/backup-restore-specimen.py
 
 ACERVO_BACKUP_SIGNING_PRIVATE_KEY_FILE="$work_directory/keys/signing" "${source_compose[@]}" run --rm --no-deps \
   --entrypoint sh backup -ceu '
@@ -98,5 +99,11 @@ sudo cmp --silent .env.production "$work_directory/restored-settings/.env.produc
 "${target_compose[@]}" up --detach --wait web proxy
 "${target_compose[@]}" exec -T web python manage.py check --deploy
 "${target_compose[@]}" exec -T web python -c "import urllib.request; request=urllib.request.Request('http://127.0.0.1:8000/health/', headers={'Host': 'acervo.localhost', 'X-Forwarded-Proto': 'https'}); assert urllib.request.urlopen(request, timeout=5).status == 200"
+"${target_compose[@]}" exec -T web python - verify < .github/scripts/backup-restore-specimen.py
+# 復元データのDB・写真ボリュームがコンテナ再作成でも残ることを確認する。
+"${target_compose[@]}" stop web proxy
+"${target_compose[@]}" up --detach --force-recreate --wait db
+"${target_compose[@]}" up --detach --force-recreate --wait web proxy
+"${target_compose[@]}" exec -T web python - verify < .github/scripts/backup-restore-specimen.py
 
 echo "backup_restore_ci=success"
