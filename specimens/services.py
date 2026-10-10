@@ -1,6 +1,7 @@
 """画面に依存しない標本採番と状態遷移。"""
 
 import json
+import logging
 import uuid
 from dataclasses import dataclass
 from enum import StrEnum
@@ -23,6 +24,7 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfgen import canvas
 
 from .models import (
+    PendingPhotoDeletion,
     QRBatch,
     QRLabel,
     Specimen,
@@ -32,6 +34,8 @@ from .models import (
     Taxon,
     TaxonSource,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SpecimenServiceErrorCode(StrEnum):
@@ -46,6 +50,8 @@ class SpecimenServiceErrorCode(StrEnum):
     PHOTO_TOO_LARGE = "photo_too_large"
     PHOTO_TOO_MANY_PIXELS = "photo_too_many_pixels"
     PHOTO_LIMIT_REACHED = "photo_limit_reached"
+    SPECIMEN_INVALIDATED = "specimen_invalidated"
+    SPECIMEN_NOT_INVALIDATED = "specimen_not_invalidated"
 
 
 class SpecimenServiceError(Exception):
@@ -240,6 +246,8 @@ def record_specimen_event(
     specimen = Specimen.objects.select_for_update().filter(pk=specimen_id).first()
     if specimen is None:
         raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_NOT_FOUND)
+    if specimen.invalidated_at is not None:
+        raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_INVALIDATED)
     next_status = _STATE_FOR_EVENT.get(event_type, specimen.status)
     if event_type in _STATE_FOR_EVENT and (
         next_status == specimen.status or next_status not in _ALLOWED_TRANSITIONS[specimen.status]
@@ -295,6 +303,8 @@ def assign_qr_label(*, token, specimen_id: int) -> QRLabelAssignmentResult:
     specimen = Specimen.objects.select_for_update().filter(pk=specimen_id).first()
     if specimen is None:
         raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_NOT_FOUND)
+    if specimen.invalidated_at is not None:
+        raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_INVALIDATED)
     if QRLabel.objects.select_for_update().filter(specimen=specimen).exists():
         raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_ALREADY_HAS_QR_LABEL)
     label.specimen = specimen
@@ -357,6 +367,81 @@ def retire_qr_label(*, token) -> QRLabel:
     label.full_clean()
     label.save(update_fields=["status", "retired_at"])
     return label
+
+
+@transaction.atomic
+def invalidate_specimen(*, specimen_id: int, actor) -> Specimen:
+    """標本と割当QRを同時に無効化し、元のデータを保持する。"""
+
+    specimen = Specimen.objects.select_for_update().filter(pk=specimen_id).first()
+    if specimen is None:
+        raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_NOT_FOUND)
+    if specimen.invalidated_at is not None:
+        raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_INVALIDATED)
+    label = QRLabel.objects.select_for_update().filter(specimen=specimen).first()
+    if label and label.status != QRLabel.Status.RETIRED:
+        label.status = QRLabel.Status.RETIRED
+        label.retired_at = timezone.now()
+        label.save(update_fields=["status", "retired_at"])
+    specimen.invalidated_at = timezone.now()
+    specimen.invalidated_by = actor
+    specimen.save(update_fields=["invalidated_at", "invalidated_by"])
+    return specimen
+
+
+def retry_pending_photo_deletions() -> tuple[int, int]:
+    """保留中の写真ファイル削除を再試行する。失敗した行は残す。"""
+
+    removed = 0
+    failed = 0
+    for pending in PendingPhotoDeletion.objects.order_by("pk").iterator():
+        path = pending.file_path
+        if not path.startswith("specimens/") or ".." in path.split("/"):
+            failed += 1
+            logger.error("標本写真の削除待ちに不正な相対パスがあります。")
+            continue
+        try:
+            default_storage.delete(path)
+            pending.delete()
+        except Exception:
+            failed += 1
+            logger.warning("標本写真の削除を再試行する必要があります。")
+        else:
+            removed += 1
+    return removed, failed
+
+
+@transaction.atomic
+def delete_invalidated_specimen(*, specimen_id: int) -> str:
+    """無効化済み標本だけを物理削除し、QRと写真削除待ちを保持する。"""
+
+    specimen = Specimen.objects.select_for_update().filter(pk=specimen_id).first()
+    if specimen is None:
+        raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_NOT_FOUND)
+    if specimen.invalidated_at is None:
+        raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_NOT_INVALIDATED)
+    code = specimen.specimen_code
+    label = QRLabel.objects.select_for_update().filter(specimen=specimen).first()
+    if label:
+        label.status = QRLabel.Status.RETIRED
+        label.retired_at = label.retired_at or timezone.now()
+        label.specimen = None
+        label.save(update_fields=["status", "retired_at", "specimen"])
+    paths = list(
+        SpecimenPhoto.objects.select_for_update()
+        .filter(specimen=specimen)
+        .values_list("file_path", flat=True)
+    )
+    PendingPhotoDeletion.objects.bulk_create(
+        [PendingPhotoDeletion(file_path=path) for path in paths]
+    )
+    SpecimenPhoto.objects.filter(specimen=specimen).delete()
+    # 通常の単一履歴削除は禁止。完全削除でのみ関連履歴を一括削除する。
+    SpecimenEvent.objects.filter(specimen=specimen).delete()
+    specimen.delete()
+    if paths:
+        transaction.on_commit(retry_pending_photo_deletions)
+    return code
 
 
 @transaction.atomic
@@ -492,6 +577,8 @@ def add_specimen_photos(*, specimen_id: int, uploads) -> tuple[SpecimenPhoto, ..
     specimen = Specimen.objects.select_for_update().filter(pk=specimen_id).first()
     if specimen is None:
         raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_NOT_FOUND)
+    if specimen.invalidated_at is not None:
+        raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_INVALIDATED)
     uploads = tuple(uploads)
     if specimen.photos.count() + len(uploads) > settings.ACERVO_PHOTO_MAX_PER_SPECIMEN:
         raise SpecimenServiceError(SpecimenServiceErrorCode.PHOTO_LIMIT_REACHED)

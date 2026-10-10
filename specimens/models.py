@@ -212,6 +212,15 @@ class Specimen(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_specimens"
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    invalidated_at = models.DateTimeField(null=True, blank=True, editable=False)
+    invalidated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="invalidated_specimens",
+        editable=False,
+    )
 
     class Meta:
         ordering = ["specimen_code"]
@@ -328,6 +337,16 @@ class SpecimenPhoto(models.Model):
     content_type = models.CharField("形式", max_length=100)
     width = models.PositiveIntegerField()
     height = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.file_path
+
+
+class PendingPhotoDeletion(models.Model):
+    """DBコミット後に削除する写真を記録し、失敗時の再実行を可能にする。"""
+
+    file_path = models.CharField(max_length=500, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

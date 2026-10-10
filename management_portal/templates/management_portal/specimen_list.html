@@ -5,20 +5,21 @@
 {% block content %}
   <section class="container py-5"><div class="row justify-content-center"><div class="col-lg-10">
     <h1 class="h2 mb-3">標本管理</h1>
-    <p class="text-secondary">標本の現在の状態を確認できます。無効化・完全削除は設計と再確認フローを整備後に追加します。</p>
+    <p class="text-secondary">標本の状態を確認できます。無効化した標本は通常の検索や詳細表示から除かれます。完全削除は無効化後に行えます。</p>
     <form method="get" class="row g-2 mb-4">
       <div class="col-md-6"><label class="form-label" for="specimen-query">標本番号・分類名</label><input class="form-control" id="specimen-query" name="q" value="{{ query }}" maxlength="255"></div>
       <div class="col-md-4"><label class="form-label" for="specimen-status">状態</label><select class="form-select" id="specimen-status" name="status"><option value="">すべて</option>{% for value, label in status_choices %}<option value="{{ value }}"{% if status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <div class="col-md-2 align-self-end"><button class="btn btn-dark w-100" type="submit">検索</button></div>
+      <div class="col-md-2"><label class="form-label" for="specimen-validity">管理状態</label><select class="form-select" id="specimen-validity" name="validity"><option value="">すべて</option><option value="active"{% if validity == "active" %} selected{% endif %}>有効</option><option value="invalidated"{% if validity == "invalidated" %} selected{% endif %}>無効</option></select></div>
+      <div class="col-12"><button class="btn btn-dark" type="submit">検索</button></div>
     </form>
     <div class="table-responsive border rounded bg-white"><table class="table align-middle mb-0">
       <thead><tr><th scope="col">標本番号</th><th scope="col">分類・同定情報</th><th scope="col">状態</th><th scope="col">保管場所</th><th scope="col">操作</th></tr></thead>
-      <tbody>{% for specimen in page %}<tr><td>{{ specimen.specimen_code }}</td><td>{{ specimen.taxon|default:specimen.identification_text|default:"未同定" }}</td><td>{{ specimen.get_status_display }}</td><td>{{ specimen.storage_location|default:"—" }}</td><td><a href="{% url 'specimens:detail' specimen.detail_uuid %}">詳細</a></td></tr>{% empty %}<tr><td colspan="5" class="text-secondary">該当する標本はありません。</td></tr>{% endfor %}</tbody>
+      <tbody>{% for specimen in page %}<tr><td>{{ specimen.specimen_code }}{% if specimen.invalidated_at %}<br><span class="badge text-bg-secondary">無効</span>{% endif %}</td><td>{{ specimen.taxon|default:specimen.identification_text|default:"未同定" }}</td><td>{{ specimen.get_status_display }}</td><td>{{ specimen.storage_location|default:"—" }}</td><td>{% if specimen.invalidated_at %}<a class="btn btn-outline-danger btn-sm" href="{% url 'management:specimen_delete' specimen.detail_uuid %}">完全削除</a>{% else %}<a href="{% url 'specimens:detail' specimen.detail_uuid %}">詳細</a> <a class="btn btn-outline-warning btn-sm" href="{% url 'management:specimen_invalidate' specimen.detail_uuid %}">無効化</a>{% endif %}</td></tr>{% empty %}<tr><td colspan="5" class="text-secondary">該当する標本はありません。</td></tr>{% endfor %}</tbody>
     </table></div>
     {% if page.has_other_pages %}<nav aria-label="標本のページ" class="mt-3"><ul class="pagination">
-      {% if page.has_previous %}<li class="page-item"><a class="page-link" href="?q={{ query|urlencode }}&status={{ status|urlencode }}&page={{ page.previous_page_number }}">前へ</a></li>{% endif %}
+      {% if page.has_previous %}<li class="page-item"><a class="page-link" href="?q={{ query|urlencode }}&status={{ status|urlencode }}&validity={{ validity|urlencode }}&page={{ page.previous_page_number }}">前へ</a></li>{% endif %}
       <li class="page-item disabled"><span class="page-link">{{ page.number }} / {{ page.paginator.num_pages }}</span></li>
-      {% if page.has_next %}<li class="page-item"><a class="page-link" href="?q={{ query|urlencode }}&status={{ status|urlencode }}&page={{ page.next_page_number }}">次へ</a></li>{% endif %}
+      {% if page.has_next %}<li class="page-item"><a class="page-link" href="?q={{ query|urlencode }}&status={{ status|urlencode }}&validity={{ validity|urlencode }}&page={{ page.next_page_number }}">次へ</a></li>{% endif %}
     </ul></nav>{% endif %}
     <p class="mt-4"><a class="btn btn-outline-secondary" href="{% url 'management:index' %}">管理トップへ戻る</a></p>
   </div></div></section>

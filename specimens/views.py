@@ -5,6 +5,7 @@ from io import BytesIO
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.shortcuts import redirect, render
@@ -49,7 +50,7 @@ def _session_photos(data) -> tuple[TemporaryPhoto, ...]:
 def _specimen_or_404(detail_uuid):
     specimen = (
         Specimen.objects.select_related("taxon", "storage_location", "created_by")
-        .filter(detail_uuid=detail_uuid)
+        .filter(detail_uuid=detail_uuid, invalidated_at__isnull=True)
         .first()
     )
     if specimen is None:
@@ -64,7 +65,9 @@ def specimen_list(request):
         raise Http404
     query = request.GET.get("q", "").strip()
     status = request.GET.get("status", "")
-    specimens = Specimen.objects.select_related("taxon", "storage_location")
+    specimens = Specimen.objects.filter(invalidated_at__isnull=True).select_related(
+        "taxon", "storage_location"
+    )
     if query:
         specimens = specimens.filter(
             Q(specimen_code__icontains=query)
@@ -203,7 +206,14 @@ def specimen_edit(request, detail_uuid):
     specimen = _specimen_or_404(detail_uuid)
     form = SpecimenEditForm(request.POST or None, instance=specimen)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        with transaction.atomic():
+            current = Specimen.objects.select_for_update().filter(pk=specimen.pk).first()
+            if current is None or current.invalidated_at is not None:
+                raise Http404
+            for field, value in form.cleaned_data.items():
+                setattr(current, field, value)
+            current.full_clean()
+            current.save()
         return redirect("specimens:detail", detail_uuid=specimen.detail_uuid)
     return render(request, "specimens/edit.html", {"form": form, "specimen": specimen})
 
@@ -257,7 +267,9 @@ def qr_resolve(request, token):
     label = QRLabel.objects.select_related("specimen").filter(token=token).first()
     if label is None:
         raise Http404
-    if label.status == QRLabel.Status.RETIRED:
+    if label.status == QRLabel.Status.RETIRED or (
+        label.specimen and label.specimen.invalidated_at is not None
+    ):
         return render(request, "specimens/qr_unavailable.html", status=410)
     if label.status == QRLabel.Status.UNUSED:
         if not can_edit_specimens(request.user):
@@ -374,7 +386,11 @@ def temporary_photo(request, token, index):
 def photo(request, detail_uuid, photo_id):
     if not can_view_specimens(request.user):
         raise Http404
-    item = SpecimenPhoto.objects.filter(pk=photo_id, specimen__detail_uuid=detail_uuid).first()
+    item = SpecimenPhoto.objects.filter(
+        pk=photo_id,
+        specimen__detail_uuid=detail_uuid,
+        specimen__invalidated_at__isnull=True,
+    ).first()
     if item is None:
         raise Http404
     from django.core.files.storage import default_storage

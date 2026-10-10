@@ -1,10 +1,18 @@
 # Project Status
 
-最終更新: 2026-10-09
+最終更新: 2026-10-11
 
 ## Current Task
 
 Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、Step 7C-DOC-R、Step 7C-LICENSE、Phase 10A（バックアップ・復元の先行部分）、Phase 4、Phase 5、Phase 6、Phase 7、Phase 8を完了。Phase 8はローカル実装・検証、GitHub Actions、VM200本番Compose反映、iPhoneでのホーム画面追加・閲覧・PWA内カメラQR読取を確認した。Android実機受入は運用者の決定でMVP完成後へ移し、未確認である。追加のカメラ切替機能はVM200へ反映し、iPhoneでの動作確認を完了した。写真選択欄はiPhoneで保存済み写真を選べるようになり、選択したスクリーンショットからQRを検出した。これは別の場所で作ったテストQRのため本番サイトのQR形式として拒否された。実際に本番サイトで発行したQR写真の読取は未確認。本番画面で製品名を固定表示しない修正はGitHub ActionsとVM200本番Compose反映まで完了した。Phase 9のQRラベル一括発行・PDF取得はローカル・CI・VM200本番Compose反映まで完了したが、Phase 9全体は未完了。導入先では署名付き暗号化バックアップの別ホスト保存とVM201への独立した空環境復元、実ドメインの公開、管理者のパスキー直接ログインを確認した。VM201では復元データを用いたDjangoビューのパスワードログイン・TOTP・管理画面・ログアウト後拒否と、再起動後のDB・写真用ボリューム永続化を確認した。別ホストの保存物3ファイルをVM201へストリームし、復元に使用した搬入物とのバイト一致も確認した。ただし復元処理への元の搬入経路はVM200である。VM201の実ブラウザ／HTTPS経路での認証は、運用者判断により今回省略した。7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+
+## 2026-10-11 Phase 9 標本無効化・完全削除
+
+`PROJECT_SPEC.md`、`PLAN.md`、`STATUS.md`と現行の標本・QR・履歴・写真・監査コードを確認した。QR・履歴・写真のDB参照はいずれも`PROTECT`で、通常の履歴削除は禁止され、写真の実体はDB外にある。`docs/specimen_invalidation_deletion_proposal.md`に推奨案と代替案・移行・テストを記し、設計責任者が「無効化は閲覧を止めてデータ保持、完全削除は履歴・写真も削除しQR識別子と採番履歴を保持」を承認した。採用要件を`PROJECT_SPEC.md`の6.5節に記録した。
+
+`specimens/models.py`と新マイグレーションで標本の無効化日時・実行者、写真削除待ちを追加した。`specimens/services.py`で標本とQRの原子的な無効化、無効化済み標本の完全削除、コミット後の写真削除と失敗時の再試行を実装した。`retry_photo_deletions`管理コマンドを追加した。`specimens/views.py`で通常の検索・詳細・写真・編集・QR解決から無効化済み標本を除き、`management_portal/views.py`・URL・テンプレートでは管理者の確認操作と一覧・CSVの区別を追加した。`audit/models.py`と新マイグレーションに両操作の監査種別を追加した。`management_portal/tests/test_specimen_retirement.py`でMFAゲート、確認、公開経路の遮断、QR保持、写真削除再試行、監査失敗時のロールバックを検証した。
+
+ローカルSQLiteの全398テストは成功（PostgreSQL専用4件skip）。`makemigrations --check --dry-run`は差分なし、Django checkと`git diff --check`は成功。最初の全テストはWindows制限環境で停止したため中断し、通常権限で再実行して成功した。PostgreSQLでの制約・トランザクション、CI、本番反映、実画面の受入はこの記録時点で未実施。完全削除後も既存バックアップには保持期間中のデータが残る。Phase 9、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
 ## 2026-10-09 監査ログ画面の検索と標本登録の分類UI整理
 

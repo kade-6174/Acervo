@@ -14,6 +14,8 @@ class AuditLog(models.Model):
         USER_CREATED = "user_created", "利用者作成"
         USER_PASSWORD_REISSUED = "user_password_reissued", "利用者一時パスワード再発行"
         SPECIMEN_CSV_EXPORTED = "specimen_csv_exported", "標本CSV出力"
+        SPECIMEN_INVALIDATED = "specimen_invalidated", "標本無効化"
+        SPECIMEN_DELETED = "specimen_deleted", "標本完全削除"
         QR_BATCH_CREATED = "qr_batch_created", "QRラベル一括発行"
         QR_BATCH_PDF_EXPORTED = "qr_batch_pdf_exported", "QRラベルPDF出力"
         QR_LABEL_RETIRED = "qr_label_retired", "QRラベル無効化"

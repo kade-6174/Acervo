@@ -21,6 +21,16 @@ urlpatterns = [
     ),
     path("site-settings/", views.site_settings, name="site_settings"),
     path("specimens/", views.specimen_management_list, name="specimen_management_list"),
+    path(
+        "specimens/<uuid:detail_uuid>/invalidate/",
+        views.specimen_invalidate,
+        name="specimen_invalidate",
+    ),
+    path(
+        "specimens/<uuid:detail_uuid>/delete/",
+        views.specimen_delete,
+        name="specimen_delete",
+    ),
     path("qr-batches/", views.qr_batch_list, name="qr_batch_list"),
     path("qr-batches/<int:batch_id>/labels.pdf", views.qr_batch_pdf, name="qr_batch_pdf"),
     path("qr-batches/<int:batch_id>/labels/", views.qr_batch_labels, name="qr_batch_labels"),

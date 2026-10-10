@@ -35,8 +35,11 @@ from audit.models import AuditLog
 from specimens.models import QRBatch, QRLabel, Specimen, StorageLocation
 from specimens.services import (
     SpecimenServiceError,
+    SpecimenServiceErrorCode,
     build_qr_labels_pdf,
     create_qr_batch,
+    delete_invalidated_specimen,
+    invalidate_specimen,
     retire_qr_label,
 )
 
@@ -148,6 +151,18 @@ class QRLabelRetirementConfirmationForm(forms.Form):
         self.fields["confirmed"].widget.attrs["class"] = "form-check-input"
         self.fields["label_id"].widget.attrs.update(
             {"class": "form-control", "autocomplete": "off", "inputmode": "numeric"}
+        )
+
+
+class SpecimenDestructiveActionForm(forms.Form):
+    confirmed = forms.BooleanField(label="内容を確認した", required=True)
+    specimen_code = forms.CharField(label="対象の標本番号", max_length=96)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["confirmed"].widget.attrs["class"] = "form-check-input"
+        self.fields["specimen_code"].widget.attrs.update(
+            {"class": "form-control", "autocomplete": "off"}
         )
 
 
@@ -568,7 +583,12 @@ def specimen_management_list(request):
     """管理者向けに標本の状態と詳細への導線を表示する。"""
     query = request.GET.get("q", "").strip()[:255]
     status = request.GET.get("status", "")
+    validity = request.GET.get("validity", "")
     specimens = Specimen.objects.select_related("taxon", "storage_location")
+    if validity == "active":
+        specimens = specimens.filter(invalidated_at__isnull=True)
+    elif validity == "invalidated":
+        specimens = specimens.filter(invalidated_at__isnull=False)
     if query:
         specimens = specimens.filter(
             Q(specimen_code__icontains=query)
@@ -586,7 +606,95 @@ def specimen_management_list(request):
             "page": page,
             "query": query,
             "status": status,
+            "validity": validity,
             "status_choices": Specimen.Status.choices,
+        },
+    )
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def specimen_invalidate(request, detail_uuid):
+    specimen = get_object_or_404(Specimen, detail_uuid=detail_uuid)
+    if specimen.invalidated_at is not None:
+        raise Http404
+    if request.method == "POST":
+        url = reverse("management:specimen_invalidate", args=[detail_uuid])
+        if not _has_recent_primary_mfa_reauthentication(request):
+            return _mfa_reauthentication_redirect(request, url)
+        form = SpecimenDestructiveActionForm(request.POST)
+        if form.is_valid():
+            if form.cleaned_data["specimen_code"] != specimen.specimen_code:
+                form.add_error("specimen_code", "表示されている標本番号を入力してください。")
+            else:
+                try:
+                    with transaction.atomic():
+                        invalidate_specimen(specimen_id=specimen.pk, actor=request.user)
+                        AuditLog.objects.create(
+                            action=AuditLog.Action.SPECIMEN_INVALIDATED,
+                            channel=AuditLog.Channel.MANAGEMENT_UI,
+                            actor=request.user,
+                            actor_username=request.user.username,
+                            target_username=f"標本 {specimen.specimen_code}",
+                        )
+                except SpecimenServiceError:
+                    form.add_error(None, "標本は既に無効化または削除されています。")
+                else:
+                    messages.success(request, f"標本 {specimen.specimen_code} を無効化しました。")
+                    return redirect("management:specimen_management_list")
+    else:
+        form = SpecimenDestructiveActionForm()
+    return render(
+        request,
+        "management_portal/specimen_destructive_action.html",
+        {"specimen": specimen, "form": form, "action": "invalidate"},
+    )
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def specimen_delete(request, detail_uuid):
+    specimen = get_object_or_404(Specimen, detail_uuid=detail_uuid)
+    if specimen.invalidated_at is None:
+        raise Http404
+    if request.method == "POST":
+        url = reverse("management:specimen_delete", args=[detail_uuid])
+        if not _has_recent_primary_mfa_reauthentication(request):
+            return _mfa_reauthentication_redirect(request, url)
+        form = SpecimenDestructiveActionForm(request.POST)
+        if form.is_valid():
+            if form.cleaned_data["specimen_code"] != specimen.specimen_code:
+                form.add_error("specimen_code", "表示されている標本番号を入力してください。")
+            else:
+                try:
+                    with transaction.atomic():
+                        delete_invalidated_specimen(specimen_id=specimen.pk)
+                        AuditLog.objects.create(
+                            action=AuditLog.Action.SPECIMEN_DELETED,
+                            channel=AuditLog.Channel.MANAGEMENT_UI,
+                            actor=request.user,
+                            actor_username=request.user.username,
+                            target_username=f"標本 {specimen.specimen_code}",
+                        )
+                except SpecimenServiceError as error:
+                    if error.code == SpecimenServiceErrorCode.SPECIMEN_NOT_INVALIDATED:
+                        form.add_error(None, "標本を先に無効化してください。")
+                    else:
+                        form.add_error(None, "標本は既に削除されています。")
+                else:
+                    messages.success(request, f"標本 {specimen.specimen_code} を完全削除しました。")
+                    return redirect("management:specimen_management_list")
+    else:
+        form = SpecimenDestructiveActionForm()
+    return render(
+        request,
+        "management_portal/specimen_destructive_action.html",
+        {
+            "specimen": specimen,
+            "form": form,
+            "action": "delete",
+            "event_count": specimen.events.count(),
+            "photo_count": specimen.photos.count(),
         },
     )
 
@@ -707,8 +815,10 @@ def specimen_csv_export(request):
             "登録日",
         ]
     )
-    specimens = Specimen.objects.select_related("taxon", "storage_location").order_by(
-        "specimen_code"
+    specimens = (
+        Specimen.objects.filter(invalidated_at__isnull=True)
+        .select_related("taxon", "storage_location")
+        .order_by("specimen_code")
     )
     for specimen in specimens:
         writer.writerow([_csv_cell(value) for value in _specimen_csv_row(specimen)])

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{% if action == "delete" %}標本の完全削除{% else %}標本の無効化{% endif %} — {{ acervo_site_name }}{% endblock %}
+{% block content %}
+<section class="container py-5" style="max-width: 42rem;">
+  <h1 class="h2 mb-3">{% if action == "delete" %}標本の完全削除{% else %}標本の無効化{% endif %}</h1>
+  {% if action == "delete" %}
+  <div class="alert alert-danger" role="alert">標本 {{ specimen.specimen_code }} と履歴 {{ event_count }} 件、写真 {{ photo_count }} 件を完全削除します。操作は取り消せません。写真ファイルの削除に失敗した場合は管理者が再試行します。QRは無効のまま残り、標本番号は再利用しません。</div>
+  {% else %}
+  <div class="alert alert-warning" role="alert">標本 {{ specimen.specimen_code }} を無効化します。通常の検索・詳細・写真・CSVでは閲覧できなくなり、割当QRも無効になります。標本と履歴・写真は保持されます。この画面から元に戻せません。</div>
+  {% endif %}
+  <form method="post" novalidate>{% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="mb-3"><label class="form-label" for="{{ form.specimen_code.id_for_label }}">{{ form.specimen_code.label }}を入力</label>{{ form.specimen_code }}{{ form.specimen_code.errors }}</div>
+    <div class="form-check">{{ form.confirmed }}<label class="form-check-label" for="{{ form.confirmed.id_for_label }}">{{ form.confirmed.label }}</label>{{ form.confirmed.errors }}</div>
+    <button class="btn btn-danger mt-3" type="submit">{% if action == "delete" %}完全削除する{% else %}無効化する{% endif %}</button>
+    <a class="btn btn-outline-secondary mt-3" href="{% url 'management:specimen_management_list' %}">キャンセル</a>
+  </form>
+</section>
+{% endblock %}
