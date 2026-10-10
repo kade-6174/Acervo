@@ -12,7 +12,9 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 `specimens/models.py`と新マイグレーションで標本の無効化日時・実行者、写真削除待ちを追加した。`specimens/services.py`で標本とQRの原子的な無効化、無効化済み標本の完全削除、コミット後の写真削除と失敗時の再試行を実装した。`retry_photo_deletions`管理コマンドを追加した。`specimens/views.py`で通常の検索・詳細・写真・編集・QR解決から無効化済み標本を除き、`management_portal/views.py`・URL・テンプレートでは管理者の確認操作と一覧・CSVの区別を追加した。`audit/models.py`と新マイグレーションに両操作の監査種別を追加した。`management_portal/tests/test_specimen_retirement.py`でMFAゲート、確認、公開経路の遮断、QR保持、写真削除再試行、監査失敗時のロールバックを検証した。
 
-ローカルSQLiteの全398テストは成功（PostgreSQL専用4件skip）。`makemigrations --check --dry-run`は差分なし、Django checkと`git diff --check`は成功。最初の全テストはWindows制限環境で停止したため中断し、通常権限で再実行して成功した。PostgreSQLでの制約・トランザクション、CI、本番反映、実画面の受入はこの記録時点で未実施。完全削除後も既存バックアップには保持期間中のデータが残る。Phase 9、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
+ローカルSQLiteの全398テストは成功（PostgreSQL専用4件skip）。Ruff lint・format、`makemigrations --check --dry-run`は差分なし、Django checkと`git diff --check`は成功。最初の全テストはWindows制限環境で停止したため中断し、通常権限で再実行して成功した。実装コミット`2b56dd9`をGitHubへpushし、GitHub Actions run `38065474872`ではPostgreSQL上の`test`と、直接HTTPS・Tunnel・暗号化バックアップからの空環境復元を含む`production-container`がともに成功した。
+
+本番VM200は更新前のGit作業ツリーが清潔でHEADが`bb73f15`。更新前の暗号化バックアップ`acervo-20261010T155841Z-5c0796adcd2f`は終了コード0で作成され、暗号化payload・metadata・checksumsの3ファイルの存在を確認した。保持規則により`acervo-20261010T090002Z-508a8b827100`が1世代削除された。`2b56dd9`へfast-forwardし、Cloudflare用Compose設定検証、`up -d --build --wait`を実行した。guest agentのPID `1014253`の終了コード0を確認し、webとdb・proxyはhealthy、tunnelは稼働中だった。コンテナ内`check --deploy`は問題0件、`migrate --check`は終了コード0。webのUIDは`10001`、VM200のGit作業ツリーは清潔でHEADは`2b56dd9`。実ブラウザでの管理者操作・通常画面の受入と、更新後のDB・写真ボリューム再起動永続化は未実施。完全削除後も既存バックアップには保持期間中のデータが残る。Phase 9、7C-LIVE-A、7C-LIVE-B、Phase 1全体は未完了。
 
 ## 2026-10-09 監査ログ画面の検索と標本登録の分類UI整理
 
