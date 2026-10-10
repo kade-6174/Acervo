@@ -1,0 +1,6 @@
+{% if pending_photo_deletion_count %}
+<div class="alert alert-warning" role="alert">
+  <h2 class="h5">写真ファイルの削除待ちがあります</h2>
+  <p class="mb-0">{{ pending_photo_deletion_count }} 件の写真ファイルが削除待ちです。標本の表示は停止しています。サーバー管理者へ削除の再試行を依頼してください。</p>
+</div>
+{% endif %}

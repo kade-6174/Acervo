@@ -8,6 +8,10 @@ Phase 1C Step 6、Step 7A-SPEC、Step 7A、Step 7A-R2、Step 7B、Step 7C-DOC、
 
 ## 2026-10-11 Phase 9 標本無効化・完全削除
 
+追加の確認で、既存標本のQR割当・無効化・完全削除の行ロックを標本→QRの順へ統一した。PostgreSQL用に二重無効化・二重削除・QR割当と無効化・履歴追加と無効化の並行操作4テストを追加した。完全削除後の写真処理はその操作で作成した削除待ちだけを対象とし、コミット後の障害は削除待ちを保持して再試行できる。管理トップ・標本管理一覧に削除待ち件数を表示し、保存パスを画面へ出さない。標本操作のMFA再認証手段が見つからない場合は標本管理へ戻す。CSRF拒否、無効標本の直接URL、削除待ち通知、再試行の成功・失敗・不正パス拒否、処理対象の限定、QR・番号の再利用拒否を追加検証した。運用手順を`docs/SPECIMEN_MANAGEMENT.md`へ追加した。
+
+追加変更後のローカル全409テストは成功（PostgreSQL専用8件skip）。対象28テスト、Ruff lint・format、migration差分なし、`git diff --check`も成功した。追加のPostgreSQL並行操作テストと本番反映はこの記録時点で未実施。これらの変更は後続の確認を終えてまとめて本番反映する。
+
 `PROJECT_SPEC.md`、`PLAN.md`、`STATUS.md`と現行の標本・QR・履歴・写真・監査コードを確認した。QR・履歴・写真のDB参照はいずれも`PROTECT`で、通常の履歴削除は禁止され、写真の実体はDB外にある。`docs/specimen_invalidation_deletion_proposal.md`に推奨案と代替案・移行・テストを記し、設計責任者が「無効化は閲覧を止めてデータ保持、完全削除は履歴・写真も削除しQR識別子と採番履歴を保持」を承認した。採用要件を`PROJECT_SPEC.md`の6.5節に記録した。
 
 `specimens/models.py`と新マイグレーションで標本の無効化日時・実行者、写真削除待ちを追加した。`specimens/services.py`で標本とQRの原子的な無効化、無効化済み標本の完全削除、コミット後の写真削除と失敗時の再試行を実装した。`retry_photo_deletions`管理コマンドを追加した。`specimens/views.py`で通常の検索・詳細・写真・編集・QR解決から無効化済み標本を除き、`management_portal/views.py`・URL・テンプレートでは管理者の確認操作と一覧・CSVの区別を追加した。`audit/models.py`と新マイグレーションに両操作の監査種別を追加した。`management_portal/tests/test_specimen_retirement.py`でMFAゲート、確認、公開経路の遮断、QR保持、写真削除再試行、監査失敗時のロールバックを検証した。

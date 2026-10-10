@@ -5,6 +5,7 @@
 {% block content %}
   <section class="container py-5"><div class="row justify-content-center"><div class="col-lg-10">
     <h1 class="h2 mb-3">標本管理</h1>
+    {% include "management_portal/pending_photo_deletions_notice.html" %}
     <p class="text-secondary">標本の状態を確認できます。無効化した標本は通常の検索や詳細表示から除かれます。完全削除は無効化後に行えます。</p>
     <form method="get" class="row g-2 mb-4">
       <div class="col-md-6"><label class="form-label" for="specimen-query">標本番号・分類名</label><input class="form-control" id="specimen-query" name="q" value="{{ query }}" maxlength="255"></div>

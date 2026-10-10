@@ -1,10 +1,13 @@
 """標本の無効化・完全削除と公開経路の遮断。"""
 
 import time
+from io import StringIO
 from unittest.mock import patch
 
 from allauth.account.authentication import AUTHENTICATION_METHODS_SESSION_KEY
 from allauth.mfa.models import Authenticator
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -21,6 +24,7 @@ from specimens.models import (
 )
 from specimens.services import (
     SpecimenServiceError,
+    assign_qr_label,
     create_specimen,
     delete_invalidated_specimen,
     invalidate_specimen,
@@ -58,9 +62,10 @@ class SpecimenRetirementTests(TestCase):
         )
         self.delete_url = reverse("management:specimen_delete", args=[self.specimen.detail_uuid])
 
-    def login_admin(self, *, recent=True):
-        self.client.force_login(self.admin)
-        session = self.client.session
+    def login_admin(self, *, recent=True, client=None):
+        client = client or self.client
+        client.force_login(self.admin)
+        session = client.session
         session[AUTHENTICATION_METHODS_SESSION_KEY] = [
             {
                 "method": "mfa",
@@ -211,3 +216,74 @@ class SpecimenRetirementTests(TestCase):
         self.assertEqual(self.client.post(self.invalidate_url, self.confirm()).status_code, 302)
         self.specimen.refresh_from_db()
         self.assertIsNone(self.specimen.invalidated_at)
+
+    def test_csrf_is_required_even_with_recent_admin_mfa(self):
+        client = Client(enforce_csrf_checks=True)
+        self.login_admin(client=client)
+        self.assertEqual(client.post(self.invalidate_url, self.confirm()).status_code, 403)
+        invalidate_specimen(specimen_id=self.specimen.pk, actor=self.admin)
+        self.assertEqual(client.post(self.delete_url, self.confirm()).status_code, 403)
+        self.assertTrue(Specimen.objects.filter(pk=self.specimen.pk).exists())
+
+    def test_invalidated_specimen_cannot_be_changed_or_printed_through_direct_urls(self):
+        invalidate_specimen(specimen_id=self.specimen.pk, actor=self.admin)
+        self.login_admin()
+        for name in ("edit", "event", "photo_add", "label_pdf", "qr_label_pdf"):
+            url = reverse(f"specimens:{name}", args=[self.specimen.detail_uuid])
+            self.assertEqual(self.client.get(url).status_code, 404, name)
+            self.assertEqual(self.client.post(url, {}).status_code, 404, name)
+
+    def test_pending_photo_notice_shows_count_without_storage_path(self):
+        path = "specimens/private-storage-path/photo.jpg"
+        PendingPhotoDeletion.objects.create(file_path=path)
+        self.login_admin()
+        for name in ("index", "specimen_management_list"):
+            response = self.client.get(reverse(f"management:{name}"))
+            self.assertContains(response, "写真ファイルの削除待ちがあります")
+            self.assertNotContains(response, path)
+
+    def test_retry_command_preserves_failed_jobs_and_reports_failure(self):
+        PendingPhotoDeletion.objects.create(file_path="specimens/example/photo.jpg")
+        output = StringIO()
+        with patch("specimens.services.default_storage.delete", side_effect=OSError("failed")):
+            with self.assertLogs("specimens.services", level="WARNING"):
+                with self.assertRaises(CommandError):
+                    call_command("retry_photo_deletions", stdout=output)
+        self.assertEqual(PendingPhotoDeletion.objects.count(), 1)
+        with patch("specimens.services.default_storage.delete"):
+            call_command("retry_photo_deletions", stdout=StringIO())
+        self.assertFalse(PendingPhotoDeletion.objects.exists())
+
+    def test_retry_rejects_paths_outside_photo_namespace(self):
+        for path in ("../secret", "specimens/../secret", "specimens/a/..\\secret"):
+            PendingPhotoDeletion.objects.create(file_path=path)
+        with patch("specimens.services.default_storage.delete") as remove_file:
+            with self.assertLogs("specimens.services", level="ERROR"):
+                self.assertEqual(retry_pending_photo_deletions(), (0, 3))
+        remove_file.assert_not_called()
+        self.assertEqual(PendingPhotoDeletion.objects.count(), 3)
+
+    def test_deletion_callback_processes_only_its_own_photos(self):
+        unrelated = PendingPhotoDeletion.objects.create(file_path="specimens/another/photo.jpg")
+        invalidate_specimen(specimen_id=self.specimen.pk, actor=self.admin)
+        path = f"specimens/{self.specimen.detail_uuid}/photo.jpg"
+        SpecimenPhoto.objects.create(
+            specimen=self.specimen, file_path=path, content_type="image/jpeg", width=1, height=1
+        )
+        with patch("specimens.services.default_storage.delete") as remove_file:
+            with self.captureOnCommitCallbacks(execute=True):
+                delete_invalidated_specimen(specimen_id=self.specimen.pk)
+        remove_file.assert_called_once_with(path)
+        self.assertTrue(PendingPhotoDeletion.objects.filter(pk=unrelated.pk).exists())
+
+    def test_deleted_qr_cannot_be_reassigned_and_new_number_is_not_reused(self):
+        invalidate_specimen(specimen_id=self.specimen.pk, actor=self.admin)
+        delete_invalidated_specimen(specimen_id=self.specimen.pk)
+        new_specimen = create_specimen(
+            created_by=self.admin,
+            identification_text="次の標本",
+            acquisition_method=Specimen.AcquisitionMethod.OTHER,
+        )
+        self.assertNotEqual(new_specimen.specimen_code, self.specimen.specimen_code)
+        with self.assertRaisesRegex(SpecimenServiceError, "qr_label_not_unused"):
+            assign_qr_label(token=self.label.token, specimen_id=new_specimen.pk)

@@ -9,6 +9,7 @@
         <p class="text-uppercase text-secondary fw-semibold mb-2">Management</p>
         <h1 class="h2 mb-3">管理</h1>
         <p class="mb-4">ログイン中: <strong>{{ user.username }}</strong></p>
+        {% include "management_portal/pending_photo_deletions_notice.html" %}
         {% if administrator_warnings.no_current_enrolled_admin %}
           <div class="alert alert-danger" role="alert">
             <h2 class="h5">現役管理者がいません</h2>

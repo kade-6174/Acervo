@@ -5,6 +5,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import partial
 from io import BytesIO
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -295,16 +296,17 @@ def create_qr_batch(*, requested_count: int, created_by, note: str = "") -> QRBa
 def assign_qr_label(*, token, specimen_id: int) -> QRLabelAssignmentResult:
     """未使用QRと標本を同時にロックし、二重割当を防ぐ。"""
 
-    label = QRLabel.objects.select_for_update().filter(token=token).first()
-    if label is None:
-        raise SpecimenServiceError(SpecimenServiceErrorCode.QR_LABEL_NOT_FOUND)
-    if label.status != QRLabel.Status.UNUSED or label.specimen_id is not None:
-        raise SpecimenServiceError(SpecimenServiceErrorCode.QR_LABEL_NOT_UNUSED)
+    # 既存標本の操作では標本→QRの順にそろえ、無効化とのデッドロックを避ける。
     specimen = Specimen.objects.select_for_update().filter(pk=specimen_id).first()
     if specimen is None:
         raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_NOT_FOUND)
     if specimen.invalidated_at is not None:
         raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_INVALIDATED)
+    label = QRLabel.objects.select_for_update().filter(token=token).first()
+    if label is None:
+        raise SpecimenServiceError(SpecimenServiceErrorCode.QR_LABEL_NOT_FOUND)
+    if label.status != QRLabel.Status.UNUSED or label.specimen_id is not None:
+        raise SpecimenServiceError(SpecimenServiceErrorCode.QR_LABEL_NOT_UNUSED)
     if QRLabel.objects.select_for_update().filter(specimen=specimen).exists():
         raise SpecimenServiceError(SpecimenServiceErrorCode.SPECIMEN_ALREADY_HAS_QR_LABEL)
     label.specimen = specimen
@@ -389,14 +391,21 @@ def invalidate_specimen(*, specimen_id: int, actor) -> Specimen:
     return specimen
 
 
-def retry_pending_photo_deletions() -> tuple[int, int]:
+def retry_pending_photo_deletions(*, pending_ids=None) -> tuple[int, int]:
     """保留中の写真ファイル削除を再試行する。失敗した行は残す。"""
 
     removed = 0
     failed = 0
-    for pending in PendingPhotoDeletion.objects.order_by("pk").iterator():
+    pending_rows = PendingPhotoDeletion.objects.order_by("pk")
+    if pending_ids is not None:
+        pending_rows = pending_rows.filter(pk__in=pending_ids)
+    for pending in pending_rows.iterator():
         path = pending.file_path
-        if not path.startswith("specimens/") or ".." in path.split("/"):
+        if (
+            not path.startswith("specimens/")
+            or "\\" in path
+            or any(part in {"", ".", ".."} for part in path.split("/"))
+        ):
             failed += 1
             logger.error("標本写真の削除待ちに不正な相対パスがあります。")
             continue
@@ -432,7 +441,7 @@ def delete_invalidated_specimen(*, specimen_id: int) -> str:
         .filter(specimen=specimen)
         .values_list("file_path", flat=True)
     )
-    PendingPhotoDeletion.objects.bulk_create(
+    pending_rows = PendingPhotoDeletion.objects.bulk_create(
         [PendingPhotoDeletion(file_path=path) for path in paths]
     )
     SpecimenPhoto.objects.filter(specimen=specimen).delete()
@@ -440,7 +449,11 @@ def delete_invalidated_specimen(*, specimen_id: int) -> str:
     SpecimenEvent.objects.filter(specimen=specimen).delete()
     specimen.delete()
     if paths:
-        transaction.on_commit(retry_pending_photo_deletions)
+        # 今回の写真だけを処理する。コミット後の障害で削除済み操作を500にしない。
+        transaction.on_commit(
+            partial(retry_pending_photo_deletions, pending_ids=[row.pk for row in pending_rows]),
+            robust=True,
+        )
     return code
 
 

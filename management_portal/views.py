@@ -32,7 +32,7 @@ from accounts.user_administration import (
     update_user_administration_by_admin,
 )
 from audit.models import AuditLog
-from specimens.models import QRBatch, QRLabel, Specimen, StorageLocation
+from specimens.models import PendingPhotoDeletion, QRBatch, QRLabel, Specimen, StorageLocation
 from specimens.services import (
     SpecimenServiceError,
     SpecimenServiceErrorCode,
@@ -234,7 +234,13 @@ def _has_recent_primary_mfa_reauthentication(request) -> bool:
     )
 
 
-def _mfa_reauthentication_redirect(request, confirmation_url: str):
+def _mfa_reauthentication_redirect(
+    request,
+    confirmation_url: str,
+    *,
+    fallback_url="management:mfa_reset_search",
+    error_message="MFA再認証方法を確認できないため、リセットを実行できません。",
+):
     """許可済みのMFA方式だけへ、固定した内部確認URLをnextとして渡す。"""
     methods = get_adapter(request).get_reauthentication_methods(request.user)
     method = next(
@@ -246,8 +252,8 @@ def _mfa_reauthentication_redirect(request, confirmation_url: str):
         None,
     )
     if method is None:
-        messages.error(request, "MFA再認証方法を確認できないため、リセットを実行できません。")
-        return redirect("management:mfa_reset_search")
+        messages.error(request, error_message)
+        return redirect(fallback_url)
     return HttpResponseRedirect(f"{method['url']}?{urlencode({'next': confirmation_url})}")
 
 
@@ -315,7 +321,10 @@ def index(request):
     return render(
         request,
         "management_portal/index.html",
-        {"administrator_warnings": get_administrator_warnings(on_date=timezone.localdate())},
+        {
+            "administrator_warnings": get_administrator_warnings(on_date=timezone.localdate()),
+            "pending_photo_deletion_count": PendingPhotoDeletion.objects.count(),
+        },
     )
 
 
@@ -608,6 +617,7 @@ def specimen_management_list(request):
             "status": status,
             "validity": validity,
             "status_choices": Specimen.Status.choices,
+            "pending_photo_deletion_count": PendingPhotoDeletion.objects.count(),
         },
     )
 
@@ -621,7 +631,12 @@ def specimen_invalidate(request, detail_uuid):
     if request.method == "POST":
         url = reverse("management:specimen_invalidate", args=[detail_uuid])
         if not _has_recent_primary_mfa_reauthentication(request):
-            return _mfa_reauthentication_redirect(request, url)
+            return _mfa_reauthentication_redirect(
+                request,
+                url,
+                fallback_url="management:specimen_management_list",
+                error_message="MFA再認証方法を確認できないため、標本の操作を実行できません。",
+            )
         form = SpecimenDestructiveActionForm(request.POST)
         if form.is_valid():
             if form.cleaned_data["specimen_code"] != specimen.specimen_code:
@@ -660,7 +675,12 @@ def specimen_delete(request, detail_uuid):
     if request.method == "POST":
         url = reverse("management:specimen_delete", args=[detail_uuid])
         if not _has_recent_primary_mfa_reauthentication(request):
-            return _mfa_reauthentication_redirect(request, url)
+            return _mfa_reauthentication_redirect(
+                request,
+                url,
+                fallback_url="management:specimen_management_list",
+                error_message="MFA再認証方法を確認できないため、標本の操作を実行できません。",
+            )
         form = SpecimenDestructiveActionForm(request.POST)
         if form.is_valid():
             if form.cleaned_data["specimen_code"] != specimen.specimen_code:
@@ -683,6 +703,11 @@ def specimen_delete(request, detail_uuid):
                         form.add_error(None, "標本は既に削除されています。")
                 else:
                     messages.success(request, f"標本 {specimen.specimen_code} を完全削除しました。")
+                    if PendingPhotoDeletion.objects.exists():
+                        messages.warning(
+                            request,
+                            "写真ファイルの削除待ちがあります。サーバー管理者へ再試行を依頼してください。",
+                        )
                     return redirect("management:specimen_management_list")
     else:
         form = SpecimenDestructiveActionForm()
